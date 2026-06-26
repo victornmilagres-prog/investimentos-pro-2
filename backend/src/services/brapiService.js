@@ -1,0 +1,303 @@
+const axios = require('axios');
+
+const BRAPI_BASE = process.env.BRAPI_BASE_URL || 'https://brapi.dev/api';
+const TOKEN = process.env.BRAPI_TOKEN;
+const MODULES = 'summaryProfile,defaultKeyStatistics,financialData,balanceSheetHistory,incomeStatementHistory';
+
+function numero(value) {
+  if (value === null || value === undefined || value === '') return 0;
+  if (typeof value === 'number') return isNaN(value) ? 0 : value;
+  let s = String(value).replace('R$', '').replace('%', '').replace(/\s/g, '');
+  if (s.includes(',') && s.includes('.')) s = s.replace(/\./g, '').replace(',', '.');
+  else if (s.includes(',')) s = s.replace(',', '.');
+  const n = Number(s);
+  return isNaN(n) ? 0 : n;
+}
+
+function percentual(value) {
+  const n = numero(value);
+  if (n === 0) return 0;
+  return Math.abs(n) <= 1 ? n * 100 : n;
+}
+
+function primeiroNumero(values) {
+  for (const v of values) {
+    const n = numero(v);
+    if (n !== 0) return n;
+  }
+  return 0;
+}
+
+function buscar(obj, chaves) {
+  if (!obj || typeof obj !== 'object') return 0;
+  for (const chave of chaves) {
+    for (const key of Object.keys(obj)) {
+      if (key.toLowerCase() === chave.toLowerCase()) {
+        const n = numero(obj[key]);
+        if (n !== 0) return n;
+      }
+    }
+  }
+  for (const key of Object.keys(obj)) {
+    if (obj[key] && typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
+      const resultado = buscar(obj[key], chaves);
+      if (resultado !== 0) return resultado;
+    }
+  }
+  return 0;
+}
+
+function calcularPrecoGraham(preco, pl, pvp) {
+  if (!(preco > 0 && pl > 0 && pvp > 0)) return 0;
+  const lpa = preco / pl;
+  const vpa = preco / pvp;
+  if (!(lpa > 0 && vpa > 0)) return 0;
+  return Math.sqrt(22.5 * lpa * vpa);
+}
+
+function classificarGraham(precoAtual, precoGraham) {
+  if (!(precoGraham > 0)) return 'SEM DADO';
+  const margem = ((precoGraham - precoAtual) / precoGraham) * 100;
+  if (margem >= 20) return 'DESCONTADO';
+  if (margem >= 0) return 'JUSTO';
+  return 'CARO';
+}
+
+function scoreAcao(pl, pvp, margem, roe, divida, dy, ticker) {
+  const bancos = ['BBAS3','ITUB4','ITSA4','BBDC4','SANB11','BPAC11','ITUB3','BBDC3'];
+  let score = 0;
+  if (pl > 0 && pl < 15) score++;
+  if (pvp > 0 && pvp < 1.5) score++;
+  if (margem > 10) score++;
+  if (roe > 10) score++;
+  if (bancos.includes(ticker) || (divida > 0 && divida < 2)) score++;
+  if (dy > 6) score++;
+  return score;
+}
+
+function classificarAcao(score) {
+  if (score >= 5) return 'EXCELENTE';
+  if (score === 4) return 'BOM';
+  if (score === 3) return 'ATENÇÃO';
+  return 'RISCO';
+}
+
+function decisaoAcao(score) {
+  if (score >= 5) return 'COMPRAR/ACUMULAR';
+  if (score === 4) return 'MANTER';
+  if (score === 3) return 'ACOMPANHAR';
+  return 'EVITAR/REVER';
+}
+
+function observacaoAcao(pl, pvp, margem, roe, divida, dy) {
+  const obs = [];
+  if (!(pl > 0 && pl < 15)) obs.push('P/L fora ideal');
+  if (!(pvp > 0 && pvp < 1.5)) obs.push('P/VP fora ideal');
+  if (!(margem > 10)) obs.push('Margem baixa');
+  if (!(roe > 10)) obs.push('ROE baixo');
+  if (!(divida > 0 && divida < 2)) obs.push('Dívida alta');
+  if (!(dy > 6)) obs.push('DY baixo');
+  return obs.length ? obs.join('; ') : 'Todos os critérios aprovados';
+}
+
+function scoreFII(dyMensal, pvp, volume, patrimonio) {
+  let score = 0;
+  if (dyMensal > 1) score++;
+  if (pvp > 0 && pvp < 1.05) score++;
+  if (volume > 1000000) score++;
+  if (patrimonio > 1000000000) score++;
+  return score;
+}
+
+function classificarFII(score) {
+  if (score >= 4) return 'EXCELENTE';
+  if (score === 3) return 'BOM';
+  if (score === 2) return 'ATENÇÃO';
+  return 'RISCO';
+}
+
+function decisaoFII(score) {
+  if (score >= 4) return 'COMPRAR/ACUMULAR';
+  if (score === 3) return 'MANTER';
+  if (score === 2) return 'ACOMPANHAR';
+  return 'EVITAR/REVER';
+}
+
+function observacaoFII(dyMensal, pvp, volume, patrimonio) {
+  const obs = [];
+  if (!(dyMensal > 1)) obs.push('DY abaixo');
+  if (!(pvp > 0 && pvp < 1.05)) obs.push('P/VP fora ideal');
+  if (!(volume > 1000000)) obs.push('Liquidez baixa');
+  if (!(patrimonio > 1000000000)) obs.push('Patrimônio baixo');
+  return obs.length ? obs.join('; ') : 'Todos os critérios aprovados';
+}
+
+async function buscarAcao(ticker, dividaManual = null) {
+  ticker = ticker.trim().toUpperCase();
+  const url = `${BRAPI_BASE}/quote/${ticker}?fundamental=true&dividends=true&modules=${encodeURIComponent(MODULES)}&token=${TOKEN}`;
+  const response = await axios.get(url, { timeout: 15000 });
+  const data = response.data;
+
+  if (!data.results || !data.results.length) {
+    throw new Error(`Ação ${ticker} não encontrada na Brapi.`);
+  }
+
+  const item = data.results[0];
+  const preco = primeiroNumero([item.regularMarketPrice, item.currentPrice]);
+
+  const pl = primeiroNumero([
+    item.priceEarnings, item.trailingPE,
+    buscar(item, ['priceEarnings','trailingPE','preco/lucro']),
+    item['preço/lucro'],
+    (item['lucro por ação'] && preco) ? preco / numero(item['lucro por ação']) : 0
+  ]);
+
+  const pvp = primeiroNumero([
+    item.priceToBook,
+    buscar(item, ['priceToBook','pvp','p/vp']),
+    (item.bookValue && preco) ? preco / numero(item.bookValue) : 0
+  ]);
+
+  const margem = percentual(primeiroNumero([
+    item.profitMargins,
+    buscar(item, ['profitMargins','grossMargins','operatingMargins','margemLiquida'])
+  ]));
+
+  const roe = percentual(primeiroNumero([
+    item.returnOnEquity,
+    buscar(item, ['returnOnEquity','retorno sobre patrimônio líquido','retorno sobre patrimonio liquido','roe'])
+  ]));
+
+  const dy = percentual(primeiroNumero([
+    item.dividendYield, item.trailingAnnualDividendYield,
+    buscar(item, ['dividendYield','dy'])
+  ]));
+
+  const totalDebt = buscar(item, ['totalDebt','dívida total','total debt','totaldebt']);
+  const ebitda = buscar(item, ['ebitda','EBITDA']);
+  const dividaCalculada = (totalDebt > 0 && ebitda > 0) ? totalDebt / ebitda : 0;
+  const divida = (dividaManual !== null && dividaManual !== '') ? Number(dividaManual) : dividaCalculada;
+
+  const precoGraham = calcularPrecoGraham(preco, pl, pvp);
+  const statusGraham = classificarGraham(preco, precoGraham);
+  const score = scoreAcao(pl, pvp, margem, roe, divida, dy, ticker);
+
+  console.log(`[${ticker}] pl=${pl} pvp=${pvp} margem=${margem} roe=${roe} dy=${dy} divida=${divida} score=${score}`);
+
+  return {
+    ticker, preco,
+    precoGraham: parseFloat(precoGraham.toFixed(2)),
+    statusGraham,
+    pl: parseFloat(pl.toFixed(4)),
+    pvp: parseFloat(pvp.toFixed(4)),
+    margemLiquida: parseFloat(margem.toFixed(4)),
+    roe: parseFloat(roe.toFixed(4)),
+    dividaEbit: divida,
+    dy: parseFloat(dy.toFixed(4)),
+    score: `${score}/6`,
+    scoreNum: score,
+    classificacao: classificarAcao(score),
+    decisao: decisaoAcao(score),
+    observacoes: observacaoAcao(pl, pvp, margem, roe, divida, dy),
+    ultimaAtualizacao: new Date(),
+    fonte: 'brapi.dev Pro'
+  };
+}
+
+async function buscarFII(ticker, ajustes = {}) {
+  ticker = ticker.trim().toUpperCase();
+
+  const urlQuote = `${BRAPI_BASE}/quote/${ticker}?fundamental=true&dividends=true&modules=${encodeURIComponent(MODULES)}&token=${TOKEN}`;
+  const resQuote = await axios.get(urlQuote, { timeout: 15000 });
+  const quote = resQuote.data?.results?.[0] || {};
+
+  let fiiBrapi = {};
+  try {
+    const urlInd = `${BRAPI_BASE}/v2/fii/indicators?symbols=${ticker}&token=${TOKEN}`;
+    const resInd = await axios.get(urlInd, { timeout: 15000 });
+    fiiBrapi = resInd.data?.fiis?.[0] || {};
+    console.log(`[FII ${ticker}] indicators: equity=${fiiBrapi.equity} pvp=${fiiBrapi.priceToNav} dy12m=${fiiBrapi.dividendYield12m} dy1m=${fiiBrapi.dividendYield1m}`);
+  } catch(e) {
+    console.log(`[FII ${ticker}] Erro indicators:`, e.message);
+    try {
+      for (let page = 1; page <= 4; page++) {
+        const urlFii = `${BRAPI_BASE}/v2/fii/list?limit=500&page=${page}&token=${TOKEN}`;
+        const resFii = await axios.get(urlFii, { timeout: 15000 });
+        const found = resFii.data?.fiis?.find(f => f.symbol === ticker);
+        if (found) { fiiBrapi = found; break; }
+        if (!resFii.data?.pagination?.hasNextPage) break;
+      }
+    } catch(e2) {}
+  }
+
+  const preco = primeiroNumero([fiiBrapi.price, quote.regularMarketPrice, quote.currentPrice]);
+
+  let dyAnual = percentual(primeiroNumero([
+    fiiBrapi.dividendYield12m,
+    quote.dividendYield,
+    quote.trailingAnnualDividendYield,
+    buscar(quote, ['dividendYield','dy'])
+  ]));
+
+  let dyMensal = percentual(primeiroNumero([
+    fiiBrapi.dividendYield1m,
+    fiiBrapi.monthlyReturn
+  ]));
+  if (dyMensal === 0 && dyAnual > 0) dyMensal = dyAnual / 12;
+
+  let pvp = primeiroNumero([
+    fiiBrapi.priceToNav,
+    quote.priceToBook,
+    buscar(quote, ['priceToBook','pvp','p/vp'])
+  ]);
+
+  const volumeCotas = primeiroNumero([quote.regularMarketVolume, quote.volume]);
+  let volume = (preco > 0 && volumeCotas > 0) ? preco * volumeCotas : 0;
+
+  let patrimonio = primeiroNumero([
+    fiiBrapi.equity,
+    fiiBrapi.totalAssets,
+    buscar(quote, ['netAssets','equity','netWorth','totalAssets'])
+  ]);
+
+  if (ajustes.dyMensal) dyMensal = numero(ajustes.dyMensal);
+  if (ajustes.dyAnual) dyAnual = numero(ajustes.dyAnual);
+  if (ajustes.pvp) pvp = numero(ajustes.pvp);
+  if (ajustes.volumeFinanceiroDia) volume = numero(ajustes.volumeFinanceiroDia);
+  if (ajustes.patrimonioLiquido) patrimonio = numero(ajustes.patrimonioLiquido);
+
+  const score = scoreFII(dyMensal, pvp, volume, patrimonio);
+  console.log(`[FII ${ticker}] dy=${dyMensal} pvp=${pvp} vol=${volume} pat=${patrimonio} score=${score}`);
+
+  return {
+    ticker, preco,
+    dyMensal: parseFloat(dyMensal.toFixed(4)),
+    dyAnual: parseFloat(dyAnual.toFixed(4)),
+    pvp: parseFloat(pvp.toFixed(4)),
+    volumeFinanceiro: parseFloat(volume.toFixed(2)),
+    patrimonioLiquido: parseFloat(patrimonio.toFixed(2)),
+    score: `${score}/4`,
+    scoreNum: score,
+    classificacao: classificarFII(score),
+    decisao: decisaoFII(score),
+    observacoes: observacaoFII(dyMensal, pvp, volume, patrimonio),
+    ultimaAtualizacao: new Date(),
+    fonte: 'brapi.dev Pro'
+  };
+}
+
+function calcularPesos(ativos) {
+  const pesoBase = (cl) => cl === 'EXCELENTE' ? 5 : cl === 'BOM' ? 3 : cl === 'ATENÇÃO' ? 1 : 0;
+  const total = ativos.reduce((s, a) => s + pesoBase(a.classificacao), 0);
+  return ativos.map(a => ({
+    ...a,
+    pesoBase: pesoBase(a.classificacao),
+    pesoSugerido: total > 0 ? pesoBase(a.classificacao) / total : 0
+  }));
+}
+
+module.exports = {
+  buscarAcao, buscarFII, calcularPesos,
+  scoreAcao, classificarAcao, decisaoAcao,
+  scoreFII, classificarFII, decisaoFII
+};
