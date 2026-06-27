@@ -1,7 +1,6 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
 const { body, validationResult } = require('express-validator');
 const { Resend } = require('resend');
 const pool = require('../config/database');
@@ -14,19 +13,47 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 router.post('/register', [
   body('nome').trim().notEmpty().withMessage('Nome obrigatorio'),
   body('email').isEmail().normalizeEmail().withMessage('Email invalido'),
-  body('senha').isLength({ min: 6 }).withMessage('Senha deve ter no minimo 6 caracteres')
+  body('senha').isLength({ min: 6 }).withMessage('Senha deve ter no minimo 6 caracteres'),
+  body('cpf').notEmpty().withMessage('CPF obrigatorio'),
+  body('telefone').notEmpty().withMessage('Telefone obrigatorio'),
+  body('termoAceito').equals('true').withMessage('Voce deve aceitar os termos de uso')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-  const { nome, email, senha } = req.body;
+
+  const {
+    nome, email, senha, cpf, telefone,
+    enderecoCep, enderecoRua, enderecoNumero, enderecoComplemento,
+    enderecoBairro, enderecoCidade, enderecoEstado,
+    termoAceito, termoVersao
+  } = req.body;
+
   try {
     const existe = await pool.query('SELECT id FROM usuarios WHERE email = $1', [email]);
     if (existe.rows.length > 0) return res.status(400).json({ error: 'Email ja cadastrado.' });
+
+    const cpfExiste = await pool.query('SELECT id FROM usuarios WHERE cpf = $1', [cpf]);
+    if (cpfExiste.rows.length > 0) return res.status(400).json({ error: 'CPF ja cadastrado.' });
+
     const hash = await bcrypt.hash(senha, 12);
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || null;
+
     const result = await pool.query(
-      'INSERT INTO usuarios (nome, email, senha_hash) VALUES ($1, $2, $3) RETURNING id, nome, email',
-      [nome, email, hash]
+      `INSERT INTO usuarios (
+        nome, email, senha_hash, cpf, telefone,
+        endereco_cep, endereco_rua, endereco_numero, endereco_complemento,
+        endereco_bairro, endereco_cidade, endereco_estado,
+        termo_aceito, termo_aceito_em, termo_ip, termo_versao
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW(),$14,$15)
+      RETURNING id, nome, email`,
+      [
+        nome, email, hash, cpf, telefone,
+        enderecoCep || null, enderecoRua || null, enderecoNumero || null, enderecoComplemento || null,
+        enderecoBairro || null, enderecoCidade || null, enderecoEstado || null,
+        true, ip, termoVersao || '1.0'
+      ]
     );
+
     const user = result.rows[0];
     await pool.query('INSERT INTO planejamento (usuario_id) VALUES ($1) ON CONFLICT DO NOTHING', [user.id]);
     const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '7d' });
