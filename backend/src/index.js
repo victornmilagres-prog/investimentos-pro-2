@@ -17,13 +17,25 @@ const notificacoesRoutes = require('./routes/notificacoes');
 
 const app = express();
 
-// Adiciona colunas de reset de senha se nao existirem
 async function runMigrations() {
   try {
     await pool.query(`
       ALTER TABLE usuarios
         ADD COLUMN IF NOT EXISTS reset_token VARCHAR(255),
-        ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMP
+        ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS cpf VARCHAR(14),
+        ADD COLUMN IF NOT EXISTS telefone VARCHAR(20),
+        ADD COLUMN IF NOT EXISTS endereco_cep VARCHAR(10),
+        ADD COLUMN IF NOT EXISTS endereco_rua VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS endereco_numero VARCHAR(20),
+        ADD COLUMN IF NOT EXISTS endereco_complemento VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS endereco_bairro VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS endereco_cidade VARCHAR(100),
+        ADD COLUMN IF NOT EXISTS endereco_estado VARCHAR(2),
+        ADD COLUMN IF NOT EXISTS termo_aceito BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS termo_aceito_em TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS termo_ip VARCHAR(45),
+        ADD COLUMN IF NOT EXISTS termo_versao VARCHAR(10) DEFAULT '1.0'
     `);
     console.log('Migrations OK');
   } catch (err) {
@@ -41,7 +53,7 @@ app.use(cors({
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
-  message: { error: 'Muitas requisições. Tente novamente em 15 minutos.' }
+  message: { error: 'Muitas requisicoes. Tente novamente em 15 minutos.' }
 });
 app.use('/api/', limiter);
 app.use(express.json());
