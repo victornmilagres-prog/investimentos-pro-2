@@ -1,23 +1,13 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "frontend/package.json",
-      "use": "@vercel/next"
-    },
-    {
-      "src": "backend/src/index.js",
-      "use": "@vercel/node"
+    "experimentalServices": {
+          "frontend": {
+                  "root": "frontend",
+                  "routePrefix": "/",
+                  "framework": "nextjs"
+          },
+          "backend": {
+                  "root": "backend",
+                  "routePrefix": "/_/backend"
+          }
     }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "backend/src/index.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "frontend/$1"
-    }
-  ]
 }
