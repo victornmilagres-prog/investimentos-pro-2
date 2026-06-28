@@ -184,6 +184,12 @@ async function buscarAcao(ticker, dividaManual = null) {
 
   console.log(`[${ticker}] pl=${pl} pvp=${pvp} margem=${margem} roe=${roe} dy=${dy} divida=${divida} score=${score}`);
 
+  const variacaoDia      = numero(item.regularMarketChangePercent);
+  const variacaoDiaReais = numero(item.regularMarketChange);
+  const precoAbertura    = numero(item.regularMarketOpen);
+  const precoMinimo      = numero(item.regularMarketDayLow);
+  const precoMaximo      = numero(item.regularMarketDayHigh);
+
   return {
     ticker, preco,
     precoGraham: parseFloat(precoGraham.toFixed(2)),
@@ -194,6 +200,11 @@ async function buscarAcao(ticker, dividaManual = null) {
     roe: parseFloat(roe.toFixed(4)),
     dividaEbit: divida,
     dy: parseFloat(dy.toFixed(4)),
+    variacaoDia: parseFloat(variacaoDia.toFixed(4)),
+    variacaoDiaReais: parseFloat(variacaoDiaReais.toFixed(4)),
+    precoAbertura: parseFloat(precoAbertura.toFixed(4)),
+    precoMinimo: parseFloat(precoMinimo.toFixed(4)),
+    precoMaximo: parseFloat(precoMaximo.toFixed(4)),
     score: `${score}/6`,
     scoreNum: score,
     classificacao: classificarAcao(score),
@@ -269,6 +280,12 @@ async function buscarFII(ticker, ajustes = {}) {
   const score = scoreFII(dyMensal, pvp, volume, patrimonio);
   console.log(`[FII ${ticker}] dy=${dyMensal} pvp=${pvp} vol=${volume} pat=${patrimonio} score=${score}`);
 
+  const variacaoDia      = numero(quote.regularMarketChangePercent);
+  const variacaoDiaReais = numero(quote.regularMarketChange);
+  const precoAbertura    = numero(quote.regularMarketOpen);
+  const precoMinimo      = numero(quote.regularMarketDayLow);
+  const precoMaximo      = numero(quote.regularMarketDayHigh);
+
   return {
     ticker, preco,
     dyMensal: parseFloat(dyMensal.toFixed(4)),
@@ -276,6 +293,11 @@ async function buscarFII(ticker, ajustes = {}) {
     pvp: parseFloat(pvp.toFixed(4)),
     volumeFinanceiro: parseFloat(volume.toFixed(2)),
     patrimonioLiquido: parseFloat(patrimonio.toFixed(2)),
+    variacaoDia: parseFloat(variacaoDia.toFixed(4)),
+    variacaoDiaReais: parseFloat(variacaoDiaReais.toFixed(4)),
+    precoAbertura: parseFloat(precoAbertura.toFixed(4)),
+    precoMinimo: parseFloat(precoMinimo.toFixed(4)),
+    precoMaximo: parseFloat(precoMaximo.toFixed(4)),
     score: `${score}/4`,
     scoreNum: score,
     classificacao: classificarFII(score),

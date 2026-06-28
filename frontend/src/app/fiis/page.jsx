@@ -27,7 +27,8 @@ function FIICard({ f, onRemover, onSalvar }) {
   const [preco, setPreco] = useState(String(f.preco_compra ?? ''));
   const perf = calcPerformance(f.preco_atual, f.preco_compra, f.quantidade);
   const maxScore = 4;
-  const fillPct = f.score != null ? (f.score / maxScore) * 100 : 0;
+  const scoreNum = typeof f.score === 'string' ? parseInt(f.score) : (f.score ?? 0);
+  const fillPct = (scoreNum / maxScore) * 100;
 
   const salvar = async () => {
     await onSalvar(f.ticker, qtd, preco);
@@ -53,7 +54,7 @@ function FIICard({ f, onRemover, onSalvar }) {
         <div style={{ flex: 1, height: 5, background: '#E8ECF0', borderRadius: 4, overflow: 'hidden' }}>
           <div style={{ width: `${fillPct}%`, height: '100%', background: scoreBarColor(f.classificacao), borderRadius: 4 }}/>
         </div>
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', whiteSpace: 'nowrap' }}>{f.score}/{maxScore}</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', whiteSpace: 'nowrap' }}>{scoreNum}/{maxScore}</span>
         <span style={{ fontSize: 12, color: '#8896A8' }}>{f.classificacao}</span>
       </div>
 
@@ -65,8 +66,8 @@ function FIICard({ f, onRemover, onSalvar }) {
             { label: 'DY Mensal',  v: f.dy_mensal          != null ? fmt.pct(f.dy_mensal)          : '-' },
             { label: 'DY Anual',   v: f.dy_anual           != null ? fmt.pct(f.dy_anual)           : '-' },
             { label: 'P/VP',       v: f.pvp                != null ? fmt.num(f.pvp)                : '-' },
-            { label: 'Volume Dia', v: f.volume_financeiro  != null ? fmt.brl(f.volume_financeiro)  : '-' },
-            { label: 'Patrimônio', v: f.patrimonio_liquido != null ? fmt.brl(f.patrimonio_liquido) : '-' },
+            { label: 'Volume Dia', v: f.volume_financeiro  != null ? fmt.abrev(f.volume_financeiro)  : '-' },
+            { label: 'Patrimônio', v: f.patrimonio_liquido != null ? fmt.abrev(f.patrimonio_liquido) : '-' },
             { label: 'Peso',       v: f.peso_sugerido      != null ? fmt.pct(f.peso_sugerido * 100): '-' },
           ].map(({ label, v }) => (
             <div key={label}>

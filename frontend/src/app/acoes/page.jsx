@@ -34,7 +34,8 @@ function AcaoCard({ a, onRemover, onSalvar }) {
   const [preco, setPreco] = useState(String(a.preco_compra ?? ''));
   const perf = calcPerformance(a.preco_atual, a.preco_compra, a.quantidade);
   const maxScore = 6;
-  const fillPct = a.score != null ? (a.score / maxScore) * 100 : 0;
+  const scoreNum = typeof a.score === 'string' ? parseInt(a.score) : (a.score ?? 0);
+  const fillPct = (scoreNum / maxScore) * 100;
 
   const salvar = async () => {
     await onSalvar(a.ticker, qtd, preco);
@@ -61,7 +62,7 @@ function AcaoCard({ a, onRemover, onSalvar }) {
         <div style={{ flex: 1, height: 5, background: '#E8ECF0', borderRadius: 4, overflow: 'hidden' }}>
           <div style={{ width: `${fillPct}%`, height: '100%', background: scoreBarColor(a.classificacao), borderRadius: 4 }}/>
         </div>
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', whiteSpace: 'nowrap' }}>{a.score}/{maxScore}</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', whiteSpace: 'nowrap' }}>{scoreNum}/{maxScore}</span>
         <span style={{ fontSize: 12, color: '#8896A8' }}>{a.classificacao}</span>
       </div>
 

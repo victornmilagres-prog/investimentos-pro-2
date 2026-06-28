@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DESIGN REFERENCE — Investimentos Pro 2.0</title>
+<style>
+  /* ============================================================
+     ARQUIVO DE REFERÊNCIA VISUAL — INVESTIMENTOS PRO 2.0
+     Use este arquivo como referência EXATA do novo design.
+     Cada seção representa uma tela do app.
+     ============================================================ */
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #F0F2F5; color: #1a1a2e; }
+
+  /* TOKENS DO NOVO DESIGN */
+  :root {
+    --bg: #F0F2F5;           /* fundo geral — cinza clarinho */
+    --surface: #FFFFFF;      /* cards e sidebar */
+    --surface2: #F8F9FA;     /* fundo interno de cards */
+    --border: #E8ECF0;       /* bordas sutis */
+    --border-strong: #D0D8E0;
+    --text-primary: #1A1A2E;
+    --text-secondary: #4A5568;
+    --text-muted: #8896A8;
+    --gold: #C9A84C;         /* manter dourado apenas em logo/destaque */
+    --accent: #2563EB;       /* azul — ações positivas */
+    --success: #16A34A;      /* verde */
+    --danger: #DC2626;       /* vermelho */
+    --warning: #D97706;      /* amarelo */
+    --bg-accent: #EFF6FF;
+    --bg-success: #F0FDF4;
+    --bg-danger: #FEF2F2;
+    --bg-warning: #FFFBEB;
+  }
+
+  /* LAYOUT GERAL */
+  .app { display: flex; min-height: 100vh; }
+  .sidebar {
+    width: 240px; background: var(--surface); border-right: 1px solid var(--border);
+    position: fixed; top: 0; bottom: 0; left: 0; display: flex; flex-direction: column;
+  }
+  .sidebar-logo {
+    padding: 18px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-text { font-size: 11px; font-weight: 800; color: var(--text-primary); letter-spacing: 1.5px; }
+  .logo-sub { font-size: 8px; color: var(--gold); letter-spacing: 1px; margin-top: 1px; }
+  .sidebar-nav { flex: 1; padding: 10px 8px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+    border-radius: 8px; margin-bottom: 2px; font-size: 13px; font-weight: 500;
+    text-decoration: none; color: var(--text-muted); border-left: 2px solid transparent;
+    transition: all 0.15s; cursor: pointer;
+  }
+  .nav-item.active {
+    background: rgba(201,168,76,0.08); color: var(--gold);
+    border-left-color: var(--gold);
+  }
+  .nav-item:hover { background: var(--surface2); color: var(--text-secondary); }
+  .content { margin-left: 240px; flex: 1; }
+  .header {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 0 24px; height: 52px; display: flex; align-items: center;
+    justify-content: space-between; position: sticky; top: 0; z-index: 10;
+  }
+  .header-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+  .main { padding: 24px; background: var(--bg); min-height: calc(100vh - 52px); }
+
+  /* COMPONENTES REUTILIZÁVEIS */
+  .page-title { font-size: 22px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+  .page-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 18px 20px;
+  }
+  .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .ticker { font-size: 18px; font-weight: 700; color: var(--accent); }
+  .ticker-row { display: flex; align-items: center; gap: 8px; }
+  .tipo-pill {
+    font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px;
+    background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border);
+  }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+  .badge-comprar { background: var(--bg-accent); color: var(--accent); }
+  .badge-manter { background: var(--bg-success); color: var(--success); }
+  .badge-risco { background: var(--bg-danger); color: var(--danger); }
+  .badge-atencao { background: var(--bg-warning); color: var(--warning); }
+
+  .score-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .score-bar { flex: 1; height: 5px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 4px; }
+  .score-fill-excelente { background: var(--accent); }
+  .score-fill-bom { background: var(--success); }
+  .score-fill-atencao { background: var(--warning); }
+  .score-fill-risco { background: var(--danger); }
+  .score-label { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; }
+  .score-class { font-size: 12px; color: var(--text-muted); }
+
+  .group-label { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .metrics { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .metric-label { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+  .metric-value { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+
+  .graham-box {
+    background: var(--bg-accent); border: 1px solid #BFDBFE; border-radius: 10px;
+    padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+  }
+  .graham-label { font-size: 11px; color: #3B82F6; margin-bottom: 3px; }
+  .graham-value { font-size: 15px; font-weight: 700; color: var(--accent); }
+  .graham-tag { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+  .graham-descontado { background: #D1FAE5; color: #065F46; }
+  .graham-caro { background: #FEE2E2; color: #991B1B; }
+  .graham-justo { background: #FEF3C7; color: #92400E; }
+
+  .posicao-box {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 12px;
+  }
+  .posicao-row { display: flex; align-items: flex-start; justify-content: space-between; }
+  .posicao-label { font-size: 11px; color: var(--text-muted); margin-bottom: 3px; }
+  .posicao-value { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+
+  .card-footer { display: flex; align-items: center; justify-content: space-between; }
+  .preco-linha { display: flex; align-items: baseline; gap: 8px; }
+  .preco-atual { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+  .var-dia-pos {
+    font-size: 12px; font-weight: 600; color: var(--success);
+    background: var(--bg-success); padding: 2px 8px; border-radius: 20px;
+  }
+  .var-dia-neg {
+    font-size: 12px; font-weight: 600; color: var(--danger);
+    background: var(--bg-danger); padding: 2px 8px; border-radius: 20px;
+  }
+  .preco-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .retorno-pos { color: var(--success); font-weight: 600; }
+  .retorno-neg { color: var(--danger); font-weight: 600; }
+
+  .btn-actions { display: flex; gap: 6px; }
+  .btn-icon {
+    background: none; border: 1px solid var(--border); border-radius: 8px;
+    padding: 5px 10px; cursor: pointer; color: var(--text-muted); font-size: 13px;
+  }
+  .btn-icon:hover { border-color: var(--border-strong); color: var(--text-secondary); }
+
+  .screen-label {
+    background: var(--gold); color: #fff; font-size: 11px; font-weight: 700;
+    padding: 4px 12px; border-radius: 0 0 8px 8px; display: inline-block;
+    margin-bottom: 20px; letter-spacing: 1px;
+  }
+  .screen { margin-bottom: 60px; }
+
+  /* CRITERIOS DO SCORE */
+  .criterios { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+  .criterio {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 10px; border-radius: 8px; background: var(--surface2);
+  }
+  .criterio-nome { font-size: 12px; color: var(--text-secondary); flex: 1; }
+  .criterio-valor { font-size: 12px; font-weight: 600; color: var(--text-primary); margin: 0 10px; }
+  .check-ok { color: var(--success); font-size: 16px; }
+  .check-fail { color: var(--danger); font-size: 16px; }
+
+  /* VARIACAO DO DIA — NO RADAR */
+  .var-box-pos {
+    background: var(--bg-success); border: 1px solid #BBF7D0; border-radius: 10px;
+    padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+  }
+  .var-box-neg {
+    background: var(--bg-danger); border: 1px solid #FECACA; border-radius: 10px;
+    padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+  }
+  .var-pct-pos { font-size: 22px; font-weight: 700; color: var(--success); }
+  .var-pct-neg { font-size: 22px; font-weight: 700; color: var(--danger); }
+  .minmax-bar-wrap { height: 5px; background: var(--border); border-radius: 4px; overflow: hidden; position: relative; margin: 6px 0 10px; }
+  .minmax-fill-pos { height: 100%; background: var(--success); border-radius: 4px; }
+  .minmax-fill-neg { height: 100%; background: var(--danger); border-radius: 4px; }
+
+  /* ALVO BOX */
+  .alvo-box {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+  }
+  .alvo-label { font-size: 11px; color: var(--text-muted); margin-bottom: 3px; }
+  .alvo-value { font-size: 15px; font-weight: 700; }
+
+  /* OBS BOX */
+  .obs-box {
+    background: var(--bg-accent); border-left: 3px solid var(--accent);
+    padding: 8px 12px; font-size: 12px; color: var(--text-secondary); margin-bottom: 10px; border-radius: 0 8px 8px 0;
+  }
+
+  /* BTN ADICIONAR CARTEIRA */
+  .btn-carteira {
+    width: 100%; background: var(--accent); color: #fff; border: none;
+    border-radius: 8px; padding: 9px; font-size: 13px; font-weight: 600;
+    cursor: pointer; margin-bottom: 8px; display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+
+  /* RENDA FIXA */
+  .card-rf {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px 20px; display: flex; align-items: center; gap: 16px; margin-bottom: 12px;
+  }
+  .rf-icon {
+    width: 42px; height: 42px; border-radius: 50%; background: var(--bg-success);
+    display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0;
+  }
+  .rf-info { flex: 1; min-width: 0; }
+  .rf-nome { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+  .rf-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .rf-values { text-align: right; }
+  .rf-valor { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+  .rf-rend { font-size: 12px; font-weight: 600; color: var(--success); margin-top: 2px; }
+  .rf-venc { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  /* DASHBOARD */
+  .pat-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
+  }
+  .pat-valor { font-size: 32px; font-weight: 800; color: var(--text-primary); }
+  .pat-label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+  .pat-sub { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  .mini-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px;
+  }
+  .mini-label { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .mini-valor { font-size: 18px; font-weight: 700; color: var(--text-primary); margin-bottom: 3px; }
+  .mini-sub { font-size: 11px; color: var(--text-muted); }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .section-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px;
+  }
+  .sec-title { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+  .dot-green { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
+  .dot-red { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); }
+  .ranking-item { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+  .ranking-item:last-child { border-bottom: none; }
+  .rank-num { font-size: 11px; color: var(--text-muted); width: 16px; }
+  .rank-ticker { font-size: 13px; font-weight: 700; color: var(--accent); flex: 1; }
+  .rank-score { font-size: 11px; color: var(--text-muted); }
+  .distrib-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .distrib-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .distrib-label { font-size: 12px; color: var(--text-secondary); width: 130px; display: flex; align-items: center; gap: 6px; }
+  .distrib-bar-wrap { flex: 1; height: 6px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .distrib-bar-fill { height: 100%; border-radius: 4px; }
+  .distrib-pct { font-size: 12px; font-weight: 700; color: var(--text-primary); width: 38px; text-align: right; }
+  .distrib-val { font-size: 11px; color: var(--text-muted); width: 80px; text-align: right; }
+  .radar-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; margin-bottom: 5px; }
+  .radar-oport { background: var(--bg-success); }
+  .radar-risco { background: var(--bg-danger); }
+
+  /* FORMULARIO ADICIONAR */
+  .form-add {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px; margin-bottom: 24px;
+  }
+  .form-title { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 14px; }
+  .form-row { display: flex; gap: 12px; align-items: flex-end; }
+  .form-group { flex: 1; }
+  .form-label { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-bottom: 4px; display: block; }
+  .form-input {
+    width: 100%; padding: 9px 12px; border: 1px solid var(--border-strong); border-radius: 8px;
+    font-size: 13px; color: var(--text-primary); background: var(--surface2); outline: none;
+  }
+  .btn-buscar {
+    background: var(--gold); color: #fff; border: none; border-radius: 8px;
+    padding: 9px 20px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<!--
+=================================================================
+INSTRUÇÕES PARA O CLAUDE CODE
+=================================================================
+Este arquivo mostra EXATAMENTE como o novo design deve ficar.
+Implemente cada tela conforme mostrado abaixo.
+
+MUDANÇAS GLOBAIS:
+1. Fundo: #F0F2F5 (cinza clarinho — NÃO branco puro)
+2. Cards: #FFFFFF com border: 1px solid #E8ECF0
+3. Sidebar: #FFFFFF com border-right
+4. Remover TODAS as variáveis --dark-* do globals.css
+5. Textos: primário #1A1A2E, secundário #4A5568, muted #8896A8
+6. Manter dourado #C9A84C apenas no logo e botão primário
+
+RENOMEAÇÕES (layout.jsx — array NAV):
+- label 'Acoes' → 'Carteira Ações'
+- label 'FIIs' → 'Carteira FII'
+- label 'Renda Fixa' → 'Carteira Renda Fixa'
+- label 'Watchlist' → 'No Radar'
+(rotas /acoes, /fiis, /renda-fixa, /watchlist — NÃO mudar)
+=================================================================
+-->
+
+<div style="max-width:1200px; margin:0 auto; padding:30px 20px;">
+
+<!-- ============================================================ -->
+<!-- TELA 1: DASHBOARD                                            -->
+<!-- ============================================================ -->
+<div class="screen">
+  <div class="screen-label">TELA 1 — DASHBOARD</div>
+
+  <div class="pat-card">
+    <div>
+      <div class="pat-label">Patrimônio total</div>
+      <div class="pat-valor">R$ 175.273,88</div>
+      <div class="pat-sub">22 ativos · 10 ações · 12 FIIs · 5 renda fixa</div>
+    </div>
+    <div style="text-align:right">
+      <div class="pat-label">Retorno total</div>
+      <div style="font-size:24px; font-weight:800; color:var(--success)">+R$ 8.420,14</div>
+      <div class="pat-sub"><span class="retorno-pos">+5.04%</span> desde o início</div>
+    </div>
+  </div>
+
+  <div class="grid4">
+    <div class="mini-card">
+      <div class="mini-label">Carteira Ações</div>
+      <div class="mini-valor">R$ 27.021</div>
+      <div class="mini-sub" style="color:var(--success)">+R$ 3.141 · +13.1%</div>
+    </div>
+    <div class="mini-card">
+      <div class="mini-label">Carteira FII</div>
+      <div class="mini-valor">R$ 21.928</div>
+      <div class="mini-sub" style="color:var(--danger)">-R$ 783 · -3.4%</div>
+    </div>
+    <div class="mini-card">
+      <div class="mini-label">Carteira Renda Fixa</div>
+      <div class="mini-valor">R$ 126.323</div>
+      <div class="mini-sub">11.99% a.a. médio</div>
+    </div>
+    <div class="mini-card">
+      <div class="mini-label">No Radar</div>
+      <div class="mini-valor">1</div>
+      <div class="mini-sub">ativo monitorado</div>
+    </div>
+  </div>
+
+  <div class="grid4" style="margin-bottom:16px">
+    <div class="mini-card">
+      <div class="mini-label">Total de ativos</div>
+      <div class="mini-valor">22</div>
+      <div class="mini-sub">10 ações · 12 FIIs</div>
+    </div>
+    <div class="mini-card">
+      <div class="mini-label">Excelentes</div>
+      <div class="mini-valor" style="color:var(--accent)">5</div>
+      <div class="mini-sub">score máximo</div>
+    </div>
+    <div class="mini-card">
+      <div class="mini-label">Em risco</div>
+      <div class="mini-valor" style="color:var(--danger)">4</div>
+      <div class="mini-sub">atenção necessária</div>
+    </div>
+    <div class="mini-card">
+      <div class="mini-label">Variação hoje</div>
+      <div class="mini-valor" style="color:var(--success)">+1.2%</div>
+      <div class="mini-sub">carteira geral</div>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="section-card">
+      <div class="sec-title">Distribuição do patrimônio</div>
+      <div class="distrib-row">
+        <div class="distrib-label"><div class="distrib-dot" style="background:var(--accent)"></div>Carteira Ações</div>
+        <div class="distrib-bar-wrap"><div class="distrib-bar-fill" style="width:15%;background:var(--accent)"></div></div>
+        <div class="distrib-pct">15.4%</div>
+        <div class="distrib-val">R$ 27.021</div>
+      </div>
+      <div class="distrib-row">
+        <div class="distrib-label"><div class="distrib-dot" style="background:var(--success)"></div>Carteira FII</div>
+        <div class="distrib-bar-wrap"><div class="distrib-bar-fill" style="width:12%;background:var(--success)"></div></div>
+        <div class="distrib-pct">12.5%</div>
+        <div class="distrib-val">R$ 21.928</div>
+      </div>
+      <div class="distrib-row">
+        <div class="distrib-label"><div class="distrib-dot" style="background:var(--warning)"></div>Renda Fixa</div>
+        <div class="distrib-bar-wrap"><div class="distrib-bar-fill" style="width:72%;background:var(--warning)"></div></div>
+        <div class="distrib-pct">72.1%</div>
+        <div class="distrib-val">R$ 126.323</div>
+      </div>
+    </div>
+    <div class="section-card">
+      <div class="sec-title">Ranking Ações</div>
+      <div class="ranking-item"><span class="rank-num">1</span><span class="rank-ticker">CMIG4</span><span class="rank-score">4/6</span><span class="badge badge-manter" style="margin-left:auto">MANTER</span></div>
+      <div class="ranking-item"><span class="rank-num">2</span><span class="rank-ticker">CMIN3</span><span class="rank-score">4/6</span><span class="badge badge-manter" style="margin-left:auto">MANTER</span></div>
+      <div class="ranking-item"><span class="rank-num">3</span><span class="rank-ticker">ITSA4</span><span class="rank-score">4/6</span><span class="badge badge-manter" style="margin-left:auto">MANTER</span></div>
+      <div class="ranking-item"><span class="rank-num">4</span><span class="rank-ticker">PETR4</span><span class="rank-score">4/6</span><span class="badge badge-manter" style="margin-left:auto">MANTER</span></div>
+      <div class="ranking-item"><span class="rank-num">5</span><span class="rank-ticker">TAEE4</span><span class="rank-score">4/6</span><span class="badge badge-manter" style="margin-left:auto">MANTER</span></div>
+    </div>
+  </div>
+
+  <div class="grid3">
+    <div class="section-card">
+      <div class="sec-title">Ranking FIIs</div>
+      <div class="ranking-item"><span class="rank-num">1</span><span class="rank-ticker">RZTR11</span><span class="rank-score">4/4</span><span class="badge badge-comprar" style="margin-left:auto">COMPRAR</span></div>
+      <div class="ranking-item"><span class="rank-num">2</span><span class="rank-ticker">TRXF11</span><span class="rank-score">4/4</span><span class="badge badge-comprar" style="margin-left:auto">COMPRAR</span></div>
+      <div class="ranking-item"><span class="rank-num">3</span><span class="rank-ticker">GGRC11</span><span class="rank-score">4/4</span><span class="badge badge-comprar" style="margin-left:auto">COMPRAR</span></div>
+      <div class="ranking-item"><span class="rank-num">4</span><span class="rank-ticker">MXRF11</span><span class="rank-score">4/4</span><span class="badge badge-comprar" style="margin-left:auto">COMPRAR</span></div>
+      <div class="ranking-item"><span class="rank-num">5</span><span class="rank-ticker">VGHF11</span><span class="rank-score">4/4</span><span class="badge badge-comprar" style="margin-left:auto">COMPRAR</span></div>
+    </div>
+    <div class="section-card">
+      <div class="sec-title"><div class="dot-green"></div>Radar de oportunidades</div>
+      <div class="radar-item radar-oport"><span class="rank-ticker" style="color:var(--success)">RZTR11</span><span class="tipo-pill">FII</span><span style="font-size:11px;color:var(--text-muted);margin-left:auto">4/4</span><span class="badge badge-comprar" style="margin-left:8px">COMPRAR</span></div>
+      <div class="radar-item radar-oport"><span class="rank-ticker" style="color:var(--success)">TRXF11</span><span class="tipo-pill">FII</span><span style="font-size:11px;color:var(--text-muted);margin-left:auto">4/4</span><span class="badge badge-comprar" style="margin-left:8px">COMPRAR</span></div>
+      <div class="radar-item radar-oport"><span class="rank-ticker" style="color:var(--success)">GGRC11</span><span class="tipo-pill">FII</span><span style="font-size:11px;color:var(--text-muted);margin-left:auto">4/4</span><span class="badge badge-comprar" style="margin-left:8px">COMPRAR</span></div>
+    </div>
+    <div class="section-card">
+      <div class="sec-title"><div class="dot-red"></div>Radar de risco</div>
+      <div class="radar-item radar-risco"><span class="rank-ticker" style="color:var(--danger)">KLBN11</span><span class="tipo-pill">AÇÃO</span><span style="font-size:11px;color:var(--text-muted);margin-left:auto">0/6</span><span class="badge badge-risco" style="margin-left:8px">EVITAR</span></div>
+      <div class="radar-item radar-risco"><span class="rank-ticker" style="color:var(--danger)">CPSH11</span><span class="tipo-pill">FII</span><span style="font-size:11px;color:var(--text-muted);margin-left:auto">0/4</span><span class="badge badge-risco" style="margin-left:8px">EVITAR</span></div>
+      <div class="radar-item radar-risco"><span class="rank-ticker" style="color:var(--danger)">TVRI11</span><span class="tipo-pill">FII</span><span style="font-size:11px;color:var(--text-muted);margin-left:auto">0/4</span><span class="badge badge-risco" style="margin-left:8px">EVITAR</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- TELA 2: CARTEIRA AÇÕES (/acoes)                              -->
+<!-- ============================================================ -->
+<div class="screen">
+  <div class="screen-label">TELA 2 — CARTEIRA AÇÕES (/acoes)</div>
+  <div class="page-title">Carteira Ações</div>
+  <div class="page-sub">Busca dados em tempo real via Brapi e avalia por critérios fundamentalistas</div>
+
+  <div class="form-add">
+    <div class="form-title">Adicionar ação</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Ticker</label><input class="form-input" placeholder="EX: PETR4"></div>
+      <div class="form-group"><label class="form-label">Qtd. que você tem</label><input class="form-input" placeholder="0"></div>
+      <div class="form-group"><label class="form-label">Preço médio de compra</label><input class="form-input" placeholder="R$ 0,00"></div>
+      <button class="btn-buscar">🔍 Buscar e Avaliar</button>
+    </div>
+  </div>
+
+  <div class="cards-grid">
+    <!-- CARD AÇÃO 1 — BOM -->
+    <div class="card">
+      <div class="card-header">
+        <span class="ticker">PETR4</span>
+        <span class="badge badge-manter">MANTER</span>
+      </div>
+      <div class="score-row">
+        <div class="score-bar"><div class="score-fill score-fill-bom" style="width:66%"></div></div>
+        <span class="score-label">4/6</span>
+        <span class="score-class">BOM</span>
+      </div>
+      <div class="group-label">Fundamentos</div>
+      <div class="metrics">
+        <div><div class="metric-label">P/L</div><div class="metric-value">4.56</div></div>
+        <div><div class="metric-label">P/VP</div><div class="metric-value">1.10</div></div>
+        <div><div class="metric-label">DY %</div><div class="metric-value">6.00%</div></div>
+        <div><div class="metric-label">Margem</div><div class="metric-value">21.69%</div></div>
+        <div><div class="metric-label">ROE</div><div class="metric-value">24.27%</div></div>
+        <div><div class="metric-label">Dív/EBIT</div><div class="metric-value">2.93</div></div>
+      </div>
+      <div class="graham-box">
+        <div>
+          <div class="graham-label">Preço Graham</div>
+          <div class="graham-value">R$ 80,54</div>
+        </div>
+        <div style="text-align:right">
+          <div class="graham-label">Situação vs Graham</div>
+          <span class="graham-tag graham-descontado">DESCONTADO</span>
+        </div>
+      </div>
+      <div class="group-label">Sua posição</div>
+      <div class="posicao-box">
+        <div class="posicao-row">
+          <div><div class="posicao-label">Qtd. ações</div><div class="posicao-value">266</div></div>
+          <div style="text-align:center"><div class="posicao-label">Seu preço médio</div><div class="posicao-value">R$ 28,75</div></div>
+          <div style="text-align:right"><div class="posicao-label">Val. investido</div><div class="posicao-value">R$ 7.647,50</div></div>
+        </div>
+        <hr class="divider">
+        <div class="posicao-row">
+          <div><div class="posicao-label">Val. atual</div><div class="posicao-value">R$ 10.123,96</div></div>
+          <div style="text-align:right"><div class="posicao-label">Retorno</div><div class="posicao-value retorno-pos">+R$ 2.476 (+32.38%)</div></div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <div>
+          <div class="preco-linha">
+            <span class="preco-atual">R$ 38,06</span>
+            <span class="var-dia-pos">▲ +2.14% hoje</span>
+          </div>
+          <div class="preco-sub">Peso: 15.00%</div>
+        </div>
+        <div class="btn-actions">
+          <button class="btn-icon">✏️</button>
+          <button class="btn-icon">🗑️</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD AÇÃO 2 — RISCO -->
+    <div class="card">
+      <div class="card-header">
+        <span class="ticker">KLBN11</span>
+        <span class="badge badge-risco">EVITAR/REVER</span>
+      </div>
+      <div class="score-row">
+        <div class="score-bar"><div class="score-fill score-fill-risco" style="width:0%"></div></div>
+        <span class="score-label">0/6</span>
+        <span class="score-class">RISCO</span>
+      </div>
+      <div class="group-label">Fundamentos</div>
+      <div class="metrics">
+        <div><div class="metric-label">P/L</div><div class="metric-value">28.81</div></div>
+        <div><div class="metric-label">P/VP</div><div class="metric-value">2.34</div></div>
+        <div><div class="metric-label">DY %</div><div class="metric-value">4.00%</div></div>
+        <div><div class="metric-label">Margem</div><div class="metric-value">3.53%</div></div>
+        <div><div class="metric-label">ROE</div><div class="metric-value">8.12%</div></div>
+        <div><div class="metric-label">Dív/EBIT</div><div class="metric-value">4.83</div></div>
+      </div>
+      <div class="graham-box">
+        <div>
+          <div class="graham-label">Preço Graham</div>
+          <div class="graham-value">R$ 9,80</div>
+        </div>
+        <div style="text-align:right">
+          <div class="graham-label">Situação vs Graham</div>
+          <span class="graham-tag graham-caro">CARO</span>
+        </div>
+      </div>
+      <div class="group-label">Sua posição</div>
+      <div class="posicao-box">
+        <div class="posicao-row">
+          <div><div class="posicao-label">Qtd. ações</div><div class="posicao-value">23</div></div>
+          <div style="text-align:center"><div class="posicao-label">Seu preço médio</div><div class="posicao-value">R$ 17,22</div></div>
+          <div style="text-align:right"><div class="posicao-label">Val. investido</div><div class="posicao-value">R$ 396,06</div></div>
+        </div>
+        <hr class="divider">
+        <div class="posicao-row">
+          <div><div class="posicao-label">Val. atual</div><div class="posicao-value">R$ 390,08</div></div>
+          <div style="text-align:right"><div class="posicao-label">Retorno</div><div class="posicao-value retorno-neg">-R$ 5,98 (-1.51%)</div></div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <div>
+          <div class="preco-linha">
+            <span class="preco-atual">R$ 16,96</span>
+            <span class="var-dia-neg">▼ -0.82% hoje</span>
+          </div>
+          <div class="preco-sub">Peso: 0.00%</div>
+        </div>
+        <div class="btn-actions">
+          <button class="btn-icon">✏️</button>
+          <button class="btn-icon">🗑️</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- TELA 3: CARTEIRA FII (/fiis)                                 -->
+<!-- ============================================================ -->
+<div class="screen">
+  <div class="screen-label">TELA 3 — CARTEIRA FII (/fiis)</div>
+  <div class="page-title">Carteira FII</div>
+  <div class="page-sub">Fundos Imobiliários avaliados por critérios de renda e qualidade</div>
+
+  <div class="cards-grid">
+    <!-- CARD FII 1 — EXCELENTE -->
+    <div class="card">
+      <div class="card-header">
+        <span class="ticker">MXRF11</span>
+        <span class="badge badge-comprar">COMPRAR/ACUMULAR</span>
+      </div>
+      <div class="score-row">
+        <div class="score-bar"><div class="score-fill score-fill-excelente" style="width:100%"></div></div>
+        <span class="score-label">4/4</span>
+        <span class="score-class">EXCELENTE</span>
+      </div>
+      <div class="group-label">Rendimento & Qualidade</div>
+      <div class="metrics">
+        <div><div class="metric-label">DY Mensal</div><div class="metric-value">1.03%</div></div>
+        <div><div class="metric-label">DY Anual</div><div class="metric-value">12.27%</div></div>
+        <div><div class="metric-label">P/VP</div><div class="metric-value">1.04</div></div>
+        <div><div class="metric-label">Volume Dia</div><div class="metric-value">R$ 19,6M</div></div>
+        <div><div class="metric-label">Patrimônio</div><div class="metric-value">R$ 4,3B</div></div>
+        <div><div class="metric-label">Peso</div><div class="metric-value">13.16%</div></div>
+      </div>
+      <div class="group-label">Sua posição</div>
+      <div class="posicao-box">
+        <div class="posicao-row">
+          <div><div class="posicao-label">Qtd. cotas</div><div class="posicao-value">268</div></div>
+          <div style="text-align:center"><div class="posicao-label">Seu preço médio</div><div class="posicao-value">R$ 9,67</div></div>
+          <div style="text-align:right"><div class="posicao-label">Val. investido</div><div class="posicao-value">R$ 2.591,56</div></div>
+        </div>
+        <hr class="divider">
+        <div class="posicao-row">
+          <div><div class="posicao-label">Val. atual</div><div class="posicao-value">R$ 2.610,32</div></div>
+          <div style="text-align:right"><div class="posicao-label">Retorno</div><div class="posicao-value retorno-pos">+R$ 18,76 (+0.72%)</div></div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <div>
+          <div class="preco-linha">
+            <span class="preco-atual">R$ 9,74</span>
+            <span class="var-dia-pos">▲ +0.72% hoje</span>
+          </div>
+        </div>
+        <div class="btn-actions">
+          <button class="btn-icon">✏️</button>
+          <button class="btn-icon">🗑️</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- TELA 4: CARTEIRA RENDA FIXA (/renda-fixa)                   -->
+<!-- ============================================================ -->
+<div class="screen">
+  <div class="screen-label">TELA 4 — CARTEIRA RENDA FIXA (/renda-fixa)</div>
+  <div class="page-title">Carteira Renda Fixa</div>
+  <div class="page-sub">Registre seus investimentos em renda fixa para o planejamento patrimonial</div>
+
+  <div class="grid3" style="margin-bottom:24px">
+    <div class="mini-card"><div class="mini-label">Total investido</div><div class="mini-valor">R$ 126.323,61</div></div>
+    <div class="mini-card"><div class="mini-label">Qtd. de aplicações</div><div class="mini-valor">5</div></div>
+    <div class="mini-card"><div class="mini-label">Rendimento médio</div><div class="mini-valor" style="color:var(--success)">11.99% a.a.</div></div>
+  </div>
+
+  <div class="card-rf">
+    <div class="rf-icon">🏦</div>
+    <div class="rf-info">
+      <div class="rf-nome">LCA Banco BV SA</div>
+      <div class="rf-sub">XP · LCA · CDI</div>
+    </div>
+    <div class="rf-values">
+      <div class="rf-valor">R$ 77.666,53</div>
+      <div class="rf-rend">11.96% a.a.</div>
+      <div class="rf-venc">Vence 13/04/2028</div>
+    </div>
+    <div class="btn-actions" style="margin-left:16px">
+      <button class="btn-icon">✏️</button>
+      <button class="btn-icon">🗑️</button>
+    </div>
+  </div>
+  <div class="card-rf">
+    <div class="rf-icon">🏦</div>
+    <div class="rf-info">
+      <div class="rf-nome">LCA Original</div>
+      <div class="rf-sub">XP · LCA · CDI</div>
+    </div>
+    <div class="rf-values">
+      <div class="rf-valor">R$ 9.727,74</div>
+      <div class="rf-rend">13.65% a.a.</div>
+      <div class="rf-venc">Vence 20/11/2029</div>
+    </div>
+    <div class="btn-actions" style="margin-left:16px">
+      <button class="btn-icon">✏️</button>
+      <button class="btn-icon">🗑️</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- TELA 5: NO RADAR (/watchlist)                                -->
+<!-- ============================================================ -->
+<div class="screen">
+  <div class="screen-label">TELA 5 — NO RADAR (/watchlist) — label no menu: "No Radar"</div>
+  <div class="page-title">No Radar</div>
+  <div class="page-sub">Ativos que você acompanha antes de comprar</div>
+
+  <div class="cards-grid">
+    <div class="card">
+      <div class="card-header">
+        <div class="ticker-row">
+          <span class="ticker">MXRF11</span>
+          <span class="tipo-pill">FII</span>
+        </div>
+        <span class="badge badge-comprar">COMPRAR/ACUMULAR</span>
+      </div>
+      <div class="score-row">
+        <div class="score-bar"><div class="score-fill score-fill-excelente" style="width:100%"></div></div>
+        <span class="score-label">4/4</span>
+        <span class="score-class">EXCELENTE</span>
+      </div>
+
+      <div class="group-label">Critérios do score — cada critério mostra valor real + ✅ ou ❌</div>
+      <div class="criterios">
+        <div class="criterio">
+          <span class="criterio-nome">DY Mensal &gt; 1%</span>
+          <span class="criterio-valor">1.03%</span>
+          <span class="check-ok">✅</span>
+        </div>
+        <div class="criterio">
+          <span class="criterio-nome">P/VP &lt; 1,05</span>
+          <span class="criterio-valor">1.04</span>
+          <span class="check-ok">✅</span>
+        </div>
+        <div class="criterio">
+          <span class="criterio-nome">Volume Diário &gt; R$ 1M</span>
+          <span class="criterio-valor">R$ 19,6M</span>
+          <span class="check-ok">✅</span>
+        </div>
+        <div class="criterio">
+          <span class="criterio-nome">Patrimônio &gt; R$ 1B</span>
+          <span class="criterio-valor">R$ 4,3B</span>
+          <span class="check-ok">✅</span>
+        </div>
+      </div>
+
+      <!-- VARIAÇÃO COMPLETA DO DIA — só no No Radar -->
+      <div class="group-label">Variação do dia</div>
+      <div class="var-box-pos">
+        <div>
+          <div style="font-size:11px;color:var(--success);margin-bottom:3px">Preço atual</div>
+          <div style="font-size:18px;font-weight:700;color:var(--text-primary)">R$ 9,74</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Abertura: R$ 9,67</div>
+        </div>
+        <div style="text-align:right">
+          <div class="var-pct-pos">+0.72%</div>
+          <div style="font-size:12px;color:var(--success)">+R$ 0,07 hoje</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:4px">
+        <span>Mín R$ 9,63</span><span>Máx R$ 9,77</span>
+      </div>
+      <div class="minmax-bar-wrap">
+        <div class="minmax-fill-pos" style="width:65%"></div>
+      </div>
+
+      <div class="alvo-box">
+        <div><div class="alvo-label">Preço atual</div><div class="alvo-value" style="color:var(--text-primary)">R$ 9,74</div></div>
+        <span style="color:var(--text-muted);font-size:18px">→</span>
+        <div style="text-align:right"><div class="alvo-label">Seu preço alvo</div><div class="alvo-value" style="color:var(--text-muted)">—</div></div>
+      </div>
+
+      <!-- BOTÃO MOVER PARA CARTEIRA — abre formulário com ticker preenchido -->
+      <button class="btn-carteira">➕ Adicionar à carteira</button>
+
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:12px;color:var(--text-muted)">Atualizado em 26/06/2026</span>
+        <button class="btn-icon">🗑️</button>
+      </div>
+    </div>
+
+    <!-- CARD COM OBSERVAÇÃO E PREÇO ALVO DEFINIDO -->
+    <div class="card">
+      <div class="card-header">
+        <div class="ticker-row">
+          <span class="ticker">VALE3</span>
+          <span class="tipo-pill">Ação</span>
+        </div>
+        <span class="badge badge-comprar">COMPRAR</span>
+      </div>
+      <div class="score-row">
+        <div class="score-bar"><div class="score-fill score-fill-excelente" style="width:83%"></div></div>
+        <span class="score-label">5/6</span>
+        <span class="score-class">EXCELENTE</span>
+      </div>
+      <div class="group-label">Critérios do score</div>
+      <div class="criterios">
+        <div class="criterio"><span class="criterio-nome">P/L &lt; 15</span><span class="criterio-valor">6.2</span><span class="check-ok">✅</span></div>
+        <div class="criterio"><span class="criterio-nome">P/VP &lt; 1,5</span><span class="criterio-valor">0.98</span><span class="check-ok">✅</span></div>
+        <div class="criterio"><span class="criterio-nome">Margem Liq. &gt; 10%</span><span class="criterio-valor">28.4%</span><span class="check-ok">✅</span></div>
+        <div class="criterio"><span class="criterio-nome">ROE &gt; 10%</span><span class="criterio-valor">19.1%</span><span class="check-ok">✅</span></div>
+        <div class="criterio"><span class="criterio-nome">Dívida/EBIT &lt; 2x</span><span class="criterio-valor">1.8x</span><span class="check-ok">✅</span></div>
+        <div class="criterio"><span class="criterio-nome">DY &gt; 6%</span><span class="criterio-valor">4.1%</span><span class="check-fail">❌</span></div>
+      </div>
+
+      <div class="group-label">Variação do dia</div>
+      <div class="var-box-neg">
+        <div>
+          <div style="font-size:11px;color:var(--danger);margin-bottom:3px">Preço atual</div>
+          <div style="font-size:18px;font-weight:700;color:var(--text-primary)">R$ 56,80</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Abertura: R$ 58,20</div>
+        </div>
+        <div style="text-align:right">
+          <div class="var-pct-neg">-2.41%</div>
+          <div style="font-size:12px;color:var(--danger)">-R$ 1,40 hoje</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);margin-bottom:4px">
+        <span>Mín R$ 56,40</span><span>Máx R$ 58,50</span>
+      </div>
+      <div class="minmax-bar-wrap">
+        <div class="minmax-fill-neg" style="width:12%"></div>
+      </div>
+
+      <div class="alvo-box">
+        <div><div class="alvo-label">Preço atual</div><div class="alvo-value" style="color:var(--text-primary)">R$ 56,80</div></div>
+        <span style="color:var(--text-muted);font-size:18px">→</span>
+        <div style="text-align:right">
+          <div class="alvo-label">Seu preço alvo</div>
+          <div class="alvo-value" style="color:var(--success)">R$ 55,00</div>
+          <div style="font-size:11px;color:var(--success)">+3.3% para atingir</div>
+        </div>
+      </div>
+
+      <div class="obs-box">📝 Bons fundamentos, esperando entrada ideal</div>
+
+      <button class="btn-carteira">➕ Adicionar à carteira</button>
+
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:12px;color:var(--text-muted)">Atualizado em 26/06/2026</span>
+        <button class="btn-icon">🗑️</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!--
+=================================================================
+RESUMO DAS CORES DO NOVO DESIGN (para globals.css)
+=================================================================
+--bg: #F0F2F5          (fundo geral)
+--surface: #FFFFFF     (cards, sidebar, header)
+--surface2: #F8F9FA    (fundo interno de boxes)
+--border: #E8ECF0      (bordas sutis)
+--border-strong: #D0D8E0
+--text-primary: #1A1A2E
+--text-secondary: #4A5568
+--text-muted: #8896A8
+--gold: #C9A84C        (logo + btn-primary apenas)
+--accent: #2563EB      (azul — links, tickers)
+--success: #16A34A
+--danger: #DC2626
+--warning: #D97706
+=================================================================
+-->
+
+</div>
+</body>
+</html>

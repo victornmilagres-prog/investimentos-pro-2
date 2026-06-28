@@ -41,7 +41,8 @@ function RadarCard({ item, onRemover, onAddCarteira }) {
   const isAcao = (item.tipo || '').toUpperCase() === 'ACAO' || (item.tipo || '').toUpperCase() === 'AÇÃO';
   const criterios = isAcao ? CRITERIOS_ACAO : CRITERIOS_FII;
   const maxScore = isAcao ? 6 : 4;
-  const fillPct = item.score != null ? (item.score / maxScore) * 100 : 0;
+  const scoreNum = typeof item.score === 'string' ? parseInt(item.score) : (item.score ?? 0);
+  const fillPct = (scoreNum / maxScore) * 100;
   const varPos = (item.variacao_dia ?? 0) >= 0;
 
   const C = {
@@ -67,7 +68,7 @@ function RadarCard({ item, onRemover, onAddCarteira }) {
         <div style={{ flex: 1, height: 5, background: '#E8ECF0', borderRadius: 4, overflow: 'hidden' }}>
           <div style={{ width: `${fillPct}%`, height: '100%', background: scoreBarColor(item.classificacao), borderRadius: 4 }}/>
         </div>
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', whiteSpace: 'nowrap' }}>{item.score || 0}/{maxScore}</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', whiteSpace: 'nowrap' }}>{scoreNum}/{maxScore}</span>
         <span style={{ fontSize: 12, color: '#8896A8' }}>{item.classificacao}</span>
       </div>
 

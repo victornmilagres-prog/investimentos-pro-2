@@ -34,8 +34,9 @@ router.post('/', async (req, res) => {
         usuario_id, ticker, quantidade, preco_compra,
         score, classificacao, decisao, preco_atual,
         dy_mensal, dy_anual, pvp, volume_financeiro, patrimonio_liquido,
+        variacao_dia, variacao_dia_reais, preco_abertura, preco_minimo, preco_maximo,
         observacoes, ultima_atualizacao
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
       ON CONFLICT (usuario_id, ticker) DO UPDATE SET
         quantidade = EXCLUDED.quantidade,
         preco_compra = CASE WHEN fiis_carteira.preco_compra = 0 THEN EXCLUDED.preco_compra ELSE fiis_carteira.preco_compra END,
@@ -44,14 +45,17 @@ router.post('/', async (req, res) => {
         dy_mensal = EXCLUDED.dy_mensal, dy_anual = EXCLUDED.dy_anual,
         pvp = EXCLUDED.pvp, volume_financeiro = EXCLUDED.volume_financeiro,
         patrimonio_liquido = EXCLUDED.patrimonio_liquido,
+        variacao_dia = EXCLUDED.variacao_dia, variacao_dia_reais = EXCLUDED.variacao_dia_reais,
+        preco_abertura = EXCLUDED.preco_abertura, preco_minimo = EXCLUDED.preco_minimo,
+        preco_maximo = EXCLUDED.preco_maximo,
         observacoes = EXCLUDED.observacoes, ultima_atualizacao = EXCLUDED.ultima_atualizacao,
         updated_at = NOW()
       RETURNING *
     `, [
       req.userId, dados.ticker, quantidade, preco_compra,
       dados.score, dados.classificacao, dados.decisao, dados.preco,
-      dados.dyMensal, dados.dyAnual, dados.pvp,
-      dados.volumeFinanceiro, dados.patrimonioLiquido,
+      dados.dyMensal, dados.dyAnual, dados.pvp, dados.volumeFinanceiro, dados.patrimonioLiquido,
+      dados.variacaoDia, dados.variacaoDiaReais, dados.precoAbertura, dados.precoMinimo, dados.precoMaximo,
       dados.observacoes, dados.ultimaAtualizacao
     ]);
 
@@ -104,12 +108,14 @@ router.post('/atualizar-todos', async (req, res) => {
         await pool.query(`
           UPDATE fiis_carteira SET score=$1, classificacao=$2, decisao=$3, preco_atual=$4,
             dy_mensal=$5, dy_anual=$6, pvp=$7, volume_financeiro=$8, patrimonio_liquido=$9,
-            observacoes=$10, ultima_atualizacao=$11, updated_at=NOW()
-          WHERE usuario_id=$12 AND ticker=$13
+            variacao_dia=$10, variacao_dia_reais=$11, preco_abertura=$12, preco_minimo=$13, preco_maximo=$14,
+            observacoes=$15, ultima_atualizacao=$16, updated_at=NOW()
+          WHERE usuario_id=$17 AND ticker=$18
         `, [
           dados.score, dados.classificacao, dados.decisao, dados.preco,
-          dados.dyMensal, dados.dyAnual, dados.pvp, dados.volumeFinanceiro,
-          dados.patrimonioLiquido, dados.observacoes, dados.ultimaAtualizacao,
+          dados.dyMensal, dados.dyAnual, dados.pvp, dados.volumeFinanceiro, dados.patrimonioLiquido,
+          dados.variacaoDia, dados.variacaoDiaReais, dados.precoAbertura, dados.precoMinimo, dados.precoMaximo,
+          dados.observacoes, dados.ultimaAtualizacao,
           req.userId, fii.ticker
         ]);
         resultados.push({ ticker: fii.ticker, status: 'ok' });

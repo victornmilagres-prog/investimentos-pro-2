@@ -39,33 +39,31 @@ router.post('/', async (req, res) => {
       INSERT INTO acoes_carteira (
         usuario_id, ticker, quantidade, preco_compra,
         score, classificacao, decisao, preco_atual, preco_graham, status_graham,
-        pl, pvp, margem_liquida, roe, divida_ebit, dy, observacoes, ultima_atualizacao
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+        pl, pvp, margem_liquida, roe, divida_ebit, dy,
+        variacao_dia, variacao_dia_reais, preco_abertura, preco_minimo, preco_maximo,
+        observacoes, ultima_atualizacao
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
       ON CONFLICT (usuario_id, ticker) DO UPDATE SET
         quantidade = EXCLUDED.quantidade,
         preco_compra = CASE WHEN acoes_carteira.preco_compra = 0 THEN EXCLUDED.preco_compra ELSE acoes_carteira.preco_compra END,
-        score = EXCLUDED.score,
-        classificacao = EXCLUDED.classificacao,
-        decisao = EXCLUDED.decisao,
-        preco_atual = EXCLUDED.preco_atual,
-        preco_graham = EXCLUDED.preco_graham,
-        status_graham = EXCLUDED.status_graham,
-        pl = EXCLUDED.pl,
-        pvp = EXCLUDED.pvp,
-        margem_liquida = EXCLUDED.margem_liquida,
-        roe = EXCLUDED.roe,
-        divida_ebit = EXCLUDED.divida_ebit,
-        dy = EXCLUDED.dy,
-        observacoes = EXCLUDED.observacoes,
-        ultima_atualizacao = EXCLUDED.ultima_atualizacao,
+        score = EXCLUDED.score, classificacao = EXCLUDED.classificacao,
+        decisao = EXCLUDED.decisao, preco_atual = EXCLUDED.preco_atual,
+        preco_graham = EXCLUDED.preco_graham, status_graham = EXCLUDED.status_graham,
+        pl = EXCLUDED.pl, pvp = EXCLUDED.pvp, margem_liquida = EXCLUDED.margem_liquida,
+        roe = EXCLUDED.roe, divida_ebit = EXCLUDED.divida_ebit, dy = EXCLUDED.dy,
+        variacao_dia = EXCLUDED.variacao_dia, variacao_dia_reais = EXCLUDED.variacao_dia_reais,
+        preco_abertura = EXCLUDED.preco_abertura, preco_minimo = EXCLUDED.preco_minimo,
+        preco_maximo = EXCLUDED.preco_maximo,
+        observacoes = EXCLUDED.observacoes, ultima_atualizacao = EXCLUDED.ultima_atualizacao,
         updated_at = NOW()
       RETURNING *
     `, [
       req.userId, dados.ticker, quantidade, preco_compra,
       dados.score, dados.classificacao, dados.decisao,
       dados.preco, dados.precoGraham, dados.statusGraham,
-      dados.pl, dados.pvp, dados.margemLiquida, dados.roe,
-      dados.dividaEbit, dados.dy, dados.observacoes, dados.ultimaAtualizacao
+      dados.pl, dados.pvp, dados.margemLiquida, dados.roe, dados.dividaEbit, dados.dy,
+      dados.variacaoDia, dados.variacaoDiaReais, dados.precoAbertura, dados.precoMinimo, dados.precoMaximo,
+      dados.observacoes, dados.ultimaAtualizacao
     ]);
 
     // Recalcula pesos de todas as ações do usuário
@@ -130,12 +128,16 @@ router.post('/atualizar-todos', async (req, res) => {
           UPDATE acoes_carteira SET
             score=$1, classificacao=$2, decisao=$3, preco_atual=$4, preco_graham=$5,
             status_graham=$6, pl=$7, pvp=$8, margem_liquida=$9, roe=$10,
-            divida_ebit=$11, dy=$12, observacoes=$13, ultima_atualizacao=$14, updated_at=NOW()
-          WHERE usuario_id=$15 AND ticker=$16
+            divida_ebit=$11, dy=$12,
+            variacao_dia=$13, variacao_dia_reais=$14, preco_abertura=$15, preco_minimo=$16, preco_maximo=$17,
+            observacoes=$18, ultima_atualizacao=$19, updated_at=NOW()
+          WHERE usuario_id=$20 AND ticker=$21
         `, [
           dados.score, dados.classificacao, dados.decisao, dados.preco, dados.precoGraham,
           dados.statusGraham, dados.pl, dados.pvp, dados.margemLiquida, dados.roe,
-          dados.dividaEbit, dados.dy, dados.observacoes, dados.ultimaAtualizacao,
+          dados.dividaEbit, dados.dy,
+          dados.variacaoDia, dados.variacaoDiaReais, dados.precoAbertura, dados.precoMinimo, dados.precoMaximo,
+          dados.observacoes, dados.ultimaAtualizacao,
           req.userId, acao.ticker
         ]);
         resultados.push({ ticker: acao.ticker, status: 'ok' });
