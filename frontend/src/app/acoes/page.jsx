@@ -81,17 +81,20 @@ function AcaoCard({ a, onRemover, onSalvar }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
           {criteriosAcao.map(({ label, key, ok, fmt: fmtFn }) => {
             const v = a[key];
-            const semDado = v == null || v === 0;
-            const dotColor = key === 'divida_ebit'
-              ? (semDado ? '#D97706' : (ok(v) ? '#16A34A' : '#DC2626'))
-              : (semDado ? '#D0D8E0' : (ok(v) ? '#16A34A' : '#DC2626'));
+            const isDivida = key === 'divida_ebit';
+            const dividaSemDado = isDivida && (!v || v === 0);
+            const semDado = !isDivida && (v == null || v === 0);
+            const dotColor = dividaSemDado
+              ? '#D97706'
+              : semDado ? '#D0D8E0' : (ok(v) ? '#16A34A' : '#DC2626');
+            const valorTexto = dividaSemDado ? 'S/D' : (v != null ? fmtFn(v) : '-');
+            const valorCor = dividaSemDado ? '#D97706' : '#1A1A2E';
             return (
               <div key={label}>
                 <p style={C.label}>{label}</p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <div style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-                    background: dotColor }}/>
-                  <p style={C.value}>{v != null ? fmtFn(v) : '-'}</p>
+                  <div style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: dotColor }}/>
+                  <p style={{ ...C.value, color: valorCor }}>{valorTexto}</p>
                 </div>
               </div>
             );

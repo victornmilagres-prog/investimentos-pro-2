@@ -26,15 +26,15 @@ const CRITERIOS_ACAO = [
   { label: 'P/VP < 1,5',         fn: a => a.pvp != null && a.pvp > 0 && a.pvp < 1.5,          val: a => a.pvp != null ? fmt.num(a.pvp) : '-' },
   { label: 'Margem Liq. > 10%',  fn: a => a.margem_liquida != null && a.margem_liquida > 10,   val: a => a.margem_liquida != null ? fmt.pct(a.margem_liquida) : '-' },
   { label: 'ROE > 10%',          fn: a => a.roe != null && a.roe > 10,                         val: a => a.roe != null ? fmt.pct(a.roe) : '-' },
-  { label: 'Dívida/EBIT < 2x',   fn: a => a.divida_ebit != null && a.divida_ebit < 2,         val: a => a.divida_ebit != null ? fmt.num(a.divida_ebit) + 'x' : '-' },
+  { label: 'Dívida/EBIT < 2x',   fn: a => a.divida_ebit != null && a.divida_ebit > 0 && a.divida_ebit < 2, val: a => a.divida_ebit != null ? fmt.num(a.divida_ebit) + 'x' : '-' },
   { label: 'DY > 6%',            fn: a => a.dy != null && a.dy > 6,                            val: a => a.dy != null ? fmt.pct(a.dy) : '-' },
 ];
 
 const CRITERIOS_FII = [
   { label: 'DY Mensal > 1%',         fn: f => f.dy_mensal != null && f.dy_mensal > 1,                         val: f => f.dy_mensal != null ? fmt.pct(f.dy_mensal) : '-' },
   { label: 'P/VP < 1,05',            fn: f => f.pvp != null && f.pvp > 0 && f.pvp < 1.05,                    val: f => f.pvp != null ? fmt.num(f.pvp) : '-' },
-  { label: 'Volume Diário > R$ 1M',  fn: f => f.volume_financeiro != null && f.volume_financeiro > 1000000,  val: f => f.volume_financeiro != null ? fmt.brl(f.volume_financeiro) : '-' },
-  { label: 'Patrimônio > R$ 1B',     fn: f => f.patrimonio_liquido != null && f.patrimonio_liquido > 1e9,    val: f => f.patrimonio_liquido != null ? fmt.brl(f.patrimonio_liquido) : '-' },
+  { label: 'Volume Diário > R$ 1M',  fn: f => f.volume_financeiro != null && f.volume_financeiro > 1000000,  val: f => f.volume_financeiro != null ? fmt.abrev(f.volume_financeiro) : '-' },
+  { label: 'Patrimônio > R$ 1B',     fn: f => f.patrimonio_liquido != null && f.patrimonio_liquido > 1e9,    val: f => f.patrimonio_liquido != null ? fmt.abrev(f.patrimonio_liquido) : '-' },
 ];
 
 function RadarCard({ item, onRemover, onAddCarteira }) {
