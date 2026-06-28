@@ -29,6 +29,17 @@ function LogoIcon({ size = 32 }) {
   );
 }
 
+const S = {
+  bg: '#0A0A0F',
+  surface: '#0F0F1A',
+  card: '#13131F',
+  border: '#1E1E2E',
+  gold: '#C9A84C',
+  text: '#FFFFFF',
+  muted: '#707088',
+  dim: '#55556A',
+};
+
 export default function RootLayout({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -55,10 +66,10 @@ export default function RootLayout({ children }) {
 
   if (loading) return (
     <html lang="pt-BR">
-      <body style={{ background: '#0A0A0F', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+      <body style={{ background: S.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', margin: 0 }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '32px', height: '32px', border: '2px solid #C9A84C', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}/>
-          <p style={{ color: '#555', fontSize: '13px' }}>Carregando...</p>
+          <div style={{ width: '32px', height: '32px', border: `2px solid ${S.gold}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}/>
+          <p style={{ color: S.dim, fontSize: '13px', margin: 0 }}>Carregando...</p>
         </div>
       </body>
     </html>
@@ -71,158 +82,156 @@ export default function RootLayout({ children }) {
         <meta name="viewport" content="width=device-width, initial-scale=1"/>
         <meta name="theme-color" content="#0A0A0F"/>
         <meta name="apple-mobile-web-app-capable" content="yes"/>
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
         <meta name="apple-mobile-web-app-title" content="AI Investimentos"/>
         <link rel="manifest" href="/manifest.json"/>
       </head>
-      <body style={{ background: '#0A0A0F' }}>
+      <body style={{ background: S.bg, margin: 0, padding: 0 }}>
         <AuthContext.Provider value={{ user, setUser, logout }}>
           {isAuth || !user ? (
-            <main style={{ minHeight: '100vh', background: '#0A0A0F' }}>{children}</main>
+            <main style={{ minHeight: '100vh', background: S.bg }}>{children}</main>
           ) : (
-            <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#0A0A0F' }}>
+            <div style={{ display: 'flex', minHeight: '100vh', background: S.bg }}>
 
               {/* Overlay mobile */}
               {sidebarOpen && (
-                <div onClick={() => setSidebarOpen(false)}
-                  style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 30 }}
-                  className="lg:hidden"/>
+                <div onClick={() => setSidebarOpen(false)} style={{
+                  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 30,
+                  display: 'block'
+                }} className="lg:hidden"/>
               )}
 
-              {/* Sidebar */}
+              {/* Sidebar — fixed, 240px */}
               <aside style={{
-                width: '240px', flexShrink: 0,
-                background: '#0F0F1A',
-                borderRight: '1px solid #1E1E2E',
-                display: 'flex', flexDirection: 'column',
-                position: 'fixed', top: 0, bottom: 0, left: 0, zIndex: 40,
-                transition: 'transform 0.3s',
-              }}
-              className={sidebarOpen ? '' : '-translate-x-full lg:translate-x-0'}>
+                width: '240px',
+                background: S.surface,
+                borderRight: `1px solid ${S.border}`,
+                display: 'flex',
+                flexDirection: 'column',
+                position: 'fixed',
+                top: 0, bottom: 0, left: 0,
+                zIndex: 40,
+                transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
+                transition: 'transform 0.25s ease',
+              }} className="lg:translate-x-0">
 
-                {/* Logo */}
-                <div style={{ padding: '20px 16px', borderBottom: '1px solid #1E1E2E', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ padding: '18px 14px', borderBottom: `1px solid ${S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <LogoIcon size={34}/>
+                    <LogoIcon size={32}/>
                     <div>
-                      <div style={{ fontSize: '11px', fontWeight: '800', color: '#FFF', letterSpacing: '2px', lineHeight: 1.1 }}>AI INVESTIMENTOS</div>
-                      <div style={{ fontSize: '7px', color: '#C9A84C', letterSpacing: '1px', marginTop: '2px' }}>SEU COPILOTO INTELIGENTE</div>
+                      <div style={{ fontSize: '10px', fontWeight: '800', color: S.text, letterSpacing: '2px' }}>AI INVESTIMENTOS</div>
+                      <div style={{ fontSize: '7px', color: S.gold, letterSpacing: '1px', marginTop: '2px' }}>SEU COPILOTO INTELIGENTE</div>
                     </div>
                   </div>
                   <button onClick={() => setSidebarOpen(false)} className="lg:hidden"
-                    style={{ color: '#555', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: S.muted, padding: '2px' }}>
                     <X size={16}/>
                   </button>
                 </div>
 
-                {/* Nav */}
-                <nav style={{ flex: 1, padding: '12px 8px', overflowY: 'auto' }}>
+                <nav style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
                   {NAV.map(({ href, label, icon: Icon }) => {
                     const active = pathname === href || pathname.startsWith(href + '/');
                     return (
                       <a key={href} href={href} style={{
                         display: 'flex', alignItems: 'center', gap: '10px',
-                        padding: '10px 12px', borderRadius: '8px', marginBottom: '2px',
+                        padding: '9px 12px', borderRadius: '8px', marginBottom: '2px',
                         fontSize: '13px', fontWeight: '500', textDecoration: 'none',
-                        background: active ? 'rgba(201,168,76,0.12)' : 'transparent',
-                        color: active ? '#C9A84C' : '#707088',
-                        borderLeft: active ? '2px solid #C9A84C' : '2px solid transparent',
+                        background: active ? 'rgba(201,168,76,0.1)' : 'transparent',
+                        color: active ? S.gold : S.muted,
+                        borderLeft: `2px solid ${active ? S.gold : 'transparent'}`,
                         transition: 'all 0.15s',
                       }}>
                         <Icon size={17} style={{ flexShrink: 0 }}/>
                         <span>{label}</span>
-                        {active && <ChevronRight size={13} style={{ marginLeft: 'auto', opacity: 0.6 }}/>}
+                        {active && <ChevronRight size={13} style={{ marginLeft: 'auto', opacity: 0.5 }}/>}
                       </a>
                     );
                   })}
                 </nav>
 
-                {/* Footer */}
-                <div style={{ padding: '8px 8px 16px', borderTop: '1px solid #1E1E2E' }}>
+                <div style={{ padding: '8px 8px 14px', borderTop: `1px solid ${S.border}` }}>
                   <a href="/notificacoes" style={{
-                    display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
-                    borderRadius: '8px', fontSize: '13px', color: '#707088', textDecoration: 'none',
-                    marginBottom: '4px'
+                    display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
+                    borderRadius: '8px', fontSize: '13px', color: S.muted, textDecoration: 'none', marginBottom: '4px'
                   }}>
                     <div style={{ position: 'relative' }}>
                       <Bell size={17}/>
-                      {notifCount > 0 && (
-                        <span style={{ position: 'absolute', top: '-4px', right: '-4px', width: '14px', height: '14px', background: '#C9A84C', borderRadius: '50%', color: '#0A0A0F', fontSize: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>
-                          {notifCount}
-                        </span>
-                      )}
+                      {notifCount > 0 && <span style={{ position: 'absolute', top: '-4px', right: '-5px', width: '14px', height: '14px', background: S.gold, borderRadius: '50%', color: S.bg, fontSize: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>{notifCount}</span>}
                     </div>
                     <span>Notificacoes</span>
                   </a>
-                  <div style={{ padding: '10px 12px', background: '#13131F', borderRadius: '8px', marginBottom: '4px' }}>
+                  <div style={{ padding: '9px 12px', background: S.card, borderRadius: '8px', marginBottom: '4px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(201,168,76,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <User size={14} style={{ color: '#C9A84C' }}/>
+                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(201,168,76,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <User size={14} style={{ color: S.gold }}/>
                       </div>
                       <div style={{ minWidth: 0 }}>
-                        <p style={{ fontSize: '12px', fontWeight: '600', color: '#FFF', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.nome}</p>
-                        <p style={{ fontSize: '10px', color: '#555', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</p>
+                        <p style={{ fontSize: '12px', fontWeight: '600', color: S.text, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.nome}</p>
+                        <p style={{ fontSize: '10px', color: S.dim, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</p>
                       </div>
                     </div>
                   </div>
                   <button onClick={logout} style={{
-                    display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
-                    borderRadius: '8px', fontSize: '13px', color: '#EF4444', background: 'none',
-                    border: 'none', cursor: 'pointer', width: '100%',
+                    display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
+                    borderRadius: '8px', fontSize: '13px', color: '#EF4444',
+                    background: 'none', border: 'none', cursor: 'pointer', width: '100%',
                   }}>
                     <LogOut size={17}/><span>Sair</span>
                   </button>
                 </div>
               </aside>
 
-              {/* Conteudo principal */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', marginLeft: '0', overflow: 'hidden' }} className="lg:ml-60">
+              {/* Conteudo — margem esquerda de 240px no desktop */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, marginLeft: 0 }} className="lg:ml-60">
 
-                {/* Topbar */}
-                <header style={{ background: '#0F0F1A', borderBottom: '1px solid #1E1E2E', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                {/* Header */}
+                <header style={{
+                  background: S.surface, borderBottom: `1px solid ${S.border}`,
+                  padding: '0 16px', height: '52px',
+                  display: 'flex', alignItems: 'center', gap: '12px',
+                  position: 'sticky', top: 0, zIndex: 20, flexShrink: 0,
+                }}>
                   <button onClick={() => setSidebarOpen(true)} className="lg:hidden"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#707088', padding: '4px' }}>
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: S.muted, padding: '4px' }}>
                     <Menu size={20}/>
                   </button>
                   <button onClick={() => setSidebarOpen(!sidebarOpen)} className="hidden lg:block"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#707088', padding: '4px' }}>
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: S.muted, padding: '4px' }}>
                     <Menu size={18}/>
                   </button>
                   <div style={{ flex: 1 }}>
-                    <span style={{ fontSize: '14px', fontWeight: '600', color: '#FFF' }}>
+                    <span style={{ fontSize: '14px', fontWeight: '600', color: S.text }}>
                       {NAV.find(n => pathname.startsWith(n.href))?.label || 'AI Investimentos'}
                     </span>
                   </div>
-                  <a href="/notificacoes" style={{ position: 'relative', color: '#707088', textDecoration: 'none', padding: '4px' }}>
+                  <a href="/notificacoes" style={{ position: 'relative', color: S.muted, textDecoration: 'none', padding: '4px' }}>
                     <Bell size={18}/>
-                    {notifCount > 0 && (
-                      <span style={{ position: 'absolute', top: 0, right: 0, width: '14px', height: '14px', background: '#C9A84C', borderRadius: '50%', color: '#0A0A0F', fontSize: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>
-                        {notifCount}
-                      </span>
-                    )}
+                    {notifCount > 0 && <span style={{ position: 'absolute', top: 0, right: 0, width: '14px', height: '14px', background: S.gold, borderRadius: '50%', color: S.bg, fontSize: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>{notifCount}</span>}
                   </a>
                 </header>
 
-                {/* Pagina */}
-                <main style={{ flex: 1, overflowY: 'auto', padding: '20px 16px', paddingBottom: '80px', background: '#0A0A0F' }} className="lg:p-6 lg:pb-6">
+                {/* Conteudo da pagina */}
+                <main style={{
+                  flex: 1, overflowY: 'auto', background: S.bg,
+                  padding: '20px 16px', paddingBottom: '80px',
+                }} className="lg:p-6 lg:pb-6">
                   {children}
                 </main>
               </div>
 
-              {/* Bottom Navigation mobile */}
+              {/* Bottom nav mobile */}
               <nav className="lg:hidden" style={{
                 position: 'fixed', bottom: 0, left: 0, right: 0,
-                background: '#0F0F1A', borderTop: '1px solid #1E1E2E',
-                display: 'flex', zIndex: 30
+                background: S.surface, borderTop: `1px solid ${S.border}`,
+                display: 'flex', zIndex: 30, height: '58px',
               }}>
                 {NAV.slice(0, 5).map(({ href, label, icon: Icon }) => {
                   const active = pathname === href || pathname.startsWith(href + '/');
                   return (
                     <a key={href} href={href} style={{
                       flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                      justifyContent: 'center', padding: '8px 4px', gap: '2px',
-                      color: active ? '#C9A84C' : '#555', textDecoration: 'none',
-                      fontSize: '10px', fontWeight: '500'
+                      justifyContent: 'center', gap: '2px', textDecoration: 'none',
+                      color: active ? S.gold : S.dim, fontSize: '10px', fontWeight: '500',
                     }}>
                       <Icon size={20}/>
                       <span>{label.split(' ')[0]}</span>
@@ -231,9 +240,8 @@ export default function RootLayout({ children }) {
                 })}
                 <button onClick={logout} style={{
                   flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                  justifyContent: 'center', padding: '8px 4px', gap: '2px',
-                  color: '#555', background: 'none', border: 'none', cursor: 'pointer',
-                  fontSize: '10px', fontWeight: '500'
+                  justifyContent: 'center', gap: '2px', color: S.dim,
+                  background: 'none', border: 'none', cursor: 'pointer', fontSize: '10px', fontWeight: '500',
                 }}>
                   <LogOut size={20}/><span>Sair</span>
                 </button>
