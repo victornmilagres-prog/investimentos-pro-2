@@ -21,6 +21,15 @@ function scoreBarColor(c = '') {
   return '#DC2626';
 }
 
+const criteriosFII = [
+  { label: 'DY Mensal',  key: 'dy_mensal',         ok: v => v > 1,             temCriterio: true,  fmt: v => fmt.pct(v) },
+  { label: 'DY Anual',   key: 'dy_anual',           ok: null,                   temCriterio: false, fmt: v => fmt.pct(v) },
+  { label: 'P/VP',       key: 'pvp',                ok: v => v > 0 && v < 1.05, temCriterio: true,  fmt: v => fmt.num(v) },
+  { label: 'Volume Dia', key: 'volume_financeiro',  ok: v => v > 1000000,       temCriterio: true,  fmt: v => fmt.abrev(v) },
+  { label: 'Patrimônio', key: 'patrimonio_liquido', ok: v => v > 1e9,           temCriterio: true,  fmt: v => fmt.abrev(v) },
+  { label: 'Peso',       key: 'peso_sugerido',      ok: null,                   temCriterio: false, fmt: v => fmt.pct((v || 0) * 100) },
+];
+
 function FIICard({ f, onRemover, onSalvar }) {
   const [editando, setEditando] = useState(false);
   const [qtd, setQtd] = useState(String(f.quantidade ?? ''));
@@ -62,19 +71,22 @@ function FIICard({ f, onRemover, onSalvar }) {
       <div>
         <p style={C.groupLabel}>Rendimento & Qualidade</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
-          {[
-            { label: 'DY Mensal',  v: f.dy_mensal          != null ? fmt.pct(f.dy_mensal)          : '-' },
-            { label: 'DY Anual',   v: f.dy_anual           != null ? fmt.pct(f.dy_anual)           : '-' },
-            { label: 'P/VP',       v: f.pvp                != null ? fmt.num(f.pvp)                : '-' },
-            { label: 'Volume Dia', v: f.volume_financeiro  != null ? fmt.abrev(f.volume_financeiro)  : '-' },
-            { label: 'Patrimônio', v: f.patrimonio_liquido != null ? fmt.abrev(f.patrimonio_liquido) : '-' },
-            { label: 'Peso',       v: f.peso_sugerido      != null ? fmt.pct(f.peso_sugerido * 100): '-' },
-          ].map(({ label, v }) => (
-            <div key={label}>
-              <p style={C.label}>{label}</p>
-              <p style={C.value}>{v}</p>
-            </div>
-          ))}
+          {criteriosFII.map(({ label, key, ok, temCriterio, fmt: fmtFn }) => {
+            const v = f[key];
+            const passou = temCriterio && v != null && ok(v);
+            return (
+              <div key={label}>
+                <p style={C.label}>{label}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  {temCriterio && (
+                    <div style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                      background: v != null ? (passou ? '#16A34A' : '#DC2626') : '#D0D8E0' }}/>
+                  )}
+                  <p style={C.value}>{v != null ? fmtFn(v) : '-'}</p>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -252,6 +264,13 @@ export default function FIIsPage() {
       <Suspense fallback={<div style={{ background: '#FFF', border: '1px solid #E8ECF0', borderRadius: 14, padding: 20, marginBottom: 24, height: 90 }}/>}>
         <FIIsForm onAdicionado={carregar}/>
       </Suspense>
+
+      <div style={{ background: '#FFFFFF', border: '1px solid #E8ECF0', borderRadius: 12, padding: '12px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#8896A8', textTransform: 'uppercase', letterSpacing: '0.05em', marginRight: 4 }}>Critérios de avaliação (Score /4)</span>
+        {['DY Mensal > 1%', 'P/VP < 1,05', 'Volume Diário > R$ 1M', 'Patrimônio > R$ 1B'].map(c => (
+          <span key={c} style={{ fontSize: 12, fontWeight: 500, padding: '3px 10px', borderRadius: 20, background: '#F0F2F5', color: '#4A5568', border: '1px solid #E8ECF0' }}>{c}</span>
+        ))}
+      </div>
 
       {fiis.length > 0 ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>

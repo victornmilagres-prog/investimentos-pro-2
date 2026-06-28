@@ -28,6 +28,15 @@ function grahamTag(s = '') {
   return 'graham-caro';
 }
 
+const criteriosAcao = [
+  { label: 'P/L',      key: 'pl',             ok: v => v > 0 && v < 15,  fmt: v => fmt.num(v) },
+  { label: 'P/VP',     key: 'pvp',            ok: v => v > 0 && v < 1.5, fmt: v => fmt.num(v) },
+  { label: 'DY %',     key: 'dy',             ok: v => v > 6,            fmt: v => fmt.pct(v) },
+  { label: 'Margem',   key: 'margem_liquida', ok: v => v > 10,           fmt: v => fmt.pct(v) },
+  { label: 'ROE',      key: 'roe',            ok: v => v > 10,           fmt: v => fmt.pct(v) },
+  { label: 'Dív/EBIT', key: 'divida_ebit',    ok: v => v > 0 && v < 2,  fmt: v => fmt.num(v) },
+];
+
 function AcaoCard({ a, onRemover, onSalvar }) {
   const [editando, setEditando] = useState(false);
   const [qtd, setQtd] = useState(String(a.quantidade ?? ''));
@@ -70,19 +79,20 @@ function AcaoCard({ a, onRemover, onSalvar }) {
       <div>
         <p style={C.groupLabel}>Fundamentos</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
-          {[
-            { label: 'P/L',       v: a.pl               != null ? fmt.num(a.pl)               : '-' },
-            { label: 'P/VP',      v: a.pvp              != null ? fmt.num(a.pvp)              : '-' },
-            { label: 'DY %',      v: a.dy               != null ? fmt.pct(a.dy)               : '-' },
-            { label: 'Margem',    v: a.margem_liquida   != null ? fmt.pct(a.margem_liquida)   : '-' },
-            { label: 'ROE',       v: a.roe              != null ? fmt.pct(a.roe)              : '-' },
-            { label: 'Dív/EBIT',  v: a.divida_ebit      != null ? fmt.num(a.divida_ebit)      : '-' },
-          ].map(({ label, v }) => (
-            <div key={label}>
-              <p style={C.label}>{label}</p>
-              <p style={C.value}>{v}</p>
-            </div>
-          ))}
+          {criteriosAcao.map(({ label, key, ok, fmt: fmtFn }) => {
+            const v = a[key];
+            const passou = v != null && ok(v);
+            return (
+              <div key={label}>
+                <p style={C.label}>{label}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <div style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                    background: v != null ? (passou ? '#16A34A' : '#DC2626') : '#D0D8E0' }}/>
+                  <p style={C.value}>{v != null ? fmtFn(v) : '-'}</p>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -277,6 +287,13 @@ export default function AcoesPage() {
       <Suspense fallback={<div style={{ background: '#FFF', border: '1px solid #E8ECF0', borderRadius: 14, padding: 20, marginBottom: 24, height: 90 }}/>}>
         <AcoesForm onAdicionado={carregar}/>
       </Suspense>
+
+      <div style={{ background: '#FFFFFF', border: '1px solid #E8ECF0', borderRadius: 12, padding: '12px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: '#8896A8', textTransform: 'uppercase', letterSpacing: '0.05em', marginRight: 4 }}>Critérios de avaliação (Score /6)</span>
+        {['P/L < 15', 'P/VP < 1,5', 'Margem Liq. > 10%', 'ROE > 10%', 'Dívida/EBIT < 2x', 'DY > 6%'].map(c => (
+          <span key={c} style={{ fontSize: 12, fontWeight: 500, padding: '3px 10px', borderRadius: 20, background: '#F0F2F5', color: '#4A5568', border: '1px solid #E8ECF0' }}>{c}</span>
+        ))}
+      </div>
 
       {acoes.length > 0 ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>

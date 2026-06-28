@@ -82,15 +82,39 @@ function RadarCard({ item, onRemover, onAddCarteira }) {
             const ok = c.fn(item);
             const v = c.val(item);
             return (
-              <div key={c.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderRadius: 8, background: '#F8F9FA' }}>
+              <div key={c.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 10px', borderRadius: 8, background: '#F8F9FA' }}>
                 <span style={{ fontSize: 12, color: '#4A5568', flex: 1 }}>{c.label}</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#1A1A2E', margin: '0 10px' }}>{v}</span>
-                <span style={{ fontSize: 16, color: ok ? '#16A34A' : '#DC2626' }}>{ok ? '✅' : '❌'}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#1A1A2E', margin: '0 8px' }}>{v}</span>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                  background: ok ? '#16A34A' : '#DC2626' }}/>
               </div>
             );
           })}
         </div>
       </div>
+
+      {/* Graham (apenas ações) */}
+      {isAcao && item.preco_graham != null && item.preco_graham > 0 && (
+        <div>
+          <p style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+            Preço Graham
+          </p>
+          <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <p style={{ fontSize: 11, color: '#3B82F6', marginBottom: 3 }}>Preço Graham calculado</p>
+              <p style={{ fontSize: 15, fontWeight: 700, color: '#2563EB' }}>{fmt.brl(item.preco_graham)}</p>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ fontSize: 11, color: '#3B82F6', marginBottom: 3 }}>Situação vs Graham</p>
+              <span style={{
+                fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20,
+                background: item.status_graham === 'DESCONTADO' ? '#D1FAE5' : item.status_graham === 'JUSTO' ? '#FEF3C7' : '#FEE2E2',
+                color: item.status_graham === 'DESCONTADO' ? '#065F46' : item.status_graham === 'JUSTO' ? '#92400E' : '#991B1B',
+              }}>{item.status_graham || 'SEM DADO'}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Variação do dia */}
       <div>

@@ -68,16 +68,19 @@ watchlistRouter.post('/', async (req, res) => {
     } catch { /* mantém dados vazios se falhar */ }
 
     const r = await pool.query(
-      `INSERT INTO watchlist (usuario_id,ticker,tipo,preco_alvo,observacoes,score,classificacao,decisao,preco_atual,ultima_atualizacao)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      `INSERT INTO watchlist (usuario_id,ticker,tipo,preco_alvo,observacoes,score,classificacao,decisao,preco_atual,preco_graham,status_graham,ultima_atualizacao)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        ON CONFLICT (usuario_id,ticker) DO UPDATE SET
          preco_alvo=EXCLUDED.preco_alvo, score=EXCLUDED.score,
          classificacao=EXCLUDED.classificacao, decisao=EXCLUDED.decisao,
-         preco_atual=EXCLUDED.preco_atual, ultima_atualizacao=EXCLUDED.ultima_atualizacao
+         preco_atual=EXCLUDED.preco_atual, preco_graham=EXCLUDED.preco_graham,
+         status_graham=EXCLUDED.status_graham, ultima_atualizacao=EXCLUDED.ultima_atualizacao
        RETURNING *`,
       [req.userId, ticker.toUpperCase(), tipo, preco_alvo || null, observacoes,
        dados.score || null, dados.classificacao || null, dados.decisao || null,
-       dados.preco || null, dados.ultimaAtualizacao || null]
+       dados.preco || null, tipo === 'ACAO' ? (dados.precoGraham || null) : null,
+       tipo === 'ACAO' ? (dados.statusGraham || null) : null,
+       dados.ultimaAtualizacao || null]
     );
     res.status(201).json(r.rows[0]);
   } catch {
@@ -96,8 +99,13 @@ watchlistRouter.post('/atualizar-todos', async (req, res) => {
     try {
       const dados = item.tipo === 'ACAO' ? await buscarAcao(item.ticker) : await buscarFII(item.ticker);
       await pool.query(
-        'UPDATE watchlist SET score=$1,classificacao=$2,decisao=$3,preco_atual=$4,ultima_atualizacao=$5 WHERE usuario_id=$6 AND ticker=$7',
-        [dados.score, dados.classificacao, dados.decisao, dados.preco, dados.ultimaAtualizacao, req.userId, item.ticker]
+        `UPDATE watchlist SET score=$1,classificacao=$2,decisao=$3,preco_atual=$4,
+          preco_graham=$5,status_graham=$6,ultima_atualizacao=$7
+         WHERE usuario_id=$8 AND ticker=$9`,
+        [dados.score, dados.classificacao, dados.decisao, dados.preco,
+         item.tipo === 'ACAO' ? (dados.precoGraham || null) : null,
+         item.tipo === 'ACAO' ? (dados.statusGraham || null) : null,
+         dados.ultimaAtualizacao, req.userId, item.ticker]
       );
     } catch { /* continua */ }
   }
