@@ -138,7 +138,7 @@ watchlistRouter.post('/atualizar-todos', async (req, res) => {
            preco_graham=$15, status_graham=$16,
            variacao_dia=$17, variacao_dia_reais=$18,
            preco_abertura=$19, preco_minimo=$20, preco_maximo=$21,
-           ultima_atualizacao=$22, updated_at=NOW()
+           ultima_atualizacao=$22
          WHERE usuario_id=$23 AND ticker=$24`,
         [
           d.preco, d.score, d.classificacao, d.decisao,
