@@ -81,12 +81,15 @@ function RadarCard({ item, onRemover, onAddCarteira }) {
           {criterios.map(c => {
             const ok = c.fn(item);
             const v = c.val(item);
+            const isDividaEbit = c.label === 'Dívida/EBIT < 2x';
+            const rawVal = isDividaEbit ? (item.divida_ebit ?? 0) : null;
+            const semDado = isDividaEbit && (rawVal === 0 || rawVal == null);
+            const dotColor = semDado ? '#D97706' : (ok ? '#16A34A' : '#DC2626');
             return (
               <div key={c.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 10px', borderRadius: 8, background: '#F8F9FA' }}>
                 <span style={{ fontSize: 12, color: '#4A5568', flex: 1 }}>{c.label}</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#1A1A2E', margin: '0 8px' }}>{v}</span>
-                <div style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-                  background: ok ? '#16A34A' : '#DC2626' }}/>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#1A1A2E', margin: '0 8px' }}>{semDado ? 'Sem dado' : v}</span>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: dotColor }}/>
               </div>
             );
           })}

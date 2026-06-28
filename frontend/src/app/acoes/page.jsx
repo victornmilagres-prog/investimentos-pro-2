@@ -81,13 +81,16 @@ function AcaoCard({ a, onRemover, onSalvar }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
           {criteriosAcao.map(({ label, key, ok, fmt: fmtFn }) => {
             const v = a[key];
-            const passou = v != null && ok(v);
+            const semDado = v == null || v === 0;
+            const dotColor = key === 'divida_ebit'
+              ? (semDado ? '#D97706' : (ok(v) ? '#16A34A' : '#DC2626'))
+              : (semDado ? '#D0D8E0' : (ok(v) ? '#16A34A' : '#DC2626'));
             return (
               <div key={label}>
                 <p style={C.label}>{label}</p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                   <div style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-                    background: v != null ? (passou ? '#16A34A' : '#DC2626') : '#D0D8E0' }}/>
+                    background: dotColor }}/>
                   <p style={C.value}>{v != null ? fmtFn(v) : '-'}</p>
                 </div>
               </div>
@@ -288,11 +291,16 @@ export default function AcoesPage() {
         <AcoesForm onAdicionado={carregar}/>
       </Suspense>
 
-      <div style={{ background: '#FFFFFF', border: '1px solid #E8ECF0', borderRadius: 12, padding: '12px 20px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <div style={{ background: '#FFFFFF', border: '1px solid #E8ECF0', borderRadius: 12, padding: '12px 20px', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: '#8896A8', textTransform: 'uppercase', letterSpacing: '0.05em', marginRight: 4 }}>Critérios de avaliação (Score /6)</span>
         {['P/L < 15', 'P/VP < 1,5', 'Margem Liq. > 10%', 'ROE > 10%', 'Dívida/EBIT < 2x', 'DY > 6%'].map(c => (
           <span key={c} style={{ fontSize: 12, fontWeight: 500, padding: '3px 10px', borderRadius: 20, background: '#F0F2F5', color: '#4A5568', border: '1px solid #E8ECF0' }}>{c}</span>
         ))}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 11, color: '#8896A8', marginBottom: 16 }}>
+        <span><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#16A34A', marginRight: 4 }}/>Aprovado</span>
+        <span><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#DC2626', marginRight: 4 }}/>Reprovado</span>
+        <span><span style={{ display: 'inline-block', width: 7, height: 7, borderRadius: '50%', background: '#D97706', marginRight: 4 }}/>Sem dado</span>
       </div>
 
       {acoes.length > 0 ? (

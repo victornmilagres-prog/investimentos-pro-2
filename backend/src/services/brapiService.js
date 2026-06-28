@@ -70,7 +70,12 @@ function scoreAcao(pl, pvp, margem, roe, divida, dy, ticker) {
   if (pvp > 0 && pvp < 1.5) score++;
   if (margem > 10) score++;
   if (roe > 10) score++;
-  if (bancos.includes(ticker) || (divida > 0 && divida < 2)) score++;
+  if (bancos.includes(ticker)) {
+    score++; // bancos não têm dívida/ebit aplicável, sempre pontua
+  } else if (divida > 0 && divida < 2) {
+    score++; // tem dado e passou
+  }
+  // se divida === 0 e não é banco: dado indisponível, não pontua nem reprova
   if (dy > 6) score++;
   return score;
 }

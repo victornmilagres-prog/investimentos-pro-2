@@ -61,29 +61,60 @@ watchlistRouter.post('/', async (req, res) => {
   const { ticker, tipo, preco_alvo, observacoes } = req.body;
   if (!ticker || !tipo) return res.status(400).json({ error: 'Ticker e tipo obrigatórios.' });
   try {
-    let dados = {};
+    let d = {};
     try {
-      if (tipo === 'ACAO') dados = await buscarAcao(ticker);
-      else dados = await buscarFII(ticker);
-    } catch { /* mantém dados vazios se falhar */ }
+      if (tipo === 'ACAO') d = await buscarAcao(ticker);
+      else d = await buscarFII(ticker);
+    } catch(e) { console.log('Erro ao buscar dados watchlist:', e.message); }
 
+    const isAcao = tipo === 'ACAO';
     const r = await pool.query(
-      `INSERT INTO watchlist (usuario_id,ticker,tipo,preco_alvo,observacoes,score,classificacao,decisao,preco_atual,preco_graham,status_graham,ultima_atualizacao)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+      `INSERT INTO watchlist (
+         usuario_id,ticker,tipo,preco_alvo,observacoes,
+         preco_atual,score,classificacao,decisao,
+         pl,pvp,margem_liquida,roe,divida_ebit,dy,
+         dy_mensal,dy_anual,volume_financeiro,patrimonio_liquido,
+         preco_graham,status_graham,
+         variacao_dia,variacao_dia_reais,preco_abertura,preco_minimo,preco_maximo,
+         ultima_atualizacao
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
        ON CONFLICT (usuario_id,ticker) DO UPDATE SET
-         preco_alvo=EXCLUDED.preco_alvo, score=EXCLUDED.score,
+         preco_alvo=EXCLUDED.preco_alvo, observacoes=EXCLUDED.observacoes,
+         preco_atual=EXCLUDED.preco_atual, score=EXCLUDED.score,
          classificacao=EXCLUDED.classificacao, decisao=EXCLUDED.decisao,
-         preco_atual=EXCLUDED.preco_atual, preco_graham=EXCLUDED.preco_graham,
-         status_graham=EXCLUDED.status_graham, ultima_atualizacao=EXCLUDED.ultima_atualizacao
+         pl=EXCLUDED.pl, pvp=EXCLUDED.pvp, margem_liquida=EXCLUDED.margem_liquida,
+         roe=EXCLUDED.roe, divida_ebit=EXCLUDED.divida_ebit, dy=EXCLUDED.dy,
+         dy_mensal=EXCLUDED.dy_mensal, dy_anual=EXCLUDED.dy_anual,
+         volume_financeiro=EXCLUDED.volume_financeiro, patrimonio_liquido=EXCLUDED.patrimonio_liquido,
+         preco_graham=EXCLUDED.preco_graham, status_graham=EXCLUDED.status_graham,
+         variacao_dia=EXCLUDED.variacao_dia, variacao_dia_reais=EXCLUDED.variacao_dia_reais,
+         preco_abertura=EXCLUDED.preco_abertura, preco_minimo=EXCLUDED.preco_minimo,
+         preco_maximo=EXCLUDED.preco_maximo, ultima_atualizacao=EXCLUDED.ultima_atualizacao,
+         updated_at=NOW()
        RETURNING *`,
-      [req.userId, ticker.toUpperCase(), tipo, preco_alvo || null, observacoes,
-       dados.score || null, dados.classificacao || null, dados.decisao || null,
-       dados.preco || null, tipo === 'ACAO' ? (dados.precoGraham || null) : null,
-       tipo === 'ACAO' ? (dados.statusGraham || null) : null,
-       dados.ultimaAtualizacao || null]
+      [
+        req.userId, ticker.toUpperCase(), tipo, preco_alvo || null, observacoes,
+        d.preco || null, d.score || null, d.classificacao || null, d.decisao || null,
+        isAcao ? (d.pl || 0) : 0,
+        d.pvp || 0,
+        isAcao ? (d.margemLiquida || 0) : 0,
+        isAcao ? (d.roe || 0) : 0,
+        isAcao ? (d.dividaEbit || 0) : 0,
+        isAcao ? (d.dy || 0) : 0,
+        !isAcao ? (d.dyMensal || 0) : 0,
+        !isAcao ? (d.dyAnual || 0) : 0,
+        !isAcao ? (d.volumeFinanceiro || 0) : 0,
+        !isAcao ? (d.patrimonioLiquido || 0) : 0,
+        isAcao ? (d.precoGraham || null) : null,
+        isAcao ? (d.statusGraham || null) : null,
+        d.variacaoDia || 0, d.variacaoDiaReais || 0,
+        d.precoAbertura || 0, d.precoMinimo || 0, d.precoMaximo || 0,
+        d.ultimaAtualizacao || new Date()
+      ]
     );
     res.status(201).json(r.rows[0]);
-  } catch {
+  } catch(err) {
+    console.error(err);
     res.status(500).json({ error: 'Erro ao adicionar à watchlist.' });
   }
 });
@@ -97,17 +128,39 @@ watchlistRouter.post('/atualizar-todos', async (req, res) => {
   const itens = await pool.query('SELECT ticker, tipo FROM watchlist WHERE usuario_id=$1', [req.userId]);
   for (const item of itens.rows) {
     try {
-      const dados = item.tipo === 'ACAO' ? await buscarAcao(item.ticker) : await buscarFII(item.ticker);
+      const d = item.tipo === 'ACAO' ? await buscarAcao(item.ticker) : await buscarFII(item.ticker);
+      const isAcao = item.tipo === 'ACAO';
       await pool.query(
-        `UPDATE watchlist SET score=$1,classificacao=$2,decisao=$3,preco_atual=$4,
-          preco_graham=$5,status_graham=$6,ultima_atualizacao=$7
-         WHERE usuario_id=$8 AND ticker=$9`,
-        [dados.score, dados.classificacao, dados.decisao, dados.preco,
-         item.tipo === 'ACAO' ? (dados.precoGraham || null) : null,
-         item.tipo === 'ACAO' ? (dados.statusGraham || null) : null,
-         dados.ultimaAtualizacao, req.userId, item.ticker]
+        `UPDATE watchlist SET
+           preco_atual=$1, score=$2, classificacao=$3, decisao=$4,
+           pl=$5, pvp=$6, margem_liquida=$7, roe=$8, divida_ebit=$9, dy=$10,
+           dy_mensal=$11, dy_anual=$12, volume_financeiro=$13, patrimonio_liquido=$14,
+           preco_graham=$15, status_graham=$16,
+           variacao_dia=$17, variacao_dia_reais=$18,
+           preco_abertura=$19, preco_minimo=$20, preco_maximo=$21,
+           ultima_atualizacao=$22, updated_at=NOW()
+         WHERE usuario_id=$23 AND ticker=$24`,
+        [
+          d.preco, d.score, d.classificacao, d.decisao,
+          isAcao ? (d.pl || 0) : 0,
+          d.pvp || 0,
+          isAcao ? (d.margemLiquida || 0) : 0,
+          isAcao ? (d.roe || 0) : 0,
+          isAcao ? (d.dividaEbit || 0) : 0,
+          isAcao ? (d.dy || 0) : 0,
+          !isAcao ? (d.dyMensal || 0) : 0,
+          !isAcao ? (d.dyAnual || 0) : 0,
+          !isAcao ? (d.volumeFinanceiro || 0) : 0,
+          !isAcao ? (d.patrimonioLiquido || 0) : 0,
+          isAcao ? (d.precoGraham || null) : null,
+          isAcao ? (d.statusGraham || null) : null,
+          d.variacaoDia || 0, d.variacaoDiaReais || 0,
+          d.precoAbertura || 0, d.precoMinimo || 0, d.precoMaximo || 0,
+          d.ultimaAtualizacao,
+          req.userId, item.ticker
+        ]
       );
-    } catch { /* continua */ }
+    } catch(e) { console.log(`Watchlist update erro ${item.ticker}:`, e.message); }
   }
   const atualizado = await pool.query('SELECT * FROM watchlist WHERE usuario_id=$1', [req.userId]);
   res.json(atualizado.rows);
