@@ -65,7 +65,7 @@ export default function RendaFixaPage() {
   return (
     <div>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
+      <div className="page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
           <h2 style={{ fontSize: 22, fontWeight: 600, color: '#1A1A2E', marginBottom: 4 }}>Carteira Renda Fixa</h2>
           <p style={{ fontSize: 13, color: '#8896A8' }}>Registre seus investimentos em renda fixa para o planejamento patrimonial</p>
@@ -76,7 +76,7 @@ export default function RendaFixaPage() {
       </div>
 
       {/* Resumo */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 24 }}>
+      <div className="grid-3" style={{ marginBottom: 24 }}>
         {[
           { label: 'Total investido',    valor: fmt.brl(totalInvestido),              color: '#1A1A2E' },
           { label: 'Qtd. de aplicações', valor: String(itens.length),                 color: '#1A1A2E' },
@@ -156,7 +156,7 @@ export default function RendaFixaPage() {
       {itens.length > 0 ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {itens.map(i => (
-            <div key={i.id} style={{ background: '#FFFFFF', border: '1px solid #E8ECF0', borderRadius: 14, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div key={i.id} className="rf-card" style={{ background: '#FFFFFF', border: '1px solid #E8ECF0', borderRadius: 14, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{ width: 42, height: 42, borderRadius: '50%', background: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
                 🏦
               </div>
@@ -166,7 +166,7 @@ export default function RendaFixaPage() {
                   {[i.instituicao, i.tipo, i.indexador].filter(Boolean).join(' · ')}
                 </p>
               </div>
-              <div style={{ textAlign: 'right' }}>
+              <div className="rf-card-values" style={{ textAlign: 'right' }}>
                 <p style={{ fontSize: 15, fontWeight: 700, color: '#1A1A2E' }}>{fmt.brl(i.valor_investido)}</p>
                 {i.rendimento_anual && (
                   <p style={{ fontSize: 12, fontWeight: 600, color: '#16A34A', marginTop: 2 }}>{fmt.pct(i.rendimento_anual)} a.a.</p>
@@ -175,7 +175,7 @@ export default function RendaFixaPage() {
                   <p style={{ fontSize: 11, color: '#8896A8', marginTop: 2 }}>Vence {fmt.data(i.vencimento)}</p>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: 6, marginLeft: 16 }}>
+              <div className="rf-card-actions" style={{ display: 'flex', gap: 6, marginLeft: 16 }}>
                 <button className="btn-icon" onClick={() => abrirForm(i)}>✏️</button>
                 <button className="btn-icon" onClick={() => remover(i.id)}>🗑️</button>
               </div>

@@ -78,7 +78,7 @@ export default function DashboardPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="page-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <h2 style={{ fontSize: 22, fontWeight: 600, color: '#1A1A2E', marginBottom: 2 }}>Dashboard</h2>
           <p style={{ fontSize: 13, color: '#8896A8' }}>Visão geral do seu patrimônio</p>
@@ -90,7 +90,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Card grande patrimônio */}
-      <div style={{ ...S.card, padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="patrimonio-hero" style={{ ...S.card, padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <p style={{ ...S.muted, marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Patrimônio total</p>
           <p style={{ fontSize: 32, fontWeight: 800, color: '#1A1A2E' }}>{fmt.brl(resumo.patrimonioTotal)}</p>
@@ -113,7 +113,7 @@ export default function DashboardPage() {
       </div>
 
       {/* 4 carteiras */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+      <div className="grid-4">
         {[
           {
             label: 'Carteira Ações',
@@ -153,7 +153,7 @@ export default function DashboardPage() {
       </div>
 
       {/* 4 stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+      <div className="grid-4">
         {[
           { label: 'Total de ativos', valor: resumo.totalAtivos, sub: `${resumo.totalAcoes} ações · ${resumo.totalFIIs} FIIs`, color: '#1A1A2E' },
           { label: 'Excelentes',      valor: resumo.ativosExcelentes, sub: 'score máximo',    color: '#2563EB' },
@@ -169,7 +169,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Distribuição + Ranking Ações */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+      <div className="grid-2">
         {/* Distribuição barras */}
         <div style={{ ...S.card, padding: '18px 20px' }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: '#1A1A2E', marginBottom: 14 }}>Distribuição do patrimônio</p>
@@ -208,7 +208,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Ranking FIIs + Radar Oportunidades + Radar Risco */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+      <div className="grid-3">
         {/* Ranking FIIs */}
         <div style={{ ...S.card, padding: '18px 20px' }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: '#1A1A2E', marginBottom: 14 }}>Ranking FIIs</p>

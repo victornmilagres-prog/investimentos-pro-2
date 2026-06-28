@@ -187,7 +187,7 @@ function FIIsForm({ onAdicionado }) {
   return (
     <div style={{ background: '#FFFFFF', border: '1px solid #E8ECF0', borderRadius: 14, padding: 20, marginBottom: 24 }}>
       <p style={{ fontSize: 14, fontWeight: 700, color: '#1A1A2E', marginBottom: 14 }}>Adicionar FII</p>
-      <form onSubmit={adicionar} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+      <form onSubmit={adicionar} className="form-row" style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 100 }}>
           <label style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Ticker *</label>
           <input className="input" placeholder="Ex: CPTS11" style={{ textTransform: 'uppercase' }}
@@ -250,7 +250,7 @@ export default function FIIsPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
+      <div className="page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
         <div>
           <h2 style={{ fontSize: 22, fontWeight: 600, color: '#1A1A2E', marginBottom: 4 }}>Carteira FII</h2>
           <p style={{ fontSize: 13, color: '#8896A8', marginBottom: 24 }}>Fundos Imobiliários avaliados por critérios de renda e qualidade</p>
@@ -273,7 +273,7 @@ export default function FIIsPage() {
       </div>
 
       {fiis.length > 0 ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+        <div className="grid-cards">
           {fiis.map(f => (
             <FIICard key={f.ticker} f={f} onRemover={remover} onSalvar={salvarEdicao}/>
           ))}

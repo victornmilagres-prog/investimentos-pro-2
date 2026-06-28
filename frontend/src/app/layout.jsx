@@ -209,7 +209,7 @@ export default function RootLayout({ children }) {
               {/* Main */}
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
                 {/* Topbar */}
-                <header style={{
+                <header className="topbar" style={{
                   background: '#FFFFFF', borderBottom: '1px solid #E8ECF0',
                   padding: '0 24px', height: 52,
                   display: 'flex', alignItems: 'center', gap: 12,

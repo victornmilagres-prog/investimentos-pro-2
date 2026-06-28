@@ -210,7 +210,7 @@ function AcoesForm({ onAdicionado }) {
   return (
     <div style={{ background: '#FFFFFF', border: '1px solid #E8ECF0', borderRadius: 14, padding: 20, marginBottom: 24 }}>
       <p style={{ fontSize: 14, fontWeight: 700, color: '#1A1A2E', marginBottom: 14 }}>Adicionar ação</p>
-      <form onSubmit={adicionar} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+      <form onSubmit={adicionar} className="form-row" style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 100 }}>
           <label style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Ticker *</label>
           <input className="input" placeholder="Ex: PETR4" style={{ textTransform: 'uppercase' }}
@@ -273,7 +273,7 @@ export default function AcoesPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
+      <div className="page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
         <div>
           <h2 style={{ fontSize: 22, fontWeight: 600, color: '#1A1A2E', marginBottom: 4 }}>Carteira Ações</h2>
           <p style={{ fontSize: 13, color: '#8896A8', marginBottom: 24 }}>Busca dados em tempo real via Brapi e avalia por critérios fundamentalistas</p>
@@ -296,7 +296,7 @@ export default function AcoesPage() {
       </div>
 
       {acoes.length > 0 ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+        <div className="grid-cards">
           {acoes.map(a => (
             <AcaoCard key={a.ticker} a={a} onRemover={remover} onSalvar={salvarEdicao}/>
           ))}

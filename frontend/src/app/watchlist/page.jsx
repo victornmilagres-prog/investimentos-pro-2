@@ -268,7 +268,7 @@ export default function WatchlistPage() {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
+      <div className="page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
         <div>
           <h2 style={{ fontSize: 22, fontWeight: 600, color: '#1A1A2E', marginBottom: 4 }}>No Radar</h2>
           <p style={{ fontSize: 13, color: '#8896A8', marginBottom: 24 }}>Ativos que você acompanha antes de comprar</p>
@@ -282,7 +282,7 @@ export default function WatchlistPage() {
       {/* Form */}
       <div style={{ background: '#FFFFFF', border: '1px solid #E8ECF0', borderRadius: 14, padding: 20, marginBottom: 24 }}>
         <p style={{ fontSize: 14, fontWeight: 700, color: '#1A1A2E', marginBottom: 14 }}>Adicionar ao radar</p>
-        <form onSubmit={adicionar} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <form onSubmit={adicionar} className="form-row" style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 100 }}>
             <label style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Ticker *</label>
             <input className="input" placeholder="Ex: VALE3" style={{ textTransform: 'uppercase' }}
@@ -313,7 +313,7 @@ export default function WatchlistPage() {
       </div>
 
       {itens.length > 0 ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+        <div className="grid-cards">
           {itens.map(i => (
             <RadarCard key={i.ticker} item={i} onRemover={remover} onAddCarteira={addCarteira}/>
           ))}

@@ -136,6 +136,50 @@ body {
   margin-bottom: 8px;
 }
 
+/* ===== RESPONSIVE UTILITIES ===== */
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.grid-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+
+@media (max-width: 767px) {
+  .main-content { padding: 12px !important; }
+
+  /* Grids colapsam para 2 ou 1 coluna */
+  .grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
+  .grid-3 { grid-template-columns: repeat(2, 1fr) !important; }
+  .grid-2 { grid-template-columns: 1fr !important; }
+  .grid-cards { grid-template-columns: 1fr !important; }
+
+  /* Flex helpers */
+  .stack-mobile { flex-direction: column !important; align-items: flex-start !important; }
+  .hide-mobile  { display: none !important; }
+
+  /* Card patrimônio: empilha em mobile */
+  .patrimonio-hero { flex-direction: column !important; gap: 8px !important; }
+  .patrimonio-hero > div:last-child { text-align: left !important; }
+
+  /* Cards de renda fixa: empilha em mobile */
+  .rf-card { flex-direction: column !important; align-items: flex-start !important; gap: 10px !important; }
+  .rf-card-actions { margin-left: 0 !important; }
+  .rf-card-values { text-align: left !important; }
+
+  /* Formulários: empilha em mobile */
+  .form-row { flex-direction: column !important; }
+  .form-row > * { width: 100% !important; min-width: unset !important; }
+  .form-row .btn-primary { width: 100% !important; justify-content: center !important; }
+
+  /* Header das páginas: empilha botão abaixo */
+  .page-header { flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; }
+  .page-header h2 { margin-bottom: 0 !important; }
+
+  /* Topbar: padding menor */
+  .topbar { padding: 0 12px !important; }
+
+  /* Faixa de critérios */
+  .criterios-band { padding: 10px 12px !important; }
+}
+
 /* Tabela (mantida para compatibilidade) */
 .table-container { @apply overflow-x-auto rounded-lg border border-[#E8ECF0]; }
 table { @apply w-full text-sm; }
