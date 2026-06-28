@@ -2,251 +2,202 @@
 import './globals.css';
 import { useState, useEffect, createContext, useContext } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { LayoutDashboard, TrendingUp, Building2, Landmark, Eye, Target, Bell, LogOut, Menu, X, ChevronRight, User } from 'lucide-react';
+import {
+  LayoutDashboard, TrendingUp, Building2, Landmark,
+  Eye, Target, Bell, LogOut, Menu, X, User
+} from 'lucide-react';
 import api from '@/lib/api';
 
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
 const NAV = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/acoes', label: 'Acoes', icon: TrendingUp },
-  { href: '/fiis', label: 'FIIs', icon: Building2 },
-  { href: '/renda-fixa', label: 'Renda Fixa', icon: Landmark },
-  { href: '/watchlist', label: 'Watchlist', icon: Eye },
-  { href: '/planejamento', label: 'Planejamento', icon: Target },
+  { href: '/planejamento', label: 'Planejamento Patrimonial', icon: Target },
+  { href: '/dashboard',    label: 'Dashboard',                icon: LayoutDashboard },
+  { href: '/acoes',        label: 'Carteira Ações',           icon: TrendingUp },
+  { href: '/fiis',         label: 'Carteira FII',             icon: Building2 },
+  { href: '/renda-fixa',   label: 'Carteira Renda Fixa',      icon: Landmark },
+  { href: '/watchlist',    label: 'No Radar',                 icon: Eye },
 ];
-
-function LogoIcon({ size = 32 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
-      <polygon points="2,38 13,7 24,38" fill="none" stroke="#FFFFFF" strokeWidth="2.8" strokeLinejoin="round"/>
-      <line x1="6" y1="27" x2="20" y2="27" stroke="#FFFFFF" strokeWidth="2.8"/>
-      <circle cx="33" cy="8" r="4" fill="#C9A84C"/>
-      <line x1="33" y1="14" x2="33" y2="38" stroke="#FFFFFF" strokeWidth="2.8" strokeLinecap="round"/>
-      <line x1="2" y1="39.5" x2="37" y2="39.5" stroke="#C9A84C" strokeWidth="1.5"/>
-    </svg>
-  );
-}
-
-const S = {
-  bg: '#0A0A0F',
-  surface: '#0F0F1A',
-  card: '#13131F',
-  border: '#1E1E2E',
-  gold: '#C9A84C',
-  text: '#FFFFFF',
-  muted: '#707088',
-  dim: '#55556A',
-};
 
 export default function RootLayout({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [notifCount, setNotifCount] = useState(0);
   const router = useRouter();
   const pathname = usePathname();
-  const isAuth = pathname === '/login' || pathname === '/register' || pathname === '/esqueci-senha';
+  const isAuth = pathname === '/login' || pathname === '/register';
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) { setLoading(false); return; }
-    api.get('/auth/me').then(r => { setUser(r.data); setLoading(false); }).catch(() => { localStorage.removeItem('token'); setLoading(false); });
+    api.get('/auth/me').then(r => {
+      setUser(r.data);
+      setLoading(false);
+    }).catch(() => {
+      localStorage.removeItem('token');
+      setLoading(false);
+    });
   }, []);
 
   useEffect(() => {
     if (!user) return;
-    api.get('/notificacoes').then(r => setNotifCount(r.data.filter(n => !n.lida).length)).catch(() => {});
+    api.get('/notificacoes').then(r => {
+      setNotifCount(r.data.filter(n => !n.lida).length);
+    }).catch(() => {});
   }, [user, pathname]);
 
-  useEffect(() => { setSidebarOpen(false); }, [pathname]);
-
-  const logout = () => { localStorage.removeItem('token'); setUser(null); router.push('/login'); };
+  const logout = () => {
+    localStorage.removeItem('token');
+    setUser(null);
+    router.push('/login');
+  };
 
   if (loading) return (
-    <html lang="pt-BR">
-      <body style={{ background: S.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', margin: 0 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-          <div style={{ width: '32px', height: '32px', border: `2px solid ${S.gold}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}/>
-          <p style={{ color: S.dim, fontSize: '13px', margin: 0 }}>Carregando...</p>
+    <html lang="pt-BR"><body style={{ background: '#F0F2F5' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+          <div style={{ width: 32, height: 32, border: '2px solid #C9A84C', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }}/>
+          <p style={{ fontSize: 13, color: '#8896A8' }}>Carregando...</p>
         </div>
-      </body>
-    </html>
+      </div>
+    </body></html>
   );
 
   return (
     <html lang="pt-BR">
       <head>
-        <title>AI Investimentos — Seu copiloto inteligente para investir</title>
+        <title>Investimentos Pro 2.0</title>
         <meta name="viewport" content="width=device-width, initial-scale=1"/>
-        <meta name="theme-color" content="#0A0A0F"/>
-        <meta name="apple-mobile-web-app-capable" content="yes"/>
-        <meta name="apple-mobile-web-app-title" content="AI Investimentos"/>
-        <link rel="manifest" href="/manifest.json"/>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </head>
-      <body style={{ background: S.bg, margin: 0, padding: 0 }}>
+      <body>
         <AuthContext.Provider value={{ user, setUser, logout }}>
           {isAuth || !user ? (
-            <main style={{ minHeight: '100vh', background: S.bg }}>{children}</main>
+            <main style={{ minHeight: '100vh', background: '#F0F2F5' }}>{children}</main>
           ) : (
-            <div style={{ display: 'flex', minHeight: '100vh', background: S.bg }}>
-
-              {/* Overlay mobile */}
-              {sidebarOpen && (
-                <div onClick={() => setSidebarOpen(false)} style={{
-                  position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 30,
-                  display: 'block'
-                }} className="lg:hidden"/>
-              )}
-
-              {/* Sidebar — fixed, 240px */}
+            <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#F0F2F5' }}>
+              {/* Sidebar */}
               <aside style={{
-                width: '240px',
-                background: S.surface,
-                borderRight: `1px solid ${S.border}`,
+                width: sidebarOpen ? 240 : 64,
+                background: '#FFFFFF',
+                borderRight: '1px solid #E8ECF0',
                 display: 'flex',
                 flexDirection: 'column',
-                position: 'fixed',
-                top: 0, bottom: 0, left: 0,
-                zIndex: 40,
-                transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
-                transition: 'transform 0.25s ease',
-              }} className="lg:translate-x-0">
-
-                <div style={{ padding: '18px 14px', borderBottom: `1px solid ${S.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <LogoIcon size={32}/>
-                    <div>
-                      <div style={{ fontSize: '10px', fontWeight: '800', color: S.text, letterSpacing: '2px' }}>AI INVESTIMENTOS</div>
-                      <div style={{ fontSize: '7px', color: S.gold, letterSpacing: '1px', marginTop: '2px' }}>SEU COPILOTO INTELIGENTE</div>
-                    </div>
+                transition: 'width 0.25s',
+                flexShrink: 0,
+                zIndex: 20,
+                overflow: 'hidden',
+              }}>
+                {/* Logo */}
+                <div style={{ padding: '18px 16px', borderBottom: '1px solid #E8ECF0', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: '#C9A84C', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <TrendingUp size={16} color="#fff"/>
                   </div>
-                  <button onClick={() => setSidebarOpen(false)} className="lg:hidden"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: S.muted, padding: '2px' }}>
-                    <X size={16}/>
-                  </button>
+                  {sidebarOpen && (
+                    <div>
+                      <p style={{ fontSize: 11, fontWeight: 800, color: '#1A1A2E', letterSpacing: '1.5px', lineHeight: 1.2 }}>INVESTIMENTOS</p>
+                      <p style={{ fontSize: 8, color: '#C9A84C', fontWeight: 700, letterSpacing: '1px', marginTop: 1 }}>PRO 2.0</p>
+                    </div>
+                  )}
                 </div>
 
+                {/* Nav */}
                 <nav style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
                   {NAV.map(({ href, label, icon: Icon }) => {
                     const active = pathname === href || pathname.startsWith(href + '/');
                     return (
                       <a key={href} href={href} style={{
-                        display: 'flex', alignItems: 'center', gap: '10px',
-                        padding: '9px 12px', borderRadius: '8px', marginBottom: '2px',
-                        fontSize: '13px', fontWeight: '500', textDecoration: 'none',
-                        background: active ? 'rgba(201,168,76,0.1)' : 'transparent',
-                        color: active ? S.gold : S.muted,
-                        borderLeft: `2px solid ${active ? S.gold : 'transparent'}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '9px 12px',
+                        borderRadius: 8,
+                        marginBottom: 2,
+                        fontSize: 13,
+                        fontWeight: 500,
+                        textDecoration: 'none',
+                        borderLeft: `2px solid ${active ? '#C9A84C' : 'transparent'}`,
+                        background: active ? 'rgba(201,168,76,0.08)' : 'transparent',
+                        color: active ? '#C9A84C' : '#8896A8',
                         transition: 'all 0.15s',
                       }}>
-                        <Icon size={17} style={{ flexShrink: 0 }}/>
-                        <span>{label}</span>
-                        {active && <ChevronRight size={13} style={{ marginLeft: 'auto', opacity: 0.5 }}/>}
+                        <Icon size={18} style={{ flexShrink: 0 }}/>
+                        {sidebarOpen && <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>}
                       </a>
                     );
                   })}
                 </nav>
 
-                <div style={{ padding: '8px 8px 14px', borderTop: `1px solid ${S.border}` }}>
+                {/* Footer */}
+                <div style={{ padding: '12px 8px', borderTop: '1px solid #E8ECF0' }}>
                   <a href="/notificacoes" style={{
-                    display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
-                    borderRadius: '8px', fontSize: '13px', color: S.muted, textDecoration: 'none', marginBottom: '4px'
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
+                    borderRadius: 8, fontSize: 13, color: '#8896A8', textDecoration: 'none',
+                    borderLeft: '2px solid transparent',
                   }}>
-                    <div style={{ position: 'relative' }}>
-                      <Bell size={17}/>
-                      {notifCount > 0 && <span style={{ position: 'absolute', top: '-4px', right: '-5px', width: '14px', height: '14px', background: S.gold, borderRadius: '50%', color: S.bg, fontSize: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>{notifCount}</span>}
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      <Bell size={18}/>
+                      {notifCount > 0 && (
+                        <span style={{
+                          position: 'absolute', top: -4, right: -4, width: 16, height: 16,
+                          background: '#DC2626', borderRadius: '50%', color: '#fff',
+                          fontSize: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>{notifCount}</span>
+                      )}
                     </div>
-                    <span>Notificacoes</span>
+                    {sidebarOpen && <span>Notificações</span>}
                   </a>
-                  <div style={{ padding: '9px 12px', background: S.card, borderRadius: '8px', marginBottom: '4px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(201,168,76,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <User size={14} style={{ color: S.gold }}/>
-                      </div>
-                      <div style={{ minWidth: 0 }}>
-                        <p style={{ fontSize: '12px', fontWeight: '600', color: S.text, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.nome}</p>
-                        <p style={{ fontSize: '10px', color: S.dim, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</p>
+                  {sidebarOpen && (
+                    <div style={{ padding: '8px 12px', background: '#F8F9FA', borderRadius: 8, margin: '4px 0' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <User size={14} color="#2563EB"/>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: 12, fontWeight: 600, color: '#1A1A2E', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.nome}</p>
+                          <p style={{ fontSize: 11, color: '#8896A8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                   <button onClick={logout} style={{
-                    display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px',
-                    borderRadius: '8px', fontSize: '13px', color: '#EF4444',
-                    background: 'none', border: 'none', cursor: 'pointer', width: '100%',
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '9px 12px', borderRadius: 8, fontSize: 13, color: '#DC2626',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    borderLeft: '2px solid transparent',
                   }}>
-                    <LogOut size={17}/><span>Sair</span>
+                    <LogOut size={18} style={{ flexShrink: 0 }}/>
+                    {sidebarOpen && <span>Sair</span>}
                   </button>
                 </div>
               </aside>
 
-              {/* Conteudo — margem esquerda de 240px no desktop */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, marginLeft: 0 }} className="lg:ml-60">
-
-                {/* Header */}
+              {/* Main */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+                {/* Topbar */}
                 <header style={{
-                  background: S.surface, borderBottom: `1px solid ${S.border}`,
-                  padding: '0 16px', height: '52px',
-                  display: 'flex', alignItems: 'center', gap: '12px',
-                  position: 'sticky', top: 0, zIndex: 20, flexShrink: 0,
+                  background: '#FFFFFF', borderBottom: '1px solid #E8ECF0',
+                  padding: '0 24px', height: 52,
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  position: 'sticky', top: 0, zIndex: 10,
                 }}>
-                  <button onClick={() => setSidebarOpen(true)} className="lg:hidden"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: S.muted, padding: '4px' }}>
-                    <Menu size={20}/>
+                  <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    padding: 6, borderRadius: 8, color: '#8896A8',
+                  }}>
+                    {sidebarOpen ? <X size={18}/> : <Menu size={18}/>}
                   </button>
-                  <button onClick={() => setSidebarOpen(!sidebarOpen)} className="hidden lg:block"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: S.muted, padding: '4px' }}>
-                    <Menu size={18}/>
-                  </button>
-                  <div style={{ flex: 1 }}>
-                    <span style={{ fontSize: '14px', fontWeight: '600', color: S.text }}>
-                      {NAV.find(n => pathname.startsWith(n.href))?.label || 'AI Investimentos'}
-                    </span>
-                  </div>
-                  <a href="/notificacoes" style={{ position: 'relative', color: S.muted, textDecoration: 'none', padding: '4px' }}>
-                    <Bell size={18}/>
-                    {notifCount > 0 && <span style={{ position: 'absolute', top: 0, right: 0, width: '14px', height: '14px', background: S.gold, borderRadius: '50%', color: S.bg, fontSize: '9px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>{notifCount}</span>}
-                  </a>
+                  <h1 style={{ fontSize: 14, fontWeight: 600, color: '#1A1A2E' }}>
+                    {NAV.find(n => pathname.startsWith(n.href))?.label || 'Investimentos Pro 2.0'}
+                  </h1>
                 </header>
 
-                {/* Conteudo da pagina */}
-                <main style={{
-                  flex: 1, overflowY: 'auto', background: S.bg,
-                  padding: '20px 16px', paddingBottom: '80px',
-                }} className="lg:p-6 lg:pb-6">
+                <main style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
                   {children}
                 </main>
               </div>
-
-              {/* Bottom nav mobile */}
-              <nav className="lg:hidden" style={{
-                position: 'fixed', bottom: 0, left: 0, right: 0,
-                background: S.surface, borderTop: `1px solid ${S.border}`,
-                display: 'flex', zIndex: 30, height: '58px',
-              }}>
-                {NAV.slice(0, 5).map(({ href, label, icon: Icon }) => {
-                  const active = pathname === href || pathname.startsWith(href + '/');
-                  return (
-                    <a key={href} href={href} style={{
-                      flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                      justifyContent: 'center', gap: '2px', textDecoration: 'none',
-                      color: active ? S.gold : S.dim, fontSize: '10px', fontWeight: '500',
-                    }}>
-                      <Icon size={20}/>
-                      <span>{label.split(' ')[0]}</span>
-                    </a>
-                  );
-                })}
-                <button onClick={logout} style={{
-                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-                  justifyContent: 'center', gap: '2px', color: S.dim,
-                  background: 'none', border: 'none', cursor: 'pointer', fontSize: '10px', fontWeight: '500',
-                }}>
-                  <LogOut size={20}/><span>Sair</span>
-                </button>
-              </nav>
-
             </div>
           )}
         </AuthContext.Provider>

@@ -1,31 +1,22 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, RefreshCw, Star, AlertTriangle, BarChart3, Building2, Landmark } from 'lucide-react';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import { RefreshCw } from 'lucide-react';
 import api from '@/lib/api';
-import { fmt, badgeClassificacao, classeDecisao } from '@/lib/utils';
+import { fmt } from '@/lib/utils';
 
-const StatCard = ({ title, value, sub, icon: Icon, color = 'blue' }) => {
-  const colors = {
-    blue:   'bg-blue-50 text-blue-600',
-    green:  'bg-green-50 text-green-600',
-    amber:  'bg-amber-50 text-amber-600',
-    red:    'bg-red-50 text-red-600',
-    purple: 'bg-purple-50 text-purple-600',
-  };
-  return (
-    <div className="card p-5">
-      <div className="flex items-start justify-between mb-3">
-        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">{title}</p>
-        <div className={`p-2 rounded-lg ${colors[color]}`}><Icon size={16}/></div>
-      </div>
-      <p className="text-2xl font-bold text-slate-900">{value}</p>
-      {sub && <p className="text-xs text-slate-500 mt-1">{sub}</p>}
-    </div>
-  );
+const COLORS = {
+  acoes: '#2563EB',
+  fiis:  '#16A34A',
+  rf:    '#D97706',
 };
 
-const CORES_PIZZA = ['#2b86fc', '#16a34a', '#d97706', '#dc2626', '#7c3aed', '#0891b2'];
+function badgeDecisao(d = '') {
+  const v = d.toUpperCase();
+  if (v.includes('COMPRAR') || v.includes('ACUMULAR')) return 'badge-comprar';
+  if (v.includes('MANTER')) return 'badge-manter';
+  if (v.includes('ACOMPANHAR') || v.includes('ATENÇÃO')) return 'badge-atencao';
+  return 'badge-risco';
+}
 
 export default function DashboardPage() {
   const [dados, setDados] = useState(null);
@@ -33,20 +24,15 @@ export default function DashboardPage() {
   const [atualizando, setAtualizando] = useState(false);
 
   const carregar = async () => {
-    try {
-      const r = await api.get('/dashboard');
-      setDados(r.data);
-    } catch { /* silencia */ }
+    try { const r = await api.get('/dashboard'); setDados(r.data); }
+    catch { /* silencia */ }
     finally { setLoading(false); }
   };
 
   const atualizarTodos = async () => {
     setAtualizando(true);
     try {
-      await Promise.all([
-        api.post('/acoes/atualizar-todos'),
-        api.post('/fiis/atualizar-todos'),
-      ]);
+      await Promise.all([api.post('/acoes/atualizar-todos'), api.post('/fiis/atualizar-todos')]);
       await carregar();
     } finally { setAtualizando(false); }
   };
@@ -54,176 +40,225 @@ export default function DashboardPage() {
   useEffect(() => { carregar(); }, []);
 
   if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin"/>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 256 }}>
+      <div style={{ width: 32, height: 32, border: '2px solid #C9A84C', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }}/>
     </div>
   );
 
-  if (!dados) return <p className="text-slate-500">Nenhum dado disponível. Adicione ações e FIIs nas abas de avaliação.</p>;
+  if (!dados) return (
+    <p style={{ color: '#8896A8', fontSize: 14 }}>Nenhum dado disponível. Adicione ações e FIIs nas abas de avaliação.</p>
+  );
 
   const { resumo, rankingAcoes, rankingFIIs, oportunidades, riscos } = dados;
+  const ganhoTotal = (resumo.ganhoAcoes || 0) + (resumo.ganhoFIIs || 0);
+  const totalInvestido = (resumo.patrimonioTotal || 0) - ganhoTotal;
+  const pctTotal = totalInvestido > 0 ? (ganhoTotal / totalInvestido) * 100 : 0;
 
-  const pizzaData = [
-    { name: 'Ações', value: resumo.patrimonioAcoes },
-    { name: 'FIIs', value: resumo.patrimonioFIIs },
-    { name: 'Renda Fixa', value: resumo.patrimonioRendaFixa },
-  ].filter(d => d.value > 0);
+  const totalPatr = resumo.patrimonioTotal || 0;
+  const distribItems = [
+    { label: 'Carteira Ações', valor: resumo.patrimonioAcoes || 0, color: COLORS.acoes },
+    { label: 'Carteira FII',   valor: resumo.patrimonioFIIs  || 0, color: COLORS.fiis },
+    { label: 'Renda Fixa',     valor: resumo.patrimonioRendaFixa || 0, color: COLORS.rf },
+  ].filter(d => d.valor > 0);
+
+  const pctAcoes = totalPatr > 0 ? (resumo.patrimonioAcoes / totalPatr) * 100 : 0;
+  const pctFIIs  = totalPatr > 0 ? (resumo.patrimonioFIIs  / totalPatr) * 100 : 0;
+  const pctAcoesCusto = resumo.patrimonioAcoes > 0 ? ((resumo.patrimonioAcoes - (resumo.ganhoAcoes||0)) || 1) : 1;
+  const pctRetAcoes = (resumo.ganhoAcoes||0) / pctAcoesCusto * 100;
+  const pctFIIsCusto = resumo.patrimonioFIIs > 0 ? ((resumo.patrimonioFIIs - (resumo.ganhoFIIs||0)) || 1) : 1;
+  const pctRetFIIs  = (resumo.ganhoFIIs||0) / pctFIIsCusto * 100;
+
+  const S = { // style helpers
+    card: { background: '#FFFFFF', border: '1px solid #E8ECF0', borderRadius: 14 },
+    muted: { fontSize: 11, color: '#8896A8' },
+    primary: { color: '#1A1A2E' },
+    secondary: { color: '#4A5568' },
+  };
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Dashboard</h2>
-          <p className="text-sm text-slate-500">Visão geral do seu patrimônio</p>
+          <h2 style={{ fontSize: 22, fontWeight: 600, color: '#1A1A2E', marginBottom: 2 }}>Dashboard</h2>
+          <p style={{ fontSize: 13, color: '#8896A8' }}>Visão geral do seu patrimônio</p>
         </div>
-        <button onClick={atualizarTodos} disabled={atualizando} className="btn-secondary flex items-center gap-2">
-          <RefreshCw size={15} className={atualizando ? 'animate-spin' : ''}/>
+        <button onClick={atualizarTodos} disabled={atualizando} className="btn-secondary">
+          <RefreshCw size={15} style={atualizando ? { animation: 'spin 0.7s linear infinite' } : {}}/>
           {atualizando ? 'Atualizando...' : 'Atualizar tudo'}
         </button>
       </div>
 
-      {/* Cards resumo */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Patrimônio Total" value={fmt.brl(resumo.patrimonioTotal)} icon={BarChart3} color="blue"/>
-        <StatCard title="Em Ações" value={fmt.brl(resumo.patrimonioAcoes)}
-          sub={resumo.ganhoAcoes >= 0 ? `+${fmt.brl(resumo.ganhoAcoes)}` : fmt.brl(resumo.ganhoAcoes)}
-          icon={TrendingUp} color={resumo.ganhoAcoes >= 0 ? 'green' : 'red'}/>
-        <StatCard title="Em FIIs" value={fmt.brl(resumo.patrimonioFIIs)}
-          sub={resumo.ganhoFIIs >= 0 ? `+${fmt.brl(resumo.ganhoFIIs)}` : fmt.brl(resumo.ganhoFIIs)}
-          icon={Building2} color={resumo.ganhoFIIs >= 0 ? 'green' : 'red'}/>
-        <StatCard title="Renda Fixa" value={fmt.brl(resumo.patrimonioRendaFixa)} icon={Landmark} color="purple"/>
+      {/* Card grande patrimônio */}
+      <div style={{ ...S.card, padding: '20px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <p style={{ ...S.muted, marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Patrimônio total</p>
+          <p style={{ fontSize: 32, fontWeight: 800, color: '#1A1A2E' }}>{fmt.brl(resumo.patrimonioTotal)}</p>
+          <p style={{ fontSize: 13, color: '#8896A8', marginTop: 4 }}>
+            {resumo.totalAtivos} ativos · {resumo.totalAcoes} ações · {resumo.totalFIIs} FIIs
+          </p>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <p style={{ ...S.muted, marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Retorno total</p>
+          <p style={{ fontSize: 24, fontWeight: 800, color: ganhoTotal >= 0 ? '#16A34A' : '#DC2626' }}>
+            {ganhoTotal >= 0 ? '+' : ''}{fmt.brl(ganhoTotal)}
+          </p>
+          <p style={{ fontSize: 13, color: '#8896A8', marginTop: 4 }}>
+            <span style={{ color: ganhoTotal >= 0 ? '#16A34A' : '#DC2626', fontWeight: 600 }}>
+              {ganhoTotal >= 0 ? '+' : ''}{fmt.pct(pctTotal)}
+            </span>{' '}
+            desde o início
+          </p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Total de Ativos" value={resumo.totalAtivos} sub={`${resumo.totalAcoes} ações · ${resumo.totalFIIs} FIIs`} icon={BarChart3} color="blue"/>
-        <StatCard title="Excelentes" value={resumo.ativosExcelentes} icon={Star} color="green"/>
-        <StatCard title="Em Risco" value={resumo.ativosRisco} icon={AlertTriangle} color="red"/>
-        <StatCard title="Watchlist" value={resumo.totalWatchlist} icon={TrendingUp} color="amber"/>
-      </div>
-
-      {/* Pizza + Rankings */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Distribuição */}
-        {pizzaData.length > 0 && (
-          <div className="card p-5">
-            <h3 className="text-sm font-semibold text-slate-900 mb-4">Distribuição do Patrimônio</h3>
-            <ResponsiveContainer width="100%" height={180}>
-              <PieChart>
-                <Pie data={pizzaData} cx="50%" cy="50%" innerRadius={50} outerRadius={80}
-                  paddingAngle={3} dataKey="value">
-                  {pizzaData.map((_, i) => <Cell key={i} fill={CORES_PIZZA[i % CORES_PIZZA.length]}/>)}
-                </Pie>
-                <Tooltip formatter={(v) => fmt.brl(v)}/>
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="space-y-2 mt-2">
-              {pizzaData.map((d, i) => (
-                <div key={i} className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ background: CORES_PIZZA[i] }}/>
-                    <span className="text-slate-600">{d.name}</span>
-                  </div>
-                  <span className="font-medium text-slate-800">
-                    {resumo.patrimonioTotal > 0 ? fmt.pct((d.value / resumo.patrimonioTotal) * 100) : '0%'}
-                  </span>
-                </div>
-              ))}
-            </div>
+      {/* 4 carteiras */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+        {[
+          {
+            label: 'Carteira Ações',
+            valor: fmt.brl(resumo.patrimonioAcoes),
+            sub: resumo.ganhoAcoes != null
+              ? `${resumo.ganhoAcoes >= 0 ? '+' : ''}${fmt.brl(resumo.ganhoAcoes)} · ${resumo.ganhoAcoes >= 0 ? '+' : ''}${fmt.pct(pctRetAcoes)}`
+              : null,
+            subColor: (resumo.ganhoAcoes || 0) >= 0 ? '#16A34A' : '#DC2626',
+          },
+          {
+            label: 'Carteira FII',
+            valor: fmt.brl(resumo.patrimonioFIIs),
+            sub: resumo.ganhoFIIs != null
+              ? `${resumo.ganhoFIIs >= 0 ? '+' : ''}${fmt.brl(resumo.ganhoFIIs)} · ${resumo.ganhoFIIs >= 0 ? '+' : ''}${fmt.pct(pctRetFIIs)}`
+              : null,
+            subColor: (resumo.ganhoFIIs || 0) >= 0 ? '#16A34A' : '#DC2626',
+          },
+          {
+            label: 'Carteira Renda Fixa',
+            valor: fmt.brl(resumo.patrimonioRendaFixa),
+            sub: null,
+            subColor: '#8896A8',
+          },
+          {
+            label: 'No Radar',
+            valor: String(resumo.totalWatchlist ?? 0),
+            sub: (resumo.totalWatchlist === 1 ? 'ativo monitorado' : 'ativos monitorados'),
+            subColor: '#8896A8',
+          },
+        ].map(({ label, valor, sub, subColor }) => (
+          <div key={label} style={{ ...S.card, padding: '14px 16px' }}>
+            <p style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>{label}</p>
+            <p style={{ fontSize: 18, fontWeight: 700, color: '#1A1A2E', marginBottom: 3 }}>{valor}</p>
+            {sub && <p style={{ fontSize: 11, color: subColor }}>{sub}</p>}
           </div>
-        )}
+        ))}
+      </div>
+
+      {/* 4 stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+        {[
+          { label: 'Total de ativos', valor: resumo.totalAtivos, sub: `${resumo.totalAcoes} ações · ${resumo.totalFIIs} FIIs`, color: '#1A1A2E' },
+          { label: 'Excelentes',      valor: resumo.ativosExcelentes, sub: 'score máximo',    color: '#2563EB' },
+          { label: 'Em risco',        valor: resumo.ativosRisco,      sub: 'atenção necessária', color: '#DC2626' },
+          { label: 'Variação hoje',   valor: resumo.variacaoHoje != null ? `${resumo.variacaoHoje >= 0 ? '+' : ''}${fmt.pct(resumo.variacaoHoje)}` : '-', sub: 'carteira geral', color: resumo.variacaoHoje != null && resumo.variacaoHoje < 0 ? '#DC2626' : '#16A34A' },
+        ].map(({ label, valor, sub, color }) => (
+          <div key={label} style={{ ...S.card, padding: '14px 16px' }}>
+            <p style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>{label}</p>
+            <p style={{ fontSize: 18, fontWeight: 700, color, marginBottom: 3 }}>{valor}</p>
+            <p style={{ fontSize: 11, color: '#8896A8' }}>{sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Distribuição + Ranking Ações */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        {/* Distribuição barras */}
+        <div style={{ ...S.card, padding: '18px 20px' }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: '#1A1A2E', marginBottom: 14 }}>Distribuição do patrimônio</p>
+          {distribItems.map(d => {
+            const pct = totalPatr > 0 ? (d.valor / totalPatr) * 100 : 0;
+            return (
+              <div key={d.label} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, width: 130 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: d.color, flexShrink: 0 }}/>
+                  <span style={{ fontSize: 12, color: '#4A5568' }}>{d.label}</span>
+                </div>
+                <div style={{ flex: 1, height: 6, background: '#E8ECF0', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ width: `${pct}%`, height: '100%', background: d.color, borderRadius: 4 }}/>
+                </div>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#1A1A2E', width: 38, textAlign: 'right' }}>{fmt.pct(pct)}</span>
+                <span style={{ fontSize: 11, color: '#8896A8', width: 80, textAlign: 'right' }}>{fmt.brl(d.valor)}</span>
+              </div>
+            );
+          })}
+          {distribItems.length === 0 && <p style={{ fontSize: 12, color: '#8896A8' }}>Nenhum dado disponível.</p>}
+        </div>
 
         {/* Ranking Ações */}
-        <div className="card p-5">
-          <h3 className="text-sm font-semibold text-slate-900 mb-4">Ranking Ações</h3>
-          <div className="space-y-2">
-            {rankingAcoes.slice(0, 6).map((a, i) => (
-              <div key={a.ticker} className="flex items-center gap-3">
-                <span className="text-xs text-slate-400 w-4">{i + 1}</span>
-                <span className="font-mono text-sm font-semibold text-slate-800 w-16">{a.ticker}</span>
-                <span className="text-xs text-slate-500 flex-1">{a.score}</span>
-                <span className={`text-xs font-medium ${classeDecisao(a.decisao)}`}>
-                  {a.decisao?.split('/')[0]}
-                </span>
-              </div>
-            ))}
-            {rankingAcoes.length === 0 && <p className="text-xs text-slate-400">Nenhuma ação adicionada.</p>}
-          </div>
+        <div style={{ ...S.card, padding: '18px 20px' }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: '#1A1A2E', marginBottom: 14 }}>Ranking Ações</p>
+          {rankingAcoes.slice(0, 5).map((a, i) => (
+            <div key={a.ticker} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: i < Math.min(rankingAcoes.length, 5) - 1 ? '1px solid #E8ECF0' : 'none' }}>
+              <span style={{ fontSize: 11, color: '#8896A8', width: 16 }}>{i + 1}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#2563EB', flex: 1 }}>{a.ticker}</span>
+              <span style={{ fontSize: 11, color: '#8896A8' }}>{a.score}</span>
+              <span className={badgeDecisao(a.decisao)} style={{ marginLeft: 8 }}>{a.decisao?.split('/')[0]}</span>
+            </div>
+          ))}
+          {rankingAcoes.length === 0 && <p style={{ fontSize: 12, color: '#8896A8' }}>Nenhuma ação adicionada.</p>}
         </div>
+      </div>
 
+      {/* Ranking FIIs + Radar Oportunidades + Radar Risco */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
         {/* Ranking FIIs */}
-        <div className="card p-5">
-          <h3 className="text-sm font-semibold text-slate-900 mb-4">Ranking FIIs</h3>
-          <div className="space-y-2">
-            {rankingFIIs.slice(0, 6).map((f, i) => (
-              <div key={f.ticker} className="flex items-center gap-3">
-                <span className="text-xs text-slate-400 w-4">{i + 1}</span>
-                <span className="font-mono text-sm font-semibold text-slate-800 w-16">{f.ticker}</span>
-                <span className="text-xs text-slate-500 flex-1">{f.score}</span>
-                <span className={`text-xs font-medium ${classeDecisao(f.decisao)}`}>
-                  {f.decisao?.split('/')[0]}
-                </span>
-              </div>
-            ))}
-            {rankingFIIs.length === 0 && <p className="text-xs text-slate-400">Nenhum FII adicionado.</p>}
+        <div style={{ ...S.card, padding: '18px 20px' }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: '#1A1A2E', marginBottom: 14 }}>Ranking FIIs</p>
+          {rankingFIIs.slice(0, 5).map((f, i) => (
+            <div key={f.ticker} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: i < Math.min(rankingFIIs.length, 5) - 1 ? '1px solid #E8ECF0' : 'none' }}>
+              <span style={{ fontSize: 11, color: '#8896A8', width: 16 }}>{i + 1}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#2563EB', flex: 1 }}>{f.ticker}</span>
+              <span style={{ fontSize: 11, color: '#8896A8' }}>{f.score}</span>
+              <span className={badgeDecisao(f.decisao)} style={{ marginLeft: 8 }}>{f.decisao?.split('/')[0]}</span>
+            </div>
+          ))}
+          {rankingFIIs.length === 0 && <p style={{ fontSize: 12, color: '#8896A8' }}>Nenhum FII adicionado.</p>}
+        </div>
+
+        {/* Radar Oportunidades */}
+        <div style={{ ...S.card, padding: '18px 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#16A34A' }}/>
+            <p style={{ fontSize: 14, fontWeight: 700, color: '#1A1A2E' }}>Radar de oportunidades</p>
           </div>
+          {oportunidades.map(a => (
+            <div key={a.ticker} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, marginBottom: 5, background: '#F0FDF4' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#16A34A', flex: 1 }}>{a.ticker}</span>
+              <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: '#F8F9FA', color: '#8896A8', border: '1px solid #E8ECF0' }}>{a.tipo}</span>
+              <span style={{ fontSize: 11, color: '#8896A8', marginLeft: 4 }}>{a.score}</span>
+              <span className={badgeDecisao(a.decisao)} style={{ marginLeft: 4 }}>{a.decisao?.split('/')[0]}</span>
+            </div>
+          ))}
+          {oportunidades.length === 0 && <p style={{ fontSize: 12, color: '#8896A8' }}>Nenhuma oportunidade identificada.</p>}
+        </div>
+
+        {/* Radar Risco */}
+        <div style={{ ...S.card, padding: '18px 20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#DC2626' }}/>
+            <p style={{ fontSize: 14, fontWeight: 700, color: '#1A1A2E' }}>Radar de risco</p>
+          </div>
+          {riscos.map(a => (
+            <div key={a.ticker} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, marginBottom: 5, background: '#FEF2F2' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#DC2626', flex: 1 }}>{a.ticker}</span>
+              <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: '#F8F9FA', color: '#8896A8', border: '1px solid #E8ECF0' }}>{a.tipo}</span>
+              <span style={{ fontSize: 11, color: '#8896A8', marginLeft: 4 }}>{a.score}</span>
+              <span className="badge-risco" style={{ marginLeft: 4 }}>{a.decisao?.split('/')[0]}</span>
+            </div>
+          ))}
+          {riscos.length === 0 && <p style={{ fontSize: 12, color: '#8896A8' }}>Nenhum risco identificado.</p>}
         </div>
       </div>
 
-      {/* Radar */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-2 h-2 rounded-full bg-green-500"/>
-            <h3 className="text-sm font-semibold text-slate-900">Radar de Oportunidades</h3>
-          </div>
-          <div className="table-container">
-            <table>
-              <thead><tr>
-                <th>Ativo</th><th>Tipo</th><th>Score</th><th>Decisão</th>
-              </tr></thead>
-              <tbody>
-                {oportunidades.map(a => (
-                  <tr key={a.ticker}>
-                    <td className="font-mono font-semibold">{a.ticker}</td>
-                    <td><span className="badge badge-bom">{a.tipo}</span></td>
-                    <td>{a.score}</td>
-                    <td><span className={classeDecisao(a.decisao)}>{a.decisao}</span></td>
-                  </tr>
-                ))}
-                {oportunidades.length === 0 && <tr><td colSpan={4} className="text-center text-slate-400">Nenhuma oportunidade identificada.</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="card p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-2 h-2 rounded-full bg-red-500"/>
-            <h3 className="text-sm font-semibold text-slate-900">Radar de Risco</h3>
-          </div>
-          <div className="table-container">
-            <table>
-              <thead><tr>
-                <th>Ativo</th><th>Tipo</th><th>Score</th><th>Decisão</th>
-              </tr></thead>
-              <tbody>
-                {riscos.map(a => (
-                  <tr key={a.ticker}>
-                    <td className="font-mono font-semibold">{a.ticker}</td>
-                    <td>{a.tipo}</td>
-                    <td>{a.score}</td>
-                    <td><span className={classeDecisao(a.decisao)}>{a.decisao}</span></td>
-                  </tr>
-                ))}
-                {riscos.length === 0 && <tr><td colSpan={4} className="text-center text-slate-400">Nenhum risco identificado.</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <p className="text-xs text-slate-400 text-center">
+      <p style={{ fontSize: 11, color: '#8896A8', textAlign: 'center' }}>
         Atualizado em {fmt.dataHora(dados.atualizadoEm)} · Dados via Brapi.dev · Não é recomendação de investimento
       </p>
     </div>

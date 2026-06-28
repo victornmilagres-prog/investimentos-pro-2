@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Pencil, Landmark, X } from 'lucide-react';
+import { Plus, Landmark, X } from 'lucide-react';
 import api from '@/lib/api';
 import { fmt } from '@/lib/utils';
 
@@ -37,8 +37,7 @@ export default function RendaFixaPage() {
   };
 
   const salvar = async (e) => {
-    e.preventDefault();
-    setErro('');
+    e.preventDefault(); setErro('');
     try {
       const payload = { ...form, valor_investido: Number(form.valor_investido), rendimento_anual: Number(form.rendimento_anual)||null };
       if (editItem) await api.put(`/renda-fixa/${editItem.id}`, payload);
@@ -53,136 +52,141 @@ export default function RendaFixaPage() {
   };
 
   const totalInvestido = itens.reduce((s, i) => s + Number(i.valor_investido), 0);
+  const mediaRendimento = itens.length > 0
+    ? itens.reduce((s, i) => s + Number(i.rendimento_anual || 0), 0) / itens.length
+    : 0;
 
-  if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin"/></div>;
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 256 }}>
+      <div style={{ width: 32, height: 32, border: '2px solid #C9A84C', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }}/>
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Renda Fixa</h2>
-          <p className="text-sm text-slate-500">Registre seus investimentos em renda fixa para o planejamento patrimonial</p>
+          <h2 style={{ fontSize: 22, fontWeight: 600, color: '#1A1A2E', marginBottom: 4 }}>Carteira Renda Fixa</h2>
+          <p style={{ fontSize: 13, color: '#8896A8' }}>Registre seus investimentos em renda fixa para o planejamento patrimonial</p>
         </div>
-        <button onClick={() => abrirForm()} className="btn-primary flex items-center gap-2">
+        <button onClick={() => abrirForm()} className="btn-primary">
           <Plus size={15}/> Adicionar
         </button>
       </div>
 
       {/* Resumo */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="card p-4">
-          <p className="text-xs text-slate-500 mb-1">Total investido</p>
-          <p className="text-xl font-bold text-slate-900">{fmt.brl(totalInvestido)}</p>
-        </div>
-        <div className="card p-4">
-          <p className="text-xs text-slate-500 mb-1">Qtd. de aplicações</p>
-          <p className="text-xl font-bold text-slate-900">{itens.length}</p>
-        </div>
-        <div className="card p-4">
-          <p className="text-xs text-slate-500 mb-1">Rendimento médio</p>
-          <p className="text-xl font-bold text-slate-900">
-            {itens.length > 0 ? fmt.pct(itens.reduce((s,i) => s + Number(i.rendimento_anual||0), 0) / itens.length) : '-'}
-          </p>
-        </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 24 }}>
+        {[
+          { label: 'Total investido',    valor: fmt.brl(totalInvestido),              color: '#1A1A2E' },
+          { label: 'Qtd. de aplicações', valor: String(itens.length),                 color: '#1A1A2E' },
+          { label: 'Rendimento médio',   valor: itens.length > 0 ? fmt.pct(mediaRendimento) + ' a.a.' : '-', color: '#16A34A' },
+        ].map(({ label, valor, color }) => (
+          <div key={label} style={{ background: '#FFFFFF', border: '1px solid #E8ECF0', borderRadius: 14, padding: '14px 16px' }}>
+            <p style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>{label}</p>
+            <p style={{ fontSize: 18, fontWeight: 700, color }}>{valor}</p>
+          </div>
+        ))}
       </div>
 
       {/* Modal form */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-base font-semibold text-slate-900">{editItem ? 'Editar' : 'Adicionar'} Renda Fixa</h3>
-              <button onClick={() => setShowForm(false)} className="p-1 hover:bg-slate-100 rounded-lg"><X size={18}/></button>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ background: '#FFFFFF', borderRadius: 16, boxShadow: '0 25px 50px rgba(0,0,0,0.15)', width: '100%', maxWidth: 440, padding: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, color: '#1A1A2E' }}>{editItem ? 'Editar' : 'Adicionar'} Renda Fixa</h3>
+              <button onClick={() => setShowForm(false)} className="btn-icon"><X size={16}/></button>
             </div>
-            {erro && <p className="mb-3 text-sm text-red-600">{erro}</p>}
-            <form onSubmit={salvar} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Nome / Descrição *</label>
+            {erro && <p style={{ marginBottom: 12, fontSize: 13, color: '#DC2626' }}>{erro}</p>}
+            <form onSubmit={salvar}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div style={{ gridColumn: '1/-1' }}>
+                  <label style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Nome / Descrição *</label>
                   <input className="input" placeholder="Ex: CDB XP 110% CDI" value={form.nome}
                     onChange={e => setForm({...form, nome: e.target.value})} required/>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Instituição</label>
+                  <label style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Instituição</label>
                   <input className="input" placeholder="XP, Nubank..." value={form.instituicao}
                     onChange={e => setForm({...form, instituicao: e.target.value})}/>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
+                  <label style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Tipo</label>
                   <select className="input" value={form.tipo} onChange={e => setForm({...form, tipo: e.target.value})}>
                     {TIPOS.map(t => <option key={t}>{t}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Valor investido (R$) *</label>
+                  <label style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Valor investido (R$) *</label>
                   <input className="input" type="number" min="0" step="0.01" placeholder="0,00"
                     value={form.valor_investido} onChange={e => setForm({...form, valor_investido: e.target.value})} required/>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Rendimento anual (%)</label>
+                  <label style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Rendimento anual (%)</label>
                   <input className="input" type="number" step="0.01" placeholder="Ex: 12.5"
                     value={form.rendimento_anual} onChange={e => setForm({...form, rendimento_anual: e.target.value})}/>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Indexador</label>
+                  <label style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Indexador</label>
                   <select className="input" value={form.indexador} onChange={e => setForm({...form, indexador: e.target.value})}>
                     {INDEXADORES.map(i => <option key={i}>{i}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Vencimento</label>
+                  <label style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Vencimento</label>
                   <input className="input" type="date" value={form.vencimento}
                     onChange={e => setForm({...form, vencimento: e.target.value})}/>
                 </div>
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Observações</label>
+                <div style={{ gridColumn: '1/-1' }}>
+                  <label style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Observações</label>
                   <textarea className="input" rows={2} placeholder="Opcional..."
                     value={form.observacoes} onChange={e => setForm({...form, observacoes: e.target.value})}/>
                 </div>
               </div>
-              <div className="flex gap-2 pt-2">
-                <button type="submit" className="btn-primary flex-1">Salvar</button>
-                <button type="button" onClick={() => setShowForm(false)} className="btn-secondary flex-1">Cancelar</button>
+              <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+                <button type="submit" className="btn-primary" style={{ flex: 1, justifyContent: 'center' }}>Salvar</button>
+                <button type="button" className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setShowForm(false)}>Cancelar</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
+      {/* Lista cards */}
       {itens.length > 0 ? (
-        <div className="table-container">
-          <table>
-            <thead><tr>
-              <th>Nome</th><th>Instituição</th><th>Tipo</th><th>Indexador</th>
-              <th>Valor Investido</th><th>Rendimento</th><th>Vencimento</th><th>Obs.</th><th></th>
-            </tr></thead>
-            <tbody>
-              {itens.map(i => (
-                <tr key={i.id}>
-                  <td className="font-medium">{i.nome}</td>
-                  <td>{i.instituicao || '-'}</td>
-                  <td><span className="badge badge-bom">{i.tipo}</span></td>
-                  <td>{i.indexador || '-'}</td>
-                  <td className="font-semibold">{fmt.brl(i.valor_investido)}</td>
-                  <td>{i.rendimento_anual ? fmt.pct(i.rendimento_anual) + ' a.a.' : '-'}</td>
-                  <td>{i.vencimento ? fmt.data(i.vencimento) : '-'}</td>
-                  <td className="text-xs text-slate-500 max-w-xs truncate">{i.observacoes || '-'}</td>
-                  <td>
-                    <div className="flex gap-1">
-                      <button onClick={() => abrirForm(i)} className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-brand-600"><Pencil size={14}/></button>
-                      <button onClick={() => remover(i.id)} className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-600"><Trash2 size={14}/></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {itens.map(i => (
+            <div key={i.id} style={{ background: '#FFFFFF', border: '1px solid #E8ECF0', borderRadius: 14, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ width: 42, height: 42, borderRadius: '50%', background: '#F0FDF4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
+                🏦
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 14, fontWeight: 700, color: '#1A1A2E' }}>{i.nome}</p>
+                <p style={{ fontSize: 12, color: '#8896A8', marginTop: 2 }}>
+                  {[i.instituicao, i.tipo, i.indexador].filter(Boolean).join(' · ')}
+                </p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ fontSize: 15, fontWeight: 700, color: '#1A1A2E' }}>{fmt.brl(i.valor_investido)}</p>
+                {i.rendimento_anual && (
+                  <p style={{ fontSize: 12, fontWeight: 600, color: '#16A34A', marginTop: 2 }}>{fmt.pct(i.rendimento_anual)} a.a.</p>
+                )}
+                {i.vencimento && (
+                  <p style={{ fontSize: 11, color: '#8896A8', marginTop: 2 }}>Vence {fmt.data(i.vencimento)}</p>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 6, marginLeft: 16 }}>
+                <button className="btn-icon" onClick={() => abrirForm(i)}>✏️</button>
+                <button className="btn-icon" onClick={() => remover(i.id)}>🗑️</button>
+              </div>
+            </div>
+          ))}
         </div>
       ) : (
-        <div className="card p-10 text-center">
-          <Landmark size={40} className="text-slate-300 mx-auto mb-3"/>
-          <p className="text-slate-500 font-medium">Nenhum investimento em renda fixa</p>
-          <p className="text-slate-400 text-sm mt-1">Adicione seus CDBs, LCIs, Tesouro Direto e outros.</p>
+        <div style={{ background: '#FFF', border: '1px solid #E8ECF0', borderRadius: 14, padding: 40, textAlign: 'center' }}>
+          <Landmark size={40} style={{ color: '#D0D8E0', margin: '0 auto 12px' }}/>
+          <p style={{ color: '#4A5568', fontWeight: 500, marginBottom: 4 }}>Nenhum investimento em renda fixa</p>
+          <p style={{ color: '#8896A8', fontSize: 13 }}>Adicione seus CDBs, LCIs, Tesouro Direto e outros.</p>
         </div>
       )}
     </div>

@@ -21,10 +21,11 @@ module.exports = {
           900: '#133c8e',
           950: '#0f2660',
         },
+        gold:    '#C9A84C',
         success: '#16a34a',
         danger:  '#dc2626',
         warning: '#d97706',
-        muted:   '#6b7280',
+        muted:   '#8896A8',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
@@ -33,7 +34,8 @@ module.exports = {
       borderRadius: {
         DEFAULT: '8px',
         lg: '12px',
-        xl: '16px',
+        xl: '14px',
+        '2xl': '16px',
       },
     },
   },

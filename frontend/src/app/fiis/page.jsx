@@ -1,26 +1,158 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { Plus, Trash2, RefreshCw, Search, TrendingUp, TrendingDown, Building2 } from 'lucide-react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { RefreshCw, Building2 } from 'lucide-react';
 import api from '@/lib/api';
-import { fmt, badgeClassificacao, classeDecisao, calcPerformance } from '@/lib/utils';
+import { fmt, calcPerformance } from '@/lib/utils';
 
-export default function FIIsPage() {
-  const [fiis, setFiis] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [buscando, setBuscando] = useState(false);
-  const [atualizando, setAtualizando] = useState(false);
-  const [ticker, setTicker] = useState('');
-  const [quantidade, setQuantidade] = useState('');
-  const [precoCompra, setPrecoCompra] = useState('');
-  const [erro, setErro] = useState('');
-  const [editando, setEditando] = useState(null);
+function badgeDecisao(d = '') {
+  const v = (d || '').toUpperCase();
+  if (v.includes('COMPRAR') || v.includes('ACUMULAR')) return 'badge-comprar';
+  if (v.includes('MANTER')) return 'badge-manter';
+  if (v.includes('ACOMPANHAR') || v.includes('ATENÇÃO')) return 'badge-atencao';
+  return 'badge-risco';
+}
 
-  const carregar = async () => {
-    try { const r = await api.get('/fiis'); setFiis(r.data); }
-    finally { setLoading(false); }
+function scoreBarColor(c = '') {
+  const v = (c || '').toUpperCase();
+  if (v.includes('EXCEL')) return '#2563EB';
+  if (v.includes('BOM'))   return '#16A34A';
+  if (v.includes('ATEN'))  return '#D97706';
+  return '#DC2626';
+}
+
+function FIICard({ f, onRemover, onSalvar }) {
+  const [editando, setEditando] = useState(false);
+  const [qtd, setQtd] = useState(String(f.quantidade ?? ''));
+  const [preco, setPreco] = useState(String(f.preco_compra ?? ''));
+  const perf = calcPerformance(f.preco_atual, f.preco_compra, f.quantidade);
+  const maxScore = 4;
+  const fillPct = f.score != null ? (f.score / maxScore) * 100 : 0;
+
+  const salvar = async () => {
+    await onSalvar(f.ticker, qtd, preco);
+    setEditando(false);
   };
 
-  useEffect(() => { carregar(); }, []);
+  const C = {
+    label: { fontSize: 11, color: '#8896A8', marginBottom: 2 },
+    value: { fontSize: 13, fontWeight: 600, color: '#1A1A2E' },
+    groupLabel: { fontSize: 11, color: '#8896A8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 },
+  };
+
+  return (
+    <div style={{ background: '#FFFFFF', border: '1px solid #E8ECF0', borderRadius: 14, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 18, fontWeight: 700, color: '#2563EB' }}>{f.ticker}</span>
+        <span className={badgeDecisao(f.decisao)}>{f.decisao}</span>
+      </div>
+
+      {/* Score bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ flex: 1, height: 5, background: '#E8ECF0', borderRadius: 4, overflow: 'hidden' }}>
+          <div style={{ width: `${fillPct}%`, height: '100%', background: scoreBarColor(f.classificacao), borderRadius: 4 }}/>
+        </div>
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', whiteSpace: 'nowrap' }}>{f.score}/{maxScore}</span>
+        <span style={{ fontSize: 12, color: '#8896A8' }}>{f.classificacao}</span>
+      </div>
+
+      {/* Rendimento & Qualidade */}
+      <div>
+        <p style={C.groupLabel}>Rendimento & Qualidade</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
+          {[
+            { label: 'DY Mensal',  v: f.dy_mensal          != null ? fmt.pct(f.dy_mensal)          : '-' },
+            { label: 'DY Anual',   v: f.dy_anual           != null ? fmt.pct(f.dy_anual)           : '-' },
+            { label: 'P/VP',       v: f.pvp                != null ? fmt.num(f.pvp)                : '-' },
+            { label: 'Volume Dia', v: f.volume_financeiro  != null ? fmt.brl(f.volume_financeiro)  : '-' },
+            { label: 'Patrimônio', v: f.patrimonio_liquido != null ? fmt.brl(f.patrimonio_liquido) : '-' },
+            { label: 'Peso',       v: f.peso_sugerido      != null ? fmt.pct(f.peso_sugerido * 100): '-' },
+          ].map(({ label, v }) => (
+            <div key={label}>
+              <p style={C.label}>{label}</p>
+              <p style={C.value}>{v}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Posição */}
+      <div>
+        <p style={C.groupLabel}>Sua posição</p>
+        {editando ? (
+          <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 10, padding: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+              <div>
+                <label style={{ ...C.label, display: 'block', marginBottom: 4 }}>Quantidade</label>
+                <input className="input" type="number" min="0" step="1" value={qtd} onChange={e => setQtd(e.target.value)}/>
+              </div>
+              <div>
+                <label style={{ ...C.label, display: 'block', marginBottom: 4 }}>Preço médio (R$)</label>
+                <input className="input" type="number" min="0" step="0.01" value={preco} onChange={e => setPreco(e.target.value)}/>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn-primary" style={{ flex: 1, justifyContent: 'center' }} onClick={salvar}>Salvar</button>
+              <button className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setEditando(false)}>Cancelar</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ background: '#F8F9FA', border: '1px solid #E8ECF0', borderRadius: 10, padding: '12px 14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div><p style={C.label}>Qtd. cotas</p><p style={C.value}>{f.quantidade ? fmt.num(f.quantidade, 0) : '-'}</p></div>
+              <div style={{ textAlign: 'center' }}><p style={C.label}>Seu preço médio</p><p style={C.value}>{f.preco_compra ? fmt.brl(f.preco_compra) : '-'}</p></div>
+              <div style={{ textAlign: 'right' }}><p style={C.label}>Val. investido</p><p style={C.value}>{perf.custo > 0 ? fmt.brl(perf.custo) : '-'}</p></div>
+            </div>
+            <hr style={{ border: 'none', borderTop: '1px solid #E8ECF0', margin: '8px 0' }}/>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <div><p style={C.label}>Val. atual</p><p style={C.value}>{perf.valorAtual > 0 ? fmt.brl(perf.valorAtual) : '-'}</p></div>
+              <div style={{ textAlign: 'right' }}>
+                <p style={C.label}>Retorno</p>
+                {perf.custo > 0 ? (
+                  <p style={{ fontSize: 13, fontWeight: 600, color: perf.ganho >= 0 ? '#16A34A' : '#DC2626' }}>
+                    {perf.ganho >= 0 ? '+' : ''}{fmt.brl(perf.ganho)} ({perf.ganho >= 0 ? '+' : ''}{fmt.pct(perf.pct)})
+                  </p>
+                ) : <p style={C.value}>-</p>}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 4, borderTop: '1px solid #E8ECF0' }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <span style={{ fontSize: 16, fontWeight: 700, color: '#1A1A2E' }}>{fmt.brl(f.preco_atual)}</span>
+            {f.variacao_dia != null && (
+              <span style={{
+                fontSize: 12, fontWeight: 600,
+                color: f.variacao_dia >= 0 ? '#16A34A' : '#DC2626',
+                background: f.variacao_dia >= 0 ? '#F0FDF4' : '#FEF2F2',
+                padding: '2px 8px', borderRadius: 20,
+              }}>
+                {f.variacao_dia >= 0 ? '▲' : '▼'} {f.variacao_dia >= 0 ? '+' : ''}{fmt.pct(f.variacao_dia)} hoje
+              </span>
+            )}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {!editando && <button className="btn-icon" onClick={() => setEditando(true)}>✏️</button>}
+          <button className="btn-icon" onClick={() => onRemover(f.ticker)}>🗑️</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FIIsForm({ onAdicionado }) {
+  const searchParams = useSearchParams();
+  const [ticker, setTicker] = useState(searchParams.get('ticker') || '');
+  const [quantidade, setQuantidade] = useState('');
+  const [precoCompra, setPrecoCompra] = useState('');
+  const [buscando, setBuscando] = useState(false);
+  const [erro, setErro] = useState('');
 
   const adicionar = async (e) => {
     e.preventDefault();
@@ -33,11 +165,52 @@ export default function FIIsPage() {
         preco_compra: Number(precoCompra) || 0
       });
       setTicker(''); setQuantidade(''); setPrecoCompra('');
-      await carregar();
+      onAdicionado();
     } catch (err) {
       setErro(err.response?.data?.error || 'Erro ao adicionar FII.');
     } finally { setBuscando(false); }
   };
+
+  return (
+    <div style={{ background: '#FFFFFF', border: '1px solid #E8ECF0', borderRadius: 14, padding: 20, marginBottom: 24 }}>
+      <p style={{ fontSize: 14, fontWeight: 700, color: '#1A1A2E', marginBottom: 14 }}>Adicionar FII</p>
+      <form onSubmit={adicionar} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 100 }}>
+          <label style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Ticker *</label>
+          <input className="input" placeholder="Ex: CPTS11" style={{ textTransform: 'uppercase' }}
+            value={ticker} onChange={e => setTicker(e.target.value.toUpperCase())} required/>
+        </div>
+        <div style={{ flex: 1, minWidth: 100 }}>
+          <label style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Qtd. que você tem</label>
+          <input className="input" type="number" min="0" step="1" placeholder="0"
+            value={quantidade} onChange={e => setQuantidade(e.target.value)}/>
+        </div>
+        <div style={{ flex: 1, minWidth: 120 }}>
+          <label style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Preço médio de compra</label>
+          <input className="input" type="number" min="0" step="0.01" placeholder="R$ 0,00"
+            value={precoCompra} onChange={e => setPrecoCompra(e.target.value)}/>
+        </div>
+        <button type="submit" disabled={buscando} className="btn-primary">
+          {buscando ? <RefreshCw size={14} style={{ animation: 'spin 0.7s linear infinite' }}/> : '🔍'}
+          {buscando ? 'Buscando...' : 'Buscar e Avaliar'}
+        </button>
+      </form>
+      {erro && <p style={{ marginTop: 8, fontSize: 13, color: '#DC2626' }}>{erro}</p>}
+    </div>
+  );
+}
+
+export default function FIIsPage() {
+  const [fiis, setFiis] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [atualizando, setAtualizando] = useState(false);
+
+  const carregar = async () => {
+    try { const r = await api.get('/fiis'); setFiis(r.data); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { carregar(); }, []);
 
   const remover = async (t) => {
     if (!confirm(`Remover ${t}?`)) return;
@@ -47,7 +220,7 @@ export default function FIIsPage() {
 
   const salvarEdicao = async (t, qtd, preco) => {
     await api.put(`/fiis/${t}`, { quantidade: Number(qtd), preco_compra: Number(preco) });
-    setEditando(null); await carregar();
+    await carregar();
   };
 
   const atualizar = async () => {
@@ -57,151 +230,39 @@ export default function FIIsPage() {
   };
 
   if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin"/>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 256 }}>
+      <div style={{ width: 32, height: 32, border: '2px solid #C9A84C', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }}/>
     </div>
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Avaliação de FIIs</h2>
-          <p className="text-sm text-slate-500">Fundos Imobiliários avaliados por critérios de renda e qualidade</p>
+          <h2 style={{ fontSize: 22, fontWeight: 600, color: '#1A1A2E', marginBottom: 4 }}>Carteira FII</h2>
+          <p style={{ fontSize: 13, color: '#8896A8', marginBottom: 24 }}>Fundos Imobiliários avaliados por critérios de renda e qualidade</p>
         </div>
-        <button onClick={atualizar} disabled={atualizando} className="btn-secondary flex items-center gap-2">
-          <RefreshCw size={15} className={atualizando ? 'animate-spin' : ''}/>
+        <button onClick={atualizar} disabled={atualizando} className="btn-secondary">
+          <RefreshCw size={15} style={atualizando ? { animation: 'spin 0.7s linear infinite' } : {}}/>
           {atualizando ? 'Atualizando...' : 'Atualizar todos'}
         </button>
       </div>
 
-      <div className="card p-5">
-        <h3 className="text-sm font-semibold text-slate-900 mb-4">Adicionar FII</h3>
-        <form onSubmit={adicionar} className="flex flex-wrap gap-3 items-end">
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Ticker *</label>
-            <input className="input w-32 uppercase" placeholder="Ex: CPTS11"
-              value={ticker} onChange={e => setTicker(e.target.value.toUpperCase())} required/>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Qtd. que você tem</label>
-            <input className="input w-32" type="number" min="0" step="0.000001" placeholder="0"
-              value={quantidade} onChange={e => setQuantidade(e.target.value)}/>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Preço médio de compra</label>
-            <input className="input w-36" type="number" min="0" step="0.01" placeholder="R$ 0,00"
-              value={precoCompra} onChange={e => setPrecoCompra(e.target.value)}/>
-          </div>
-          <button type="submit" disabled={buscando} className="btn-primary flex items-center gap-2">
-            {buscando ? <RefreshCw size={14} className="animate-spin"/> : <Search size={14}/>}
-            {buscando ? 'Buscando...' : 'Buscar e Avaliar'}
-          </button>
-        </form>
-        {erro && <p className="mt-2 text-sm text-red-600">{erro}</p>}
-      </div>
-
-      <div className="card p-4">
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Critérios de avaliação (Score /4)</p>
-        <div className="flex flex-wrap gap-2 text-xs text-slate-600">
-          <span className="px-2 py-1 bg-slate-100 rounded">DY Mensal &gt; 1%</span>
-          <span className="px-2 py-1 bg-slate-100 rounded">P/VP &lt; 1,05</span>
-          <span className="px-2 py-1 bg-slate-100 rounded">Volume Diário &gt; R$ 1M</span>
-          <span className="px-2 py-1 bg-slate-100 rounded">Patrimônio &gt; R$ 1B</span>
-        </div>
-      </div>
+      <Suspense fallback={<div style={{ background: '#FFF', border: '1px solid #E8ECF0', borderRadius: 14, padding: 20, marginBottom: 24, height: 90 }}/>}>
+        <FIIsForm onAdicionado={carregar}/>
+      </Suspense>
 
       {fiis.length > 0 ? (
-        <div className="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Ticker</th>
-                <th>Preço Atual</th>
-                <th>DY Mensal</th>
-                <th>DY Anual</th>
-                <th>P/VP</th>
-                <th>Volume Dia</th>
-                <th>Patrimônio</th>
-                <th>Score</th>
-                <th>Classificação</th>
-                <th>Decisão</th>
-                <th>Qtd.</th>
-                <th>Preço Médio</th>
-                <th>Val. Atual</th>
-                <th>Retorno</th>
-                <th>Peso</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {fiis.map(f => {
-                const perf = calcPerformance(f.preco_atual, f.preco_compra, f.quantidade);
-                const isEdit = editando === f.ticker;
-                return (
-                  <tr key={f.ticker}>
-                    <td className="font-mono font-bold text-brand-700">{f.ticker}</td>
-                    <td className="font-semibold">{fmt.brl(f.preco_atual)}</td>
-                    <td>{f.dy_mensal ? fmt.pct(f.dy_mensal) : '-'}</td>
-                    <td>{f.dy_anual ? fmt.pct(f.dy_anual) : '-'}</td>
-                    <td>{f.pvp ? fmt.num(f.pvp) : '-'}</td>
-                    <td className="text-xs">{f.volume_financeiro ? fmt.brl(f.volume_financeiro) : '-'}</td>
-                    <td className="text-xs">{f.patrimonio_liquido ? fmt.brl(f.patrimonio_liquido) : '-'}</td>
-                    <td className="font-mono font-semibold">{f.score}</td>
-                    <td><span className={badgeClassificacao(f.classificacao)}>{f.classificacao}</span></td>
-                    <td><span className={classeDecisao(f.decisao)}>{f.decisao}</span></td>
-                    <td>
-                      {isEdit
-                        ? <input className="input w-20 text-xs" type="number" defaultValue={f.quantidade} id={`qtd-${f.ticker}`}/>
-                        : fmt.num(f.quantidade, 0) || '-'}
-                    </td>
-                    <td>
-                      {isEdit
-                        ? <input className="input w-24 text-xs" type="number" defaultValue={f.preco_compra} id={`preco-${f.ticker}`} step="0.01"/>
-                        : f.preco_compra ? fmt.brl(f.preco_compra) : '-'}
-                    </td>
-                    <td>{perf.valorAtual ? fmt.brl(perf.valorAtual) : '-'}</td>
-                    <td>
-                      {perf.custo > 0 && (
-                        <span className={`flex items-center gap-1 text-xs font-medium ${perf.ganho >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                          {perf.ganho >= 0 ? <TrendingUp size={12}/> : <TrendingDown size={12}/>}
-                          {fmt.pct(perf.pct)}
-                        </span>
-                      )}
-                    </td>
-                    <td className="text-slate-500">{f.peso_sugerido ? fmt.pct(f.peso_sugerido * 100) : '-'}</td>
-                    <td>
-                      <div className="flex items-center gap-1">
-                        {isEdit ? (
-                          <>
-                            <button className="btn-primary text-xs px-2 py-1" onClick={() => {
-                              salvarEdicao(f.ticker,
-                                document.getElementById(`qtd-${f.ticker}`)?.value,
-                                document.getElementById(`preco-${f.ticker}`)?.value
-                              );
-                            }}>Salvar</button>
-                            <button className="btn-secondary text-xs px-2 py-1" onClick={() => setEditando(null)}>Cancelar</button>
-                          </>
-                        ) : (
-                          <button className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-brand-600 text-xs"
-                            onClick={() => setEditando(f.ticker)}>Editar</button>
-                        )}
-                        <button onClick={() => remover(f.ticker)} className="p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-600">
-                          <Trash2 size={14}/>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+          {fiis.map(f => (
+            <FIICard key={f.ticker} f={f} onRemover={remover} onSalvar={salvarEdicao}/>
+          ))}
         </div>
       ) : (
-        <div className="card p-10 text-center">
-          <Building2 size={40} className="text-slate-300 mx-auto mb-3"/>
-          <p className="text-slate-500 font-medium">Nenhum FII adicionado</p>
-          <p className="text-slate-400 text-sm mt-1">Digite um ticker acima para buscar e avaliar um fundo imobiliário.</p>
+        <div style={{ background: '#FFF', border: '1px solid #E8ECF0', borderRadius: 14, padding: 40, textAlign: 'center' }}>
+          <Building2 size={40} style={{ color: '#D0D8E0', margin: '0 auto 12px' }}/>
+          <p style={{ color: '#4A5568', fontWeight: 500, marginBottom: 4 }}>Nenhum FII adicionado</p>
+          <p style={{ color: '#8896A8', fontSize: 13 }}>Digite um ticker acima para buscar e avaliar um fundo imobiliário.</p>
         </div>
       )}
     </div>

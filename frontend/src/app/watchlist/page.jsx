@@ -1,8 +1,199 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, RefreshCw, Eye } from 'lucide-react';
+import { Plus, RefreshCw, Eye, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
-import { fmt, badgeClassificacao, classeDecisao } from '@/lib/utils';
+import { fmt } from '@/lib/utils';
+
+function badgeDecisao(d = '') {
+  const v = (d || '').toUpperCase();
+  if (v.includes('COMPRAR') || v.includes('ACUMULAR')) return 'badge-comprar';
+  if (v.includes('MANTER')) return 'badge-manter';
+  if (v.includes('ACOMPANHAR') || v.includes('ATENÇÃO')) return 'badge-atencao';
+  return 'badge-risco';
+}
+
+function scoreBarColor(c = '') {
+  const v = (c || '').toUpperCase();
+  if (v.includes('EXCEL')) return '#2563EB';
+  if (v.includes('BOM'))   return '#16A34A';
+  if (v.includes('ATEN'))  return '#D97706';
+  return '#DC2626';
+}
+
+const CRITERIOS_ACAO = [
+  { label: 'P/L < 15',           fn: a => a.pl != null && a.pl > 0 && a.pl < 15,              val: a => a.pl != null ? fmt.num(a.pl) : '-' },
+  { label: 'P/VP < 1,5',         fn: a => a.pvp != null && a.pvp > 0 && a.pvp < 1.5,          val: a => a.pvp != null ? fmt.num(a.pvp) : '-' },
+  { label: 'Margem Liq. > 10%',  fn: a => a.margem_liquida != null && a.margem_liquida > 10,   val: a => a.margem_liquida != null ? fmt.pct(a.margem_liquida) : '-' },
+  { label: 'ROE > 10%',          fn: a => a.roe != null && a.roe > 10,                         val: a => a.roe != null ? fmt.pct(a.roe) : '-' },
+  { label: 'Dívida/EBIT < 2x',   fn: a => a.divida_ebit != null && a.divida_ebit < 2,         val: a => a.divida_ebit != null ? fmt.num(a.divida_ebit) + 'x' : '-' },
+  { label: 'DY > 6%',            fn: a => a.dy != null && a.dy > 6,                            val: a => a.dy != null ? fmt.pct(a.dy) : '-' },
+];
+
+const CRITERIOS_FII = [
+  { label: 'DY Mensal > 1%',         fn: f => f.dy_mensal != null && f.dy_mensal > 1,                         val: f => f.dy_mensal != null ? fmt.pct(f.dy_mensal) : '-' },
+  { label: 'P/VP < 1,05',            fn: f => f.pvp != null && f.pvp > 0 && f.pvp < 1.05,                    val: f => f.pvp != null ? fmt.num(f.pvp) : '-' },
+  { label: 'Volume Diário > R$ 1M',  fn: f => f.volume_financeiro != null && f.volume_financeiro > 1000000,  val: f => f.volume_financeiro != null ? fmt.brl(f.volume_financeiro) : '-' },
+  { label: 'Patrimônio > R$ 1B',     fn: f => f.patrimonio_liquido != null && f.patrimonio_liquido > 1e9,    val: f => f.patrimonio_liquido != null ? fmt.brl(f.patrimonio_liquido) : '-' },
+];
+
+function RadarCard({ item, onRemover, onAddCarteira }) {
+  const isAcao = (item.tipo || '').toUpperCase() === 'ACAO' || (item.tipo || '').toUpperCase() === 'AÇÃO';
+  const criterios = isAcao ? CRITERIOS_ACAO : CRITERIOS_FII;
+  const maxScore = isAcao ? 6 : 4;
+  const fillPct = item.score != null ? (item.score / maxScore) * 100 : 0;
+  const varPos = (item.variacao_dia ?? 0) >= 0;
+
+  const C = {
+    label: { fontSize: 11, color: '#8896A8', marginBottom: 2 },
+    muted: { fontSize: 11, color: '#8896A8' },
+  };
+
+  return (
+    <div style={{ background: '#FFFFFF', border: '1px solid #E8ECF0', borderRadius: 14, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 18, fontWeight: 700, color: '#2563EB' }}>{item.ticker}</span>
+          <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: '#F8F9FA', color: '#8896A8', border: '1px solid #E8ECF0' }}>
+            {item.tipo}
+          </span>
+        </div>
+        <span className={badgeDecisao(item.decisao)}>{item.decisao}</span>
+      </div>
+
+      {/* Score bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ flex: 1, height: 5, background: '#E8ECF0', borderRadius: 4, overflow: 'hidden' }}>
+          <div style={{ width: `${fillPct}%`, height: '100%', background: scoreBarColor(item.classificacao), borderRadius: 4 }}/>
+        </div>
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#1A1A2E', whiteSpace: 'nowrap' }}>{item.score || 0}/{maxScore}</span>
+        <span style={{ fontSize: 12, color: '#8896A8' }}>{item.classificacao}</span>
+      </div>
+
+      {/* Critérios */}
+      <div>
+        <p style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+          Critérios do score
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          {criterios.map(c => {
+            const ok = c.fn(item);
+            const v = c.val(item);
+            return (
+              <div key={c.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderRadius: 8, background: '#F8F9FA' }}>
+                <span style={{ fontSize: 12, color: '#4A5568', flex: 1 }}>{c.label}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#1A1A2E', margin: '0 10px' }}>{v}</span>
+                <span style={{ fontSize: 16, color: ok ? '#16A34A' : '#DC2626' }}>{ok ? '✅' : '❌'}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Variação do dia */}
+      <div>
+        <p style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+          Variação do dia
+        </p>
+        <div style={{
+          background: varPos ? '#F0FDF4' : '#FEF2F2',
+          border: `1px solid ${varPos ? '#BBF7D0' : '#FECACA'}`,
+          borderRadius: 10, padding: '12px 14px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8,
+        }}>
+          <div>
+            <p style={{ fontSize: 11, color: varPos ? '#16A34A' : '#DC2626', marginBottom: 3 }}>Preço atual</p>
+            <p style={{ fontSize: 18, fontWeight: 700, color: '#1A1A2E' }}>{item.preco_atual ? fmt.brl(item.preco_atual) : '-'}</p>
+            {item.preco_abertura && (
+              <p style={{ fontSize: 11, color: '#8896A8', marginTop: 2 }}>Abertura: {fmt.brl(item.preco_abertura)}</p>
+            )}
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            {item.variacao_dia != null ? (
+              <>
+                <p style={{ fontSize: 22, fontWeight: 700, color: varPos ? '#16A34A' : '#DC2626' }}>
+                  {varPos ? '+' : ''}{fmt.pct(item.variacao_dia)}
+                </p>
+                {item.variacao_dia_reais != null && (
+                  <p style={{ fontSize: 12, color: varPos ? '#16A34A' : '#DC2626' }}>
+                    {varPos ? '+' : ''}{fmt.brl(item.variacao_dia_reais)} hoje
+                  </p>
+                )}
+              </>
+            ) : (
+              <p style={{ fontSize: 14, color: '#8896A8' }}>-</p>
+            )}
+          </div>
+        </div>
+
+        {/* Barra Min/Max */}
+        {item.preco_minimo != null && item.preco_maximo != null && item.preco_atual != null && (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#8896A8', marginBottom: 4 }}>
+              <span>Mín {fmt.brl(item.preco_minimo)}</span>
+              <span>Máx {fmt.brl(item.preco_maximo)}</span>
+            </div>
+            <div style={{ height: 5, background: '#E8ECF0', borderRadius: 4, overflow: 'hidden', marginBottom: 12 }}>
+              {(() => {
+                const range = item.preco_maximo - item.preco_minimo;
+                const pos = range > 0 ? ((item.preco_atual - item.preco_minimo) / range) * 100 : 50;
+                return <div style={{ width: `${Math.max(0, Math.min(100, pos))}%`, height: '100%', background: varPos ? '#16A34A' : '#DC2626', borderRadius: 4 }}/>;
+              })()}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Preço atual vs alvo */}
+      <div style={{ background: '#F8F9FA', border: '1px solid #E8ECF0', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <p style={C.label}>Preço atual</p>
+          <p style={{ fontSize: 15, fontWeight: 700, color: '#1A1A2E' }}>{item.preco_atual ? fmt.brl(item.preco_atual) : '-'}</p>
+        </div>
+        <span style={{ color: '#8896A8', fontSize: 18 }}>→</span>
+        <div style={{ textAlign: 'right' }}>
+          <p style={C.label}>Seu preço alvo</p>
+          {item.preco_alvo ? (
+            <>
+              <p style={{ fontSize: 15, fontWeight: 700, color: '#16A34A' }}>{fmt.brl(item.preco_alvo)}</p>
+              {item.preco_atual && (
+                <p style={{ fontSize: 11, color: '#16A34A' }}>
+                  {fmt.pct(Math.abs(((item.preco_alvo - item.preco_atual) / item.preco_atual) * 100))} para atingir
+                </p>
+              )}
+            </>
+          ) : (
+            <p style={{ fontSize: 15, fontWeight: 700, color: '#8896A8' }}>—</p>
+          )}
+        </div>
+      </div>
+
+      {/* Observações */}
+      {item.observacoes && (
+        <div style={{ background: '#EFF6FF', borderLeft: '3px solid #2563EB', padding: '8px 12px', fontSize: 12, color: '#4A5568', borderRadius: '0 8px 8px 0' }}>
+          📝 {item.observacoes}
+        </div>
+      )}
+
+      {/* Botão Adicionar à carteira */}
+      <button
+        onClick={() => onAddCarteira(item)}
+        style={{ width: '100%', background: '#2563EB', color: '#fff', border: 'none', borderRadius: 8, padding: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+      >
+        ➕ Adicionar à carteira
+      </button>
+
+      {/* Footer */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 12, color: '#8896A8' }}>
+          Atualizado em {fmt.data(item.ultima_atualizacao)}
+        </span>
+        <button className="btn-icon" onClick={() => onRemover(item.ticker)}><Trash2 size={14}/></button>
+      </div>
+    </div>
+  );
+}
 
 export default function WatchlistPage() {
   const [itens, setItens] = useState([]);
@@ -10,6 +201,7 @@ export default function WatchlistPage() {
   const [atualizando, setAtualizando] = useState(false);
   const [form, setForm] = useState({ ticker: '', tipo: 'ACAO', preco_alvo: '', observacoes: '' });
   const [erro, setErro] = useState('');
+  const router = useRouter();
 
   const carregar = async () => {
     try { const r = await api.get('/watchlist'); setItens(r.data); }
@@ -19,17 +211,16 @@ export default function WatchlistPage() {
   useEffect(() => { carregar(); }, []);
 
   const adicionar = async (e) => {
-    e.preventDefault();
-    setErro('');
+    e.preventDefault(); setErro('');
     try {
-      await api.post('/watchlist', { ...form, ticker: form.ticker.toUpperCase(), preco_alvo: Number(form.preco_alvo)||null });
+      await api.post('/watchlist', { ...form, ticker: form.ticker.toUpperCase(), preco_alvo: Number(form.preco_alvo) || null });
       setForm({ ticker: '', tipo: 'ACAO', preco_alvo: '', observacoes: '' });
       await carregar();
     } catch (err) { setErro(err.response?.data?.error || 'Erro ao adicionar.'); }
   };
 
   const remover = async (ticker) => {
-    if (!confirm(`Remover ${ticker} da watchlist?`)) return;
+    if (!confirm(`Remover ${ticker} do radar?`)) return;
     await api.delete(`/watchlist/${ticker}`); await carregar();
   };
 
@@ -39,87 +230,74 @@ export default function WatchlistPage() {
     finally { setAtualizando(false); }
   };
 
-  if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin"/></div>;
+  const addCarteira = (item) => {
+    const isAcao = (item.tipo || '').toUpperCase() === 'ACAO' || (item.tipo || '').toUpperCase() === 'AÇÃO';
+    router.push(`${isAcao ? '/acoes' : '/fiis'}?ticker=${item.ticker}`);
+  };
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 256 }}>
+      <div style={{ width: 32, height: 32, border: '2px solid #C9A84C', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }}/>
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Watchlist</h2>
-          <p className="text-sm text-slate-500">Ativos que você acompanha antes de comprar</p>
+          <h2 style={{ fontSize: 22, fontWeight: 600, color: '#1A1A2E', marginBottom: 4 }}>No Radar</h2>
+          <p style={{ fontSize: 13, color: '#8896A8', marginBottom: 24 }}>Ativos que você acompanha antes de comprar</p>
         </div>
-        <button onClick={atualizar} disabled={atualizando} className="btn-secondary flex items-center gap-2">
-          <RefreshCw size={15} className={atualizando ? 'animate-spin' : ''}/>
+        <button onClick={atualizar} disabled={atualizando} className="btn-secondary">
+          <RefreshCw size={15} style={atualizando ? { animation: 'spin 0.7s linear infinite' } : {}}/>
           Atualizar cotações
         </button>
       </div>
 
-      <div className="card p-5">
-        <h3 className="text-sm font-semibold text-slate-900 mb-4">Adicionar à watchlist</h3>
-        <form onSubmit={adicionar} className="flex flex-wrap gap-3 items-end">
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Ticker *</label>
-            <input className="input w-32 uppercase" placeholder="Ex: VALE3"
+      {/* Form */}
+      <div style={{ background: '#FFFFFF', border: '1px solid #E8ECF0', borderRadius: 14, padding: 20, marginBottom: 24 }}>
+        <p style={{ fontSize: 14, fontWeight: 700, color: '#1A1A2E', marginBottom: 14 }}>Adicionar ao radar</p>
+        <form onSubmit={adicionar} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 100 }}>
+            <label style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Ticker *</label>
+            <input className="input" placeholder="Ex: VALE3" style={{ textTransform: 'uppercase' }}
               value={form.ticker} onChange={e => setForm({...form, ticker: e.target.value.toUpperCase()})} required/>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Tipo *</label>
-            <select className="input w-28" value={form.tipo} onChange={e => setForm({...form, tipo: e.target.value})}>
+          <div style={{ minWidth: 100 }}>
+            <label style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Tipo *</label>
+            <select className="input" value={form.tipo} onChange={e => setForm({...form, tipo: e.target.value})}>
               <option value="ACAO">Ação</option>
               <option value="FII">FII</option>
             </select>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Preço alvo (R$)</label>
-            <input className="input w-32" type="number" step="0.01" placeholder="Opcional"
+          <div style={{ flex: 1, minWidth: 100 }}>
+            <label style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Preço alvo (R$)</label>
+            <input className="input" type="number" step="0.01" placeholder="Opcional"
               value={form.preco_alvo} onChange={e => setForm({...form, preco_alvo: e.target.value})}/>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Observações</label>
-            <input className="input w-48" placeholder="Opcional"
+          <div style={{ flex: 2, minWidth: 140 }}>
+            <label style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, display: 'block', marginBottom: 4 }}>Observações</label>
+            <input className="input" placeholder="Opcional"
               value={form.observacoes} onChange={e => setForm({...form, observacoes: e.target.value})}/>
           </div>
-          <button type="submit" className="btn-primary flex items-center gap-2">
+          <button type="submit" className="btn-primary">
             <Plus size={14}/> Adicionar
           </button>
         </form>
-        {erro && <p className="mt-2 text-sm text-red-600">{erro}</p>}
+        {erro && <p style={{ marginTop: 8, fontSize: 13, color: '#DC2626' }}>{erro}</p>}
       </div>
 
       {itens.length > 0 ? (
-        <div className="table-container">
-          <table>
-            <thead><tr>
-              <th>Ticker</th><th>Tipo</th><th>Preço Atual</th><th>Preço Alvo</th>
-              <th>Score</th><th>Classificação</th><th>Decisão</th><th>Observações</th><th>Atualizado</th><th></th>
-            </tr></thead>
-            <tbody>
-              {itens.map(i => (
-                <tr key={i.ticker}>
-                  <td className="font-mono font-bold text-brand-700">{i.ticker}</td>
-                  <td><span className="badge badge-bom">{i.tipo}</span></td>
-                  <td>{i.preco_atual ? fmt.brl(i.preco_atual) : '-'}</td>
-                  <td>{i.preco_alvo ? fmt.brl(i.preco_alvo) : '-'}</td>
-                  <td className="font-mono">{i.score || '-'}</td>
-                  <td>{i.classificacao ? <span className={badgeClassificacao(i.classificacao)}>{i.classificacao}</span> : '-'}</td>
-                  <td>{i.decisao ? <span className={classeDecisao(i.decisao)}>{i.decisao}</span> : '-'}</td>
-                  <td className="text-xs text-slate-500 max-w-xs truncate">{i.observacoes || '-'}</td>
-                  <td className="text-xs text-slate-400">{fmt.data(i.ultima_atualizacao)}</td>
-                  <td>
-                    <button onClick={() => remover(i.ticker)} className="p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-600">
-                      <Trash2 size={14}/>
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+          {itens.map(i => (
+            <RadarCard key={i.ticker} item={i} onRemover={remover} onAddCarteira={addCarteira}/>
+          ))}
         </div>
       ) : (
-        <div className="card p-10 text-center">
-          <Eye size={40} className="text-slate-300 mx-auto mb-3"/>
-          <p className="text-slate-500 font-medium">Watchlist vazia</p>
-          <p className="text-slate-400 text-sm mt-1">Adicione ativos que você quer acompanhar antes de investir.</p>
+        <div style={{ background: '#FFF', border: '1px solid #E8ECF0', borderRadius: 14, padding: 40, textAlign: 'center' }}>
+          <Eye size={40} style={{ color: '#D0D8E0', margin: '0 auto 12px' }}/>
+          <p style={{ color: '#4A5568', fontWeight: 500, marginBottom: 4 }}>Radar vazio</p>
+          <p style={{ color: '#8896A8', fontSize: 13 }}>Adicione ativos que você quer acompanhar antes de investir.</p>
         </div>
       )}
     </div>
