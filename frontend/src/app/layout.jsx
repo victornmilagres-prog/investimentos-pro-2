@@ -20,6 +20,36 @@ const NAV = [
   { href: '/watchlist',    label: 'No Radar',                 icon: Eye },
 ];
 
+const BOTTOM_NAV = [
+  { href: '/dashboard',  label: 'Dashboard',   icon: LayoutDashboard },
+  { href: '/acoes',      label: 'Ações',        icon: TrendingUp },
+  { href: '/fiis',       label: 'FII',          icon: Building2 },
+  { href: '/renda-fixa', label: 'Renda Fixa',   icon: Landmark },
+  { href: '/watchlist',  label: 'Radar',        icon: Eye },
+];
+
+function LogoSidebar({ collapsed }) {
+  const gold = '#C9A84C';
+  const dark = '#1A1A2E';
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <svg width="36" height="36" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+        <polygon points="2,38 13,7 24,38" fill="none" stroke={dark} strokeWidth="2.8" strokeLinejoin="round"/>
+        <line x1="6" y1="27" x2="20" y2="27" stroke={dark} strokeWidth="2.8"/>
+        <circle cx="33" cy="8" r="4" fill={gold}/>
+        <line x1="33" y1="14" x2="33" y2="38" stroke={dark} strokeWidth="2.8" strokeLinecap="round"/>
+        <line x1="2" y1="39.5" x2="37" y2="39.5" stroke={gold} strokeWidth="1.5"/>
+      </svg>
+      {!collapsed && (
+        <div>
+          <p style={{ fontSize: 11, fontWeight: 800, color: dark, letterSpacing: '1.5px', lineHeight: 1.2 }}>INVESTIMENTOS</p>
+          <p style={{ fontSize: 8, color: gold, fontWeight: 700, letterSpacing: '1px', marginTop: 1 }}>PRO 2.0</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function RootLayout({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -70,7 +100,17 @@ export default function RootLayout({ children }) {
       <head>
         <title>Investimentos Pro 2.0</title>
         <meta name="viewport" content="width=device-width, initial-scale=1"/>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <style>{`
+          @keyframes spin { to { transform: rotate(360deg); } }
+          @media (max-width: 767px) {
+            .sidebar-desktop { display: none !important; }
+            .bottom-nav { display: flex !important; }
+            .main-content { padding-bottom: 64px !important; }
+          }
+          @media (min-width: 768px) {
+            .bottom-nav { display: none !important; }
+          }
+        `}</style>
       </head>
       <body>
         <AuthContext.Provider value={{ user, setUser, logout }}>
@@ -78,8 +118,8 @@ export default function RootLayout({ children }) {
             <main style={{ minHeight: '100vh', background: '#F0F2F5' }}>{children}</main>
           ) : (
             <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#F0F2F5' }}>
-              {/* Sidebar */}
-              <aside style={{
+              {/* Sidebar — desktop only */}
+              <aside className="sidebar-desktop" style={{
                 width: sidebarOpen ? 240 : 64,
                 background: '#FFFFFF',
                 borderRight: '1px solid #E8ECF0',
@@ -92,15 +132,7 @@ export default function RootLayout({ children }) {
               }}>
                 {/* Logo */}
                 <div style={{ padding: '18px 16px', borderBottom: '1px solid #E8ECF0', display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 8, background: '#C9A84C', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <TrendingUp size={16} color="#fff"/>
-                  </div>
-                  {sidebarOpen && (
-                    <div>
-                      <p style={{ fontSize: 11, fontWeight: 800, color: '#1A1A2E', letterSpacing: '1.5px', lineHeight: 1.2 }}>INVESTIMENTOS</p>
-                      <p style={{ fontSize: 8, color: '#C9A84C', fontWeight: 700, letterSpacing: '1px', marginTop: 1 }}>PRO 2.0</p>
-                    </div>
-                  )}
+                  <LogoSidebar collapsed={!sidebarOpen}/>
                 </div>
 
                 {/* Nav */}
@@ -183,7 +215,7 @@ export default function RootLayout({ children }) {
                   display: 'flex', alignItems: 'center', gap: 12,
                   position: 'sticky', top: 0, zIndex: 10,
                 }}>
-                  <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{
+                  <button onClick={() => setSidebarOpen(!sidebarOpen)} className="sidebar-desktop" style={{
                     background: 'none', border: 'none', cursor: 'pointer',
                     padding: 6, borderRadius: 8, color: '#8896A8',
                   }}>
@@ -194,10 +226,34 @@ export default function RootLayout({ children }) {
                   </h1>
                 </header>
 
-                <main style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
+                <main className="main-content" style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
                   {children}
                 </main>
               </div>
+
+              {/* Bottom nav — mobile only */}
+              <nav className="bottom-nav" style={{
+                position: 'fixed', bottom: 0, left: 0, right: 0,
+                background: '#FFFFFF', borderTop: '1px solid #E8ECF0',
+                height: 60, zIndex: 50,
+                display: 'none',
+                alignItems: 'stretch',
+              }}>
+                {BOTTOM_NAV.map(({ href, label, icon: Icon }) => {
+                  const active = pathname === href || pathname.startsWith(href + '/');
+                  return (
+                    <a key={href} href={href} style={{
+                      flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                      gap: 3, textDecoration: 'none',
+                      color: active ? '#C9A84C' : '#8896A8',
+                      borderTop: `2px solid ${active ? '#C9A84C' : 'transparent'}`,
+                    }}>
+                      <Icon size={20}/>
+                      <span style={{ fontSize: 10, fontWeight: 500 }}>{label}</span>
+                    </a>
+                  );
+                })}
+              </nav>
             </div>
           )}
         </AuthContext.Provider>
