@@ -40,9 +40,10 @@ const CRITERIOS_FII = [
 function RadarCard({ item, onRemover, onAddCarteira }) {
   const isAcao = (item.tipo || '').toUpperCase() === 'ACAO' || (item.tipo || '').toUpperCase() === 'AÇÃO';
   const criterios = isAcao ? CRITERIOS_ACAO : CRITERIOS_FII;
-  const maxScore = isAcao ? 6 : 4;
+  const maxScore = item.max_score || (isAcao ? 6 : 4);
   const scoreNum = typeof item.score === 'string' ? parseInt(item.score) : (item.score ?? 0);
   const fillPct = (scoreNum / maxScore) * 100;
+  const dividaSemDado = isAcao && (!item.divida_ebit || item.divida_ebit === 0);
   const varPos = (item.variacao_dia ?? 0) >= 0;
 
   const C = {
@@ -82,18 +83,24 @@ function RadarCard({ item, onRemover, onAddCarteira }) {
             const ok = c.fn(item);
             const v = c.val(item);
             const isDividaEbit = c.label === 'Dívida/EBIT < 2x';
-            const rawVal = isDividaEbit ? (item.divida_ebit ?? 0) : null;
-            const semDado = isDividaEbit && (rawVal === 0 || rawVal == null);
+            const semDado = isDividaEbit && (!item.divida_ebit || item.divida_ebit === 0);
             const dotColor = semDado ? '#D97706' : (ok ? '#16A34A' : '#DC2626');
+            const bgItem = semDado ? '#FFFBEB' : '#F8F9FA';
+            const corValor = semDado ? '#D97706' : '#1A1A2E';
             return (
-              <div key={c.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 10px', borderRadius: 8, background: '#F8F9FA' }}>
+              <div key={c.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 10px', borderRadius: 8, background: bgItem }}>
                 <span style={{ fontSize: 12, color: '#4A5568', flex: 1 }}>{c.label}</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#1A1A2E', margin: '0 8px' }}>{semDado ? 'Sem dado' : v}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: corValor, margin: '0 8px' }}>{semDado ? 'sem dado' : v}</span>
                 <div style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: dotColor }}/>
               </div>
             );
           })}
         </div>
+        {dividaSemDado && (
+          <div style={{ fontSize: 11, color: '#D97706', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 8, padding: '6px 10px', marginTop: 6 }}>
+            ⚠️ Dívida/EBIT sem dado — critério não pontuado. Score máximo: {maxScore}/{maxScore}
+          </div>
+        )}
       </div>
 
       {/* Graham (apenas ações) */}
@@ -315,13 +322,47 @@ export default function WatchlistPage() {
         {erro && <p style={{ marginTop: 8, fontSize: 13, color: '#DC2626' }}>{erro}</p>}
       </div>
 
-      {itens.length > 0 ? (
-        <div className="grid-cards">
-          {itens.map(i => (
-            <RadarCard key={i.ticker} item={i} onRemover={remover} onAddCarteira={addCarteira}/>
+      {/* Legenda */}
+      {itens.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 11, color: '#8896A8', marginBottom: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: 600, color: '#4A5568' }}>Legenda:</span>
+          {[
+            { color: '#16A34A', label: 'Aprovado' },
+            { color: '#DC2626', label: 'Reprovado' },
+            { color: '#D97706', label: 'Sem dado (não pontua)' },
+          ].map(l => (
+            <span key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: l.color, display: 'inline-block' }}/>
+              {l.label}
+            </span>
           ))}
         </div>
-      ) : (
+      )}
+
+      {itens.length > 0 ? (() => {
+        const acoes = itens.filter(i => (i.tipo || '').toUpperCase() === 'ACAO' || (i.tipo || '').toUpperCase() === 'AÇÃO');
+        const fiis = itens.filter(i => (i.tipo || '').toUpperCase() === 'FII');
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+            {acoes.length > 0 && (
+              <div>
+                <p style={{ fontSize: 14, fontWeight: 700, color: '#1A1A2E', marginBottom: 14 }}>📈 Ações no Radar</p>
+                <div className="grid-cards">
+                  {acoes.map(i => <RadarCard key={i.ticker} item={i} onRemover={remover} onAddCarteira={addCarteira}/>)}
+                </div>
+              </div>
+            )}
+            {fiis.length > 0 && (
+              <div>
+                <p style={{ fontSize: 14, fontWeight: 700, color: '#1A1A2E', marginBottom: 14 }}>🏢 FIIs no Radar</p>
+                <div className="grid-cards">
+                  {fiis.map(i => <RadarCard key={i.ticker} item={i} onRemover={remover} onAddCarteira={addCarteira}/>)}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })() : (
         <div style={{ background: '#FFF', border: '1px solid #E8ECF0', borderRadius: 14, padding: 40, textAlign: 'center' }}>
           <Eye size={40} style={{ color: '#D0D8E0', margin: '0 auto 12px' }}/>
           <p style={{ color: '#4A5568', fontWeight: 500, marginBottom: 4 }}>Radar vazio</p>

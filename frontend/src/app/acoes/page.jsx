@@ -42,7 +42,7 @@ function AcaoCard({ a, onRemover, onSalvar }) {
   const [qtd, setQtd] = useState(String(a.quantidade ?? ''));
   const [preco, setPreco] = useState(String(a.preco_compra ?? ''));
   const perf = calcPerformance(a.preco_atual, a.preco_compra, a.quantidade);
-  const maxScore = 6;
+  const maxScore = a.max_score || 6;
   const scoreNum = typeof a.score === 'string' ? parseInt(a.score) : (a.score ?? 0);
   const fillPct = (scoreNum / maxScore) * 100;
 

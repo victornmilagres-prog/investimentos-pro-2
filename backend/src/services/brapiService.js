@@ -66,18 +66,24 @@ function classificarGraham(precoAtual, precoGraham) {
 function scoreAcao(pl, pvp, margem, roe, divida, dy, ticker) {
   const bancos = ['BBAS3','ITUB4','ITSA4','BBDC4','SANB11','BPAC11','ITUB3','BBDC3'];
   let score = 0;
+  let maxScore = 6;
+
   if (pl > 0 && pl < 15) score++;
   if (pvp > 0 && pvp < 1.5) score++;
   if (margem > 10) score++;
   if (roe > 10) score++;
+
   if (bancos.includes(ticker)) {
-    score++; // bancos não têm dívida/ebit aplicável, sempre pontua
+    score++; // banco sempre pontua
   } else if (divida > 0 && divida < 2) {
     score++; // tem dado e passou
+  } else if (divida === 0) {
+    maxScore = 5; // sem dado — reduz o máximo, não pontua nem reprova
   }
-  // se divida === 0 e não é banco: dado indisponível, não pontua nem reprova
+  // divida >= 2: reprova, maxScore continua 6
+
   if (dy > 6) score++;
-  return score;
+  return { score, maxScore };
 }
 
 function classificarAcao(score) {
@@ -185,9 +191,9 @@ async function buscarAcao(ticker, dividaManual = null) {
 
   const precoGraham = calcularPrecoGraham(preco, pl, pvp);
   const statusGraham = classificarGraham(preco, precoGraham);
-  const score = scoreAcao(pl, pvp, margem, roe, divida, dy, ticker);
+  const { score, maxScore } = scoreAcao(pl, pvp, margem, roe, divida, dy, ticker);
 
-  console.log(`[${ticker}] pl=${pl} pvp=${pvp} margem=${margem} roe=${roe} dy=${dy} divida=${divida} score=${score}`);
+  console.log(`[${ticker}] pl=${pl} pvp=${pvp} margem=${margem} roe=${roe} dy=${dy} divida=${divida} score=${score}/${maxScore}`);
 
   const variacaoDia      = numero(item.regularMarketChangePercent);
   const variacaoDiaReais = numero(item.regularMarketChange);
@@ -210,8 +216,9 @@ async function buscarAcao(ticker, dividaManual = null) {
     precoAbertura: parseFloat(precoAbertura.toFixed(4)),
     precoMinimo: parseFloat(precoMinimo.toFixed(4)),
     precoMaximo: parseFloat(precoMaximo.toFixed(4)),
-    score: `${score}/6`,
+    score: `${score}/${maxScore}`,
     scoreNum: score,
+    maxScore,
     classificacao: classificarAcao(score),
     decisao: decisaoAcao(score),
     observacoes: observacaoAcao(pl, pvp, margem, roe, divida, dy),

@@ -71,16 +71,16 @@ watchlistRouter.post('/', async (req, res) => {
     const r = await pool.query(
       `INSERT INTO watchlist (
          usuario_id,ticker,tipo,preco_alvo,observacoes,
-         preco_atual,score,classificacao,decisao,
+         preco_atual,score,max_score,classificacao,decisao,
          pl,pvp,margem_liquida,roe,divida_ebit,dy,
          dy_mensal,dy_anual,volume_financeiro,patrimonio_liquido,
          preco_graham,status_graham,
          variacao_dia,variacao_dia_reais,preco_abertura,preco_minimo,preco_maximo,
          ultima_atualizacao
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
        ON CONFLICT (usuario_id,ticker) DO UPDATE SET
          preco_alvo=EXCLUDED.preco_alvo, observacoes=EXCLUDED.observacoes,
-         preco_atual=EXCLUDED.preco_atual, score=EXCLUDED.score,
+         preco_atual=EXCLUDED.preco_atual, score=EXCLUDED.score, max_score=EXCLUDED.max_score,
          classificacao=EXCLUDED.classificacao, decisao=EXCLUDED.decisao,
          pl=EXCLUDED.pl, pvp=EXCLUDED.pvp, margem_liquida=EXCLUDED.margem_liquida,
          roe=EXCLUDED.roe, divida_ebit=EXCLUDED.divida_ebit, dy=EXCLUDED.dy,
@@ -94,7 +94,8 @@ watchlistRouter.post('/', async (req, res) => {
        RETURNING *`,
       [
         req.userId, ticker.toUpperCase(), tipo, preco_alvo || null, observacoes,
-        d.preco || null, d.score || null, d.classificacao || null, d.decisao || null,
+        d.preco || null, d.score || null, isAcao ? (d.maxScore || 6) : 4,
+        d.classificacao || null, d.decisao || null,
         isAcao ? (d.pl || 0) : 0,
         d.pvp || 0,
         isAcao ? (d.margemLiquida || 0) : 0,
@@ -132,16 +133,16 @@ watchlistRouter.post('/atualizar-todos', async (req, res) => {
       const isAcao = item.tipo === 'ACAO';
       await pool.query(
         `UPDATE watchlist SET
-           preco_atual=$1, score=$2, classificacao=$3, decisao=$4,
-           pl=$5, pvp=$6, margem_liquida=$7, roe=$8, divida_ebit=$9, dy=$10,
-           dy_mensal=$11, dy_anual=$12, volume_financeiro=$13, patrimonio_liquido=$14,
-           preco_graham=$15, status_graham=$16,
-           variacao_dia=$17, variacao_dia_reais=$18,
-           preco_abertura=$19, preco_minimo=$20, preco_maximo=$21,
-           ultima_atualizacao=$22
-         WHERE usuario_id=$23 AND ticker=$24`,
+           preco_atual=$1, score=$2, max_score=$3, classificacao=$4, decisao=$5,
+           pl=$6, pvp=$7, margem_liquida=$8, roe=$9, divida_ebit=$10, dy=$11,
+           dy_mensal=$12, dy_anual=$13, volume_financeiro=$14, patrimonio_liquido=$15,
+           preco_graham=$16, status_graham=$17,
+           variacao_dia=$18, variacao_dia_reais=$19,
+           preco_abertura=$20, preco_minimo=$21, preco_maximo=$22,
+           ultima_atualizacao=$23
+         WHERE usuario_id=$24 AND ticker=$25`,
         [
-          d.preco, d.score, d.classificacao, d.decisao,
+          d.preco, d.score, isAcao ? (d.maxScore || 6) : 4, d.classificacao, d.decisao,
           isAcao ? (d.pl || 0) : 0,
           d.pvp || 0,
           isAcao ? (d.margemLiquida || 0) : 0,

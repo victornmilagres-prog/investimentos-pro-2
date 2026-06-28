@@ -38,15 +38,15 @@ router.post('/', async (req, res) => {
     const result = await pool.query(`
       INSERT INTO acoes_carteira (
         usuario_id, ticker, quantidade, preco_compra,
-        score, classificacao, decisao, preco_atual, preco_graham, status_graham,
+        score, max_score, classificacao, decisao, preco_atual, preco_graham, status_graham,
         pl, pvp, margem_liquida, roe, divida_ebit, dy,
         variacao_dia, variacao_dia_reais, preco_abertura, preco_minimo, preco_maximo,
         observacoes, ultima_atualizacao
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
       ON CONFLICT (usuario_id, ticker) DO UPDATE SET
         quantidade = EXCLUDED.quantidade,
         preco_compra = CASE WHEN acoes_carteira.preco_compra = 0 THEN EXCLUDED.preco_compra ELSE acoes_carteira.preco_compra END,
-        score = EXCLUDED.score, classificacao = EXCLUDED.classificacao,
+        score = EXCLUDED.score, max_score = EXCLUDED.max_score, classificacao = EXCLUDED.classificacao,
         decisao = EXCLUDED.decisao, preco_atual = EXCLUDED.preco_atual,
         preco_graham = EXCLUDED.preco_graham, status_graham = EXCLUDED.status_graham,
         pl = EXCLUDED.pl, pvp = EXCLUDED.pvp, margem_liquida = EXCLUDED.margem_liquida,
@@ -59,7 +59,7 @@ router.post('/', async (req, res) => {
       RETURNING *
     `, [
       req.userId, dados.ticker, quantidade, preco_compra,
-      dados.score, dados.classificacao, dados.decisao,
+      dados.score, dados.maxScore, dados.classificacao, dados.decisao,
       dados.preco, dados.precoGraham, dados.statusGraham,
       dados.pl, dados.pvp, dados.margemLiquida, dados.roe, dados.dividaEbit, dados.dy,
       dados.variacaoDia, dados.variacaoDiaReais, dados.precoAbertura, dados.precoMinimo, dados.precoMaximo,
@@ -126,14 +126,14 @@ router.post('/atualizar-todos', async (req, res) => {
         const dados = await buscarAcao(acao.ticker, dividaManual);
         await pool.query(`
           UPDATE acoes_carteira SET
-            score=$1, classificacao=$2, decisao=$3, preco_atual=$4, preco_graham=$5,
-            status_graham=$6, pl=$7, pvp=$8, margem_liquida=$9, roe=$10,
-            divida_ebit=$11, dy=$12,
-            variacao_dia=$13, variacao_dia_reais=$14, preco_abertura=$15, preco_minimo=$16, preco_maximo=$17,
-            observacoes=$18, ultima_atualizacao=$19, updated_at=NOW()
-          WHERE usuario_id=$20 AND ticker=$21
+            score=$1, max_score=$2, classificacao=$3, decisao=$4, preco_atual=$5, preco_graham=$6,
+            status_graham=$7, pl=$8, pvp=$9, margem_liquida=$10, roe=$11,
+            divida_ebit=$12, dy=$13,
+            variacao_dia=$14, variacao_dia_reais=$15, preco_abertura=$16, preco_minimo=$17, preco_maximo=$18,
+            observacoes=$19, ultima_atualizacao=$20, updated_at=NOW()
+          WHERE usuario_id=$21 AND ticker=$22
         `, [
-          dados.score, dados.classificacao, dados.decisao, dados.preco, dados.precoGraham,
+          dados.score, dados.maxScore, dados.classificacao, dados.decisao, dados.preco, dados.precoGraham,
           dados.statusGraham, dados.pl, dados.pvp, dados.margemLiquida, dados.roe,
           dados.dividaEbit, dados.dy,
           dados.variacaoDia, dados.variacaoDiaReais, dados.precoAbertura, dados.precoMinimo, dados.precoMaximo,
