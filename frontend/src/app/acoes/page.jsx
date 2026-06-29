@@ -311,10 +311,10 @@ function AcaoCard({ a, onRemover, onSalvar, onAbrirDividendo }) {
             const v = a[key];
             const isDivida = key === 'divida_ebit';
             // Div/EBIT: 0 ou null = sem dado → laranja
-            const semDadoDivida = isDivida && (v == null || v === 0);
-            const semDadoOutro  = !isDivida && (v == null || v === 0);
+            const semDadoDivida = isDivida && (v == null || Number(v) === 0);
+            const semDadoOutro  = !isDivida && (v == null || Number(v) === 0);
             const dotColor = semDadoDivida ? '#D97706' : semDadoOutro ? '#D0D8E0' : ok(v) ? '#16A34A' : '#DC2626';
-            const texto    = semDadoDivida ? 'S/D' : (v != null && v !== 0 ? fmtFn(v) : '-');
+            const texto    = semDadoDivida ? 'S/D' : (v != null && Number(v) !== 0 ? fmtFn(v) : '-');
             const cor      = semDadoDivida ? '#D97706' : '#1A1A2E';
             return (
               <div key={label}>

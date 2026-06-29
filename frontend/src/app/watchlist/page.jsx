@@ -47,7 +47,7 @@ function RadarCard({ item, onRemover, onAddCarteira }) {
   const varPos    = (item.variacao_dia??0) >= 0;
 
   // Div/EBIT sem dado: null ou 0 → laranja
-  const dividaSemDado = isAcao && (item.divida_ebit == null || item.divida_ebit === 0);
+  const dividaSemDado = isAcao && (item.divida_ebit == null || Number(item.divida_ebit) === 0);
 
   return (
     <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:14,padding:'18px 20px',display:'flex',flexDirection:'column',gap:12}}>
