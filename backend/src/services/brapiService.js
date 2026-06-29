@@ -63,6 +63,11 @@ function classificarGraham(precoAtual, precoGraham) {
   return 'CARO';
 }
 
+// DY: >= 6 (era > 6). 6% exato agora aprova.
+// Div/EBIT:
+//   - divida === 0  → SEM DADO (API não retornou) → maxScore = 5, não pontua
+//   - divida > 0 && < 2 → aprovado
+//   - divida >= 2  → reprovado, maxScore continua 6
 function scoreAcao(pl, pvp, margem, roe, divida, dy, ticker) {
   const bancos = ['BBAS3','ITUB4','ITSA4','BBDC4','SANB11','BPAC11','ITUB3','BBDC3'];
   let score = 0;
@@ -74,15 +79,15 @@ function scoreAcao(pl, pvp, margem, roe, divida, dy, ticker) {
   if (roe > 10) score++;
 
   if (bancos.includes(ticker)) {
-    score++; // banco sempre pontua
+    score++;
   } else if (divida > 0 && divida < 2) {
-    score++; // tem dado e passou
+    score++;
   } else if (divida === 0) {
-    maxScore = 5; // sem dado — reduz o máximo, não pontua nem reprova
+    maxScore = 5;
   }
-  // divida >= 2: reprova, maxScore continua 6
 
-  if (dy > 6) score++;
+  if (dy >= 6) score++;
+
   return { score, maxScore };
 }
 
@@ -107,7 +112,7 @@ function observacaoAcao(pl, pvp, margem, roe, divida, dy) {
   if (!(margem > 10)) obs.push('Margem baixa');
   if (!(roe > 10)) obs.push('ROE baixo');
   if (!(divida > 0 && divida < 2)) obs.push('Dívida alta');
-  if (!(dy > 6)) obs.push('DY baixo');
+  if (!(dy >= 6)) obs.push('DY baixo');
   return obs.length ? obs.join('; ') : 'Todos os critérios aprovados';
 }
 
@@ -195,11 +200,11 @@ async function buscarAcao(ticker, dividaManual = null) {
 
   console.log(`[${ticker}] pl=${pl} pvp=${pvp} margem=${margem} roe=${roe} dy=${dy} divida=${divida} score=${score}/${maxScore}`);
 
-  const variacaoDia      = numero(item.regularMarketChangePercent);
+  const variacaoDia = numero(item.regularMarketChangePercent);
   const variacaoDiaReais = numero(item.regularMarketChange);
-  const precoAbertura    = numero(item.regularMarketOpen);
-  const precoMinimo      = numero(item.regularMarketDayLow);
-  const precoMaximo      = numero(item.regularMarketDayHigh);
+  const precoAbertura = numero(item.regularMarketOpen);
+  const precoMinimo = numero(item.regularMarketDayLow);
+  const precoMaximo = numero(item.regularMarketDayHigh);
 
   return {
     ticker, preco,
@@ -292,11 +297,11 @@ async function buscarFII(ticker, ajustes = {}) {
   const score = scoreFII(dyMensal, pvp, volume, patrimonio);
   console.log(`[FII ${ticker}] dy=${dyMensal} pvp=${pvp} vol=${volume} pat=${patrimonio} score=${score}`);
 
-  const variacaoDia      = numero(quote.regularMarketChangePercent);
+  const variacaoDia = numero(quote.regularMarketChangePercent);
   const variacaoDiaReais = numero(quote.regularMarketChange);
-  const precoAbertura    = numero(quote.regularMarketOpen);
-  const precoMinimo      = numero(quote.regularMarketDayLow);
-  const precoMaximo      = numero(quote.regularMarketDayHigh);
+  const precoAbertura = numero(quote.regularMarketOpen);
+  const precoMinimo = numero(quote.regularMarketDayLow);
+  const precoMaximo = numero(quote.regularMarketDayHigh);
 
   return {
     ticker, preco,

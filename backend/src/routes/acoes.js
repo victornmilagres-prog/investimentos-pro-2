@@ -6,7 +6,7 @@ const { buscarAcao, calcularPesos } = require('../services/brapiService');
 const router = express.Router();
 router.use(auth);
 
-// GET /api/acoes — lista todas as ações do usuário
+// GET /api/acoes
 router.get('/', async (req, res) => {
   try {
     const result = await pool.query(
@@ -20,19 +20,17 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/acoes — adiciona uma ação e busca dados na Brapi
+// POST /api/acoes — adiciona ação e busca dados na Brapi
 router.post('/', async (req, res) => {
   const { ticker, quantidade = 0, preco_compra = 0 } = req.body;
   if (!ticker) return res.status(400).json({ error: 'Ticker obrigatório.' });
 
   try {
-    // Verifica ajuste manual de dívida
     const ajuste = await pool.query(
       'SELECT divida_liquida_ebit FROM ajustes_manuais_acoes WHERE usuario_id = $1 AND ticker = $2',
       [req.userId, ticker.toUpperCase()]
     );
     const dividaManual = ajuste.rows[0]?.divida_liquida_ebit ?? null;
-
     const dados = await buscarAcao(ticker, dividaManual);
 
     const result = await pool.query(`
@@ -41,14 +39,16 @@ router.post('/', async (req, res) => {
         score, max_score, classificacao, decisao, preco_atual, preco_graham, status_graham,
         pl, pvp, margem_liquida, roe, divida_ebit, dy,
         variacao_dia, variacao_dia_reais, preco_abertura, preco_minimo, preco_maximo,
-        observacoes, ultima_atualizacao
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+        observacoes, ultima_atualizacao,
+        dividendos_ano, dividendos_lancamentos
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,0,0)
       ON CONFLICT (usuario_id, ticker) DO UPDATE SET
         quantidade = EXCLUDED.quantidade,
         preco_compra = CASE WHEN acoes_carteira.preco_compra = 0 THEN EXCLUDED.preco_compra ELSE acoes_carteira.preco_compra END,
-        score = EXCLUDED.score, max_score = EXCLUDED.max_score, classificacao = EXCLUDED.classificacao,
-        decisao = EXCLUDED.decisao, preco_atual = EXCLUDED.preco_atual,
-        preco_graham = EXCLUDED.preco_graham, status_graham = EXCLUDED.status_graham,
+        score = EXCLUDED.score, max_score = EXCLUDED.max_score,
+        classificacao = EXCLUDED.classificacao, decisao = EXCLUDED.decisao,
+        preco_atual = EXCLUDED.preco_atual, preco_graham = EXCLUDED.preco_graham,
+        status_graham = EXCLUDED.status_graham,
         pl = EXCLUDED.pl, pvp = EXCLUDED.pvp, margem_liquida = EXCLUDED.margem_liquida,
         roe = EXCLUDED.roe, divida_ebit = EXCLUDED.divida_ebit, dy = EXCLUDED.dy,
         variacao_dia = EXCLUDED.variacao_dia, variacao_dia_reais = EXCLUDED.variacao_dia_reais,
@@ -66,9 +66,7 @@ router.post('/', async (req, res) => {
       dados.observacoes, dados.ultimaAtualizacao
     ]);
 
-    // Recalcula pesos de todas as ações do usuário
     await recalcularPesos(req.userId);
-
     res.status(201).json({ ...result.rows[0], ...dados });
   } catch (err) {
     console.error(err);
@@ -77,15 +75,23 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PUT /api/acoes/:ticker — atualiza quantidade e preço de compra
+// PUT /api/acoes/:ticker — atualiza quantidade e preço
 router.put('/:ticker', async (req, res) => {
   const { ticker } = req.params;
   const { quantidade, preco_compra } = req.body;
   try {
+    const fields = [];
+    const values = [];
+    let idx = 1;
+    if (quantidade !== undefined) { fields.push(`quantidade=$${idx++}`); values.push(quantidade); }
+    if (preco_compra !== undefined) { fields.push(`preco_compra=$${idx++}`); values.push(preco_compra); }
+    if (!fields.length) return res.status(400).json({ error: 'Nenhum campo para atualizar.' });
+    fields.push(`updated_at=NOW()`);
+    values.push(req.userId, ticker.toUpperCase());
+
     const result = await pool.query(
-      `UPDATE acoes_carteira SET quantidade=$1, preco_compra=$2, updated_at=NOW()
-       WHERE usuario_id=$3 AND ticker=$4 RETURNING *`,
-      [quantidade, preco_compra, req.userId, ticker.toUpperCase()]
+      `UPDATE acoes_carteira SET ${fields.join(', ')} WHERE usuario_id=$${idx++} AND ticker=$${idx++} RETURNING *`,
+      values
     );
     if (!result.rows.length) return res.status(404).json({ error: 'Ação não encontrada.' });
     res.json(result.rows[0]);
@@ -108,7 +114,7 @@ router.delete('/:ticker', async (req, res) => {
   }
 });
 
-// POST /api/acoes/atualizar-todos — atualiza dados da Brapi para todas as ações
+// POST /api/acoes/atualizar-todos
 router.post('/atualizar-todos', async (req, res) => {
   try {
     const acoes = await pool.query(
@@ -126,17 +132,19 @@ router.post('/atualizar-todos', async (req, res) => {
         const dados = await buscarAcao(acao.ticker, dividaManual);
         await pool.query(`
           UPDATE acoes_carteira SET
-            score=$1, max_score=$2, classificacao=$3, decisao=$4, preco_atual=$5, preco_graham=$6,
-            status_graham=$7, pl=$8, pvp=$9, margem_liquida=$10, roe=$11,
-            divida_ebit=$12, dy=$13,
-            variacao_dia=$14, variacao_dia_reais=$15, preco_abertura=$16, preco_minimo=$17, preco_maximo=$18,
+            score=$1, max_score=$2, classificacao=$3, decisao=$4, preco_atual=$5,
+            preco_graham=$6, status_graham=$7, pl=$8, pvp=$9, margem_liquida=$10,
+            roe=$11, divida_ebit=$12, dy=$13,
+            variacao_dia=$14, variacao_dia_reais=$15, preco_abertura=$16,
+            preco_minimo=$17, preco_maximo=$18,
             observacoes=$19, ultima_atualizacao=$20, updated_at=NOW()
           WHERE usuario_id=$21 AND ticker=$22
         `, [
-          dados.score, dados.maxScore, dados.classificacao, dados.decisao, dados.preco, dados.precoGraham,
-          dados.statusGraham, dados.pl, dados.pvp, dados.margemLiquida, dados.roe,
-          dados.dividaEbit, dados.dy,
-          dados.variacaoDia, dados.variacaoDiaReais, dados.precoAbertura, dados.precoMinimo, dados.precoMaximo,
+          dados.score, dados.maxScore, dados.classificacao, dados.decisao, dados.preco,
+          dados.precoGraham, dados.statusGraham, dados.pl, dados.pvp, dados.margemLiquida,
+          dados.roe, dados.dividaEbit, dados.dy,
+          dados.variacaoDia, dados.variacaoDiaReais, dados.precoAbertura,
+          dados.precoMinimo, dados.precoMaximo,
           dados.observacoes, dados.ultimaAtualizacao,
           req.userId, acao.ticker
         ]);
@@ -149,6 +157,53 @@ router.post('/atualizar-todos', async (req, res) => {
     res.json({ resultados, atualizadoEm: new Date() });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao atualizar ações.' });
+  }
+});
+
+// POST /api/acoes/dividendos
+// Recebe: { lancamentos: [{ ticker, valor_por_acao, quantidade, mes, ano }] }
+router.post('/dividendos', async (req, res) => {
+  const { lancamentos } = req.body;
+  if (!Array.isArray(lancamentos) || !lancamentos.length) {
+    return res.status(400).json({ error: 'Nenhum lançamento informado.' });
+  }
+
+  try {
+    for (const lanc of lancamentos) {
+      const { ticker, valor_por_acao, quantidade, mes, ano } = lanc;
+      if (!ticker || !valor_por_acao || !mes || !ano) continue;
+
+      const valorTotal = Number(valor_por_acao) * Number(quantidade || 0);
+      const anoAtual = new Date().getFullYear();
+
+      await pool.query(`
+        INSERT INTO dividendos_acoes (usuario_id, ticker, valor_por_acao, valor_total, mes, ano, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        ON CONFLICT (usuario_id, ticker, mes, ano) DO UPDATE SET
+          valor_por_acao = EXCLUDED.valor_por_acao,
+          valor_total = EXCLUDED.valor_total,
+          created_at = NOW()
+      `, [req.userId, ticker.toUpperCase(), Number(valor_por_acao), valorTotal, mes, ano]);
+
+      const totais = await pool.query(`
+        SELECT COALESCE(SUM(valor_total), 0) AS total, COUNT(*) AS lancamentos
+        FROM dividendos_acoes
+        WHERE usuario_id=$1 AND ticker=$2 AND ano=$3
+      `, [req.userId, ticker.toUpperCase(), anoAtual]);
+
+      const { total, lancamentos: numLanc } = totais.rows[0];
+
+      await pool.query(`
+        UPDATE acoes_carteira
+        SET dividendos_ano=$1, dividendos_lancamentos=$2, updated_at=NOW()
+        WHERE usuario_id=$3 AND ticker=$4
+      `, [Number(total), Number(numLanc), req.userId, ticker.toUpperCase()]);
+    }
+
+    res.json({ message: 'Dividendos lançados com sucesso.' });
+  } catch (err) {
+    console.error('[dividendos]', err);
+    res.status(500).json({ error: 'Erro ao lançar dividendos.' });
   }
 });
 
