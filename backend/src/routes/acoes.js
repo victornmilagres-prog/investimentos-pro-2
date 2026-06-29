@@ -20,11 +20,10 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/acoes — adiciona ação e busca dados na Brapi
+// POST /api/acoes
 router.post('/', async (req, res) => {
   const { ticker, quantidade = 0, preco_compra = 0 } = req.body;
   if (!ticker) return res.status(400).json({ error: 'Ticker obrigatório.' });
-
   try {
     const ajuste = await pool.query(
       'SELECT divida_liquida_ebit FROM ajustes_manuais_acoes WHERE usuario_id = $1 AND ticker = $2',
@@ -40,8 +39,8 @@ router.post('/', async (req, res) => {
         pl, pvp, margem_liquida, roe, divida_ebit, dy,
         variacao_dia, variacao_dia_reais, preco_abertura, preco_minimo, preco_maximo,
         observacoes, ultima_atualizacao,
-        dividendos_ano, dividendos_lancamentos
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,0,0)
+        dividendos_ano, dividendos_lancamentos, proventos_breakdown
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,0,0,'{}')
       ON CONFLICT (usuario_id, ticker) DO UPDATE SET
         quantidade = EXCLUDED.quantidade,
         preco_compra = CASE WHEN acoes_carteira.preco_compra = 0 THEN EXCLUDED.preco_compra ELSE acoes_carteira.preco_compra END,
@@ -75,7 +74,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PUT /api/acoes/:ticker — atualiza quantidade e preço
+// PUT /api/acoes/:ticker
 router.put('/:ticker', async (req, res) => {
   const { ticker } = req.params;
   const { quantidade, preco_compra } = req.body;
@@ -88,7 +87,6 @@ router.put('/:ticker', async (req, res) => {
     if (!fields.length) return res.status(400).json({ error: 'Nenhum campo para atualizar.' });
     fields.push(`updated_at=NOW()`);
     values.push(req.userId, ticker.toUpperCase());
-
     const result = await pool.query(
       `UPDATE acoes_carteira SET ${fields.join(', ')} WHERE usuario_id=$${idx++} AND ticker=$${idx++} RETURNING *`,
       values
@@ -160,91 +158,170 @@ router.post('/atualizar-todos', async (req, res) => {
   }
 });
 
-// POST /api/acoes/dividendos
-// Recebe: { lancamentos: [{ ticker, valor_por_acao, quantidade, mes, ano }] }
-router.post('/dividendos', async (req, res) => {
+// ─── POST /api/acoes/proventos ────────────────────────────────────────────
+// Recebe: { lancamentos: [{ ticker, tipo_provento, valor_por_acao, quantidade, mes, ano }] }
+// tipo_provento: 'Dividendo' | 'JCP' | 'Rendimento' | 'Outros'
+router.post('/proventos', async (req, res) => {
   const { lancamentos } = req.body;
-  if (!Array.isArray(lancamentos) || !lancamentos.length) {
+  if (!Array.isArray(lancamentos) || !lancamentos.length)
     return res.status(400).json({ error: 'Nenhum lançamento informado.' });
-  }
 
   try {
+    const anoAtual = new Date().getFullYear();
+
     for (const lanc of lancamentos) {
-      const { ticker, valor_por_acao, quantidade, mes, ano } = lanc;
+      const { ticker, tipo_provento = 'Dividendo', valor_por_acao, quantidade, mes, ano } = lanc;
       if (!ticker || !valor_por_acao || !mes || !ano) continue;
 
       const valorTotal = Number(valor_por_acao) * Number(quantidade || 0);
-      const anoAtual = new Date().getFullYear();
 
+      // Upsert por ticker + mes + ano + tipo_provento
       await pool.query(`
-        INSERT INTO dividendos_acoes (usuario_id, ticker, valor_por_acao, valor_total, mes, ano, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, NOW())
-        ON CONFLICT (usuario_id, ticker, mes, ano) DO UPDATE SET
+        INSERT INTO dividendos_acoes (usuario_id, ticker, tipo_provento, valor_por_acao, valor_total, mes, ano, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+        ON CONFLICT (usuario_id, ticker, mes, ano, tipo_provento) DO UPDATE SET
+          valor_por_acao = EXCLUDED.valor_por_acao,
+          valor_total = EXCLUDED.valor_total,
+          created_at = NOW()
+      `, [req.userId, ticker.toUpperCase(), tipo_provento, Number(valor_por_acao), valorTotal, mes, ano]);
+    }
+
+    // Recalcula totais por ticker afetado
+    const tickers = [...new Set(lancamentos.map(l => l.ticker.toUpperCase()))];
+    for (const ticker of tickers) {
+      await recalcularProventos(req.userId, ticker, anoAtual);
+    }
+
+    res.json({ message: 'Proventos lançados com sucesso.' });
+  } catch (err) {
+    console.error('[proventos]', err);
+    res.status(500).json({ error: 'Erro ao lançar proventos.' });
+  }
+});
+
+// Mantém compatibilidade com rota antiga /dividendos
+router.post('/dividendos', async (req, res) => {
+  const { lancamentos } = req.body;
+  if (!Array.isArray(lancamentos) || !lancamentos.length)
+    return res.status(400).json({ error: 'Nenhum lançamento informado.' });
+  try {
+    const anoAtual = new Date().getFullYear();
+    for (const lanc of lancamentos) {
+      const { ticker, valor_por_acao, quantidade, mes, ano } = lanc;
+      if (!ticker || !valor_por_acao || !mes || !ano) continue;
+      const valorTotal = Number(valor_por_acao) * Number(quantidade || 0);
+      await pool.query(`
+        INSERT INTO dividendos_acoes (usuario_id, ticker, tipo_provento, valor_por_acao, valor_total, mes, ano, created_at)
+        VALUES ($1, $2, 'Dividendo', $3, $4, $5, $6, NOW())
+        ON CONFLICT (usuario_id, ticker, mes, ano, tipo_provento) DO UPDATE SET
           valor_por_acao = EXCLUDED.valor_por_acao,
           valor_total = EXCLUDED.valor_total,
           created_at = NOW()
       `, [req.userId, ticker.toUpperCase(), Number(valor_por_acao), valorTotal, mes, ano]);
-
-      const totais = await pool.query(`
-        SELECT COALESCE(SUM(valor_total), 0) AS total, COUNT(*) AS lancamentos
-        FROM dividendos_acoes
-        WHERE usuario_id=$1 AND ticker=$2 AND ano=$3
-      `, [req.userId, ticker.toUpperCase(), anoAtual]);
-
-      const { total, lancamentos: numLanc } = totais.rows[0];
-
-      await pool.query(`
-        UPDATE acoes_carteira
-        SET dividendos_ano=$1, dividendos_lancamentos=$2, updated_at=NOW()
-        WHERE usuario_id=$3 AND ticker=$4
-      `, [Number(total), Number(numLanc), req.userId, ticker.toUpperCase()]);
     }
-
-    res.json({ message: 'Dividendos lançados com sucesso.' });
+    const tickers = [...new Set(lancamentos.map(l => l.ticker.toUpperCase()))];
+    for (const ticker of tickers) {
+      await recalcularProventos(req.userId, ticker, anoAtual);
+    }
+    res.json({ message: 'Proventos lançados com sucesso.' });
   } catch (err) {
     console.error('[dividendos]', err);
-    res.status(500).json({ error: 'Erro ao lançar dividendos.' });
+    res.status(500).json({ error: 'Erro ao lançar proventos.' });
   }
 });
 
-// GET /api/acoes/dividendos?mes=X&ano=Y
-router.get('/dividendos', async (req, res) => {
+// GET /api/acoes/proventos?mes=X&ano=Y
+router.get('/proventos', async (req, res) => {
   const { mes, ano } = req.query;
   if (!mes || !ano) return res.status(400).json({ error: 'mes e ano obrigatórios.' });
   try {
     const r = await pool.query(
-      'SELECT ticker, valor_por_acao, valor_total, mes, ano FROM dividendos_acoes WHERE usuario_id=$1 AND mes=$2 AND ano=$3 ORDER BY ticker',
+      `SELECT ticker, tipo_provento, valor_por_acao, valor_total, mes, ano
+       FROM dividendos_acoes
+       WHERE usuario_id=$1 AND mes=$2 AND ano=$3
+       ORDER BY ticker, tipo_provento`,
       [req.userId, Number(mes), Number(ano)]
     );
     res.json(r.rows);
   } catch (err) {
-    res.status(500).json({ error: 'Erro ao buscar dividendos.' });
+    res.status(500).json({ error: 'Erro ao buscar proventos.' });
   }
 });
 
-// DELETE /api/acoes/dividendos/:ticker/:mes/:ano
-router.delete('/dividendos/:ticker/:mes/:ano', async (req, res) => {
-  const { ticker, mes, ano } = req.params;
+// DELETE /api/acoes/proventos/:ticker/:tipo/:mes/:ano
+router.delete('/proventos/:ticker/:tipo/:mes/:ano', async (req, res) => {
+  const { ticker, tipo, mes, ano } = req.params;
   const anoAtual = new Date().getFullYear();
   try {
     await pool.query(
-      'DELETE FROM dividendos_acoes WHERE usuario_id=$1 AND ticker=$2 AND mes=$3 AND ano=$4',
-      [req.userId, ticker.toUpperCase(), Number(mes), Number(ano)]
+      `DELETE FROM dividendos_acoes
+       WHERE usuario_id=$1 AND ticker=$2 AND tipo_provento=$3 AND mes=$4 AND ano=$5`,
+      [req.userId, ticker.toUpperCase(), tipo, Number(mes), Number(ano)]
     );
-    const totais = await pool.query(
-      'SELECT COALESCE(SUM(valor_total),0) AS total, COUNT(*) AS lancamentos FROM dividendos_acoes WHERE usuario_id=$1 AND ticker=$2 AND ano=$3',
-      [req.userId, ticker.toUpperCase(), anoAtual]
-    );
-    const { total, lancamentos } = totais.rows[0];
-    await pool.query(
-      'UPDATE acoes_carteira SET dividendos_ano=$1, dividendos_lancamentos=$2, updated_at=NOW() WHERE usuario_id=$3 AND ticker=$4',
-      [Number(total), Number(lancamentos), req.userId, ticker.toUpperCase()]
-    );
+    await recalcularProventos(req.userId, ticker.toUpperCase(), anoAtual);
     res.json({ message: 'Lançamento removido.' });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao remover lançamento.' });
   }
 });
+
+// GET /api/acoes/dividendos (compatibilidade)
+router.get('/dividendos', async (req, res) => {
+  const { mes, ano } = req.query;
+  if (!mes || !ano) return res.status(400).json({ error: 'mes e ano obrigatórios.' });
+  try {
+    const r = await pool.query(
+      `SELECT ticker, tipo_provento, valor_por_acao, valor_total, mes, ano
+       FROM dividendos_acoes
+       WHERE usuario_id=$1 AND mes=$2 AND ano=$3
+       ORDER BY ticker, tipo_provento`,
+      [req.userId, Number(mes), Number(ano)]
+    );
+    res.json(r.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar proventos.' });
+  }
+});
+
+// DELETE /api/acoes/dividendos/:ticker/:mes/:ano (compatibilidade)
+router.delete('/dividendos/:ticker/:mes/:ano', async (req, res) => {
+  const { ticker, mes, ano } = req.params;
+  const anoAtual = new Date().getFullYear();
+  try {
+    await pool.query(
+      `DELETE FROM dividendos_acoes WHERE usuario_id=$1 AND ticker=$2 AND mes=$3 AND ano=$4`,
+      [req.userId, ticker.toUpperCase(), Number(mes), Number(ano)]
+    );
+    await recalcularProventos(req.userId, ticker.toUpperCase(), anoAtual);
+    res.json({ message: 'Lançamento removido.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao remover lançamento.' });
+  }
+});
+
+// ─── helper: recalcula total + breakdown por tipo ─────────────────────────
+async function recalcularProventos(usuarioId, ticker, anoAtual) {
+  const totais = await pool.query(`
+    SELECT
+      COALESCE(SUM(valor_total), 0) AS total,
+      COUNT(*) AS lancamentos,
+      json_object_agg(tipo_provento, COALESCE(soma, 0)) AS breakdown
+    FROM (
+      SELECT tipo_provento, SUM(valor_total) AS soma
+      FROM dividendos_acoes
+      WHERE usuario_id=$1 AND ticker=$2 AND ano=$3
+      GROUP BY tipo_provento
+    ) t
+  `, [usuarioId, ticker, anoAtual]);
+
+  const { total, lancamentos, breakdown } = totais.rows[0];
+
+  await pool.query(`
+    UPDATE acoes_carteira
+    SET dividendos_ano=$1, dividendos_lancamentos=$2, proventos_breakdown=$3, updated_at=NOW()
+    WHERE usuario_id=$4 AND ticker=$5
+  `, [Number(total), Number(lancamentos), JSON.stringify(breakdown || {}), usuarioId, ticker]);
+}
 
 async function recalcularPesos(usuarioId) {
   const acoes = await pool.query(

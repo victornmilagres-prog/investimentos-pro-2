@@ -5,6 +5,8 @@ import { RefreshCw, TrendingUp, X } from 'lucide-react';
 import api from '@/lib/api';
 import { fmt, calcPerformance } from '@/lib/utils';
 
+const TIPOS_PROVENTO = ['Dividendo', 'JCP', 'Rendimento', 'Outros'];
+
 function badgeDecisao(d = '') {
   const v = (d || '').toUpperCase();
   if (v.includes('COMPRAR') || v.includes('ACUMULAR')) return 'badge-comprar';
@@ -28,7 +30,6 @@ function grahamTag(s = '') {
   return 'graham-caro';
 }
 
-// DY >= 6 (alterado de > 6)
 const criteriosAcao = [
   { label: 'P/L',      key: 'pl',             ok: v => v > 0 && v < 15,  fmt: v => fmt.num(v) },
   { label: 'P/VP',     key: 'pvp',            ok: v => v > 0 && v < 1.5, fmt: v => fmt.num(v) },
@@ -38,7 +39,7 @@ const criteriosAcao = [
   { label: 'Dív/EBIT', key: 'divida_ebit',   ok: v => v > 0 && v < 2,   fmt: v => fmt.num(v) },
 ];
 
-// ─── MODAL COMPRAR / VENDER ────────────────────────────────────────────────
+// ─── MODAL COMPRAR / VENDER ───────────────────────────────────────────────
 function ModalCompraVenda({ acoes, tipo, onFechar, onSalvar }) {
   const [ticker, setTicker] = useState(acoes[0]?.ticker || '');
   const [qtd, setQtd]       = useState('');
@@ -47,41 +48,32 @@ function ModalCompraVenda({ acoes, tipo, onFechar, onSalvar }) {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro]     = useState('');
 
-  const acao    = acoes.find(a => a.ticker === ticker);
+  const acao     = acoes.find(a => a.ticker === ticker);
   const qtdAtual = acao?.quantidade || 0;
   const pmAtual  = acao?.preco_compra || 0;
-  const novoQtd  = tipo === 'comprar'
-    ? qtdAtual + Number(qtd || 0)
-    : Math.max(0, qtdAtual - Number(qtd || 0));
-  const novoPM = tipo === 'comprar' && qtdAtual > 0 && Number(qtd) > 0 && Number(preco) > 0
-    ? ((qtdAtual * pmAtual) + (Number(qtd) * Number(preco))) / novoQtd
+  const novoQtd  = tipo === 'comprar' ? qtdAtual + Number(qtd||0) : Math.max(0, qtdAtual - Number(qtd||0));
+  const novoPM   = tipo === 'comprar' && qtdAtual > 0 && Number(qtd) > 0 && Number(preco) > 0
+    ? ((qtdAtual*pmAtual)+(Number(qtd)*Number(preco)))/novoQtd
     : tipo === 'comprar' && Number(qtd) > 0 ? Number(preco) : pmAtual;
 
   const confirmar = async () => {
     if (!qtd || !preco) return setErro('Preencha quantidade e preço.');
     setSalvando(true); setErro('');
-    try {
-      await onSalvar({ ticker, tipo, quantidade: Number(qtd), preco: Number(preco), data });
-      onFechar();
-    } catch (e) {
-      setErro(e.response?.data?.error || 'Erro ao salvar.');
-    } finally { setSalvando(false); }
+    try { await onSalvar({ ticker, tipo, quantidade: Number(qtd), preco: Number(preco), data }); onFechar(); }
+    catch (e) { setErro(e.response?.data?.error || 'Erro ao salvar.'); }
+    finally { setSalvando(false); }
   };
 
   const st = {
     overlay: { position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200 },
     modal:   { background:'#fff',borderRadius:14,padding:28,width:460,boxShadow:'0 20px 60px rgba(0,0,0,0.2)',maxHeight:'90vh',overflowY:'auto' },
-    label:   { fontSize:12,color:'#8896A8',fontWeight:500,display:'block',marginBottom:5 },
-    input:   { width:'100%',padding:'9px 12px',border:'1px solid #E8ECF0',borderRadius:7,fontSize:13,outline:'none',color:'#1A1A2E' },
-    row:     { display:'flex',gap:12,marginBottom:14 },
-    prev:    { background:'#F8F9FA',borderRadius:8,padding:'12px 14px',display:'flex',gap:16,marginBottom:18 },
+    lbl:     { fontSize:12,color:'#8896A8',fontWeight:500,display:'block',marginBottom:5 },
+    inp:     { width:'100%',padding:'9px 12px',border:'1px solid #E8ECF0',borderRadius:7,fontSize:13,outline:'none',color:'#1A1A2E' },
     footer:  { display:'flex',gap:10,justifyContent:'flex-end' },
-    btnCancel:  { padding:'9px 20px',borderRadius:7,fontSize:13,fontWeight:600,border:'none',cursor:'pointer',background:'#EDF2F7',color:'#8896A8' },
-    btnConfirm: { padding:'9px 20px',borderRadius:7,fontSize:13,fontWeight:600,border:'none',cursor:'pointer',background: tipo==='comprar'?'#16A34A':'#DC2626',color:'#fff' },
   };
 
   return (
-    <div style={st.overlay} onClick={e => e.target===e.currentTarget && onFechar()}>
+    <div style={st.overlay} onClick={e=>e.target===e.currentTarget&&onFechar()}>
       <div style={st.modal}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
           <h3 style={{fontSize:17,fontWeight:700}}>{tipo==='comprar'?'▲ Registrar Compra':'▼ Registrar Venda'}</h3>
@@ -90,43 +82,28 @@ function ModalCompraVenda({ acoes, tipo, onFechar, onSalvar }) {
         <p style={{fontSize:13,color:'#8896A8',marginBottom:20}}>
           {tipo==='comprar'?'Atualiza a quantidade e recalcula o preço médio automaticamente':'Atualiza a quantidade na sua carteira'}
         </p>
-
         <div style={{marginBottom:14}}>
-          <label style={st.label}>Ativo</label>
-          <select style={st.input} value={ticker} onChange={e=>setTicker(e.target.value)}>
+          <label style={st.lbl}>Ativo</label>
+          <select style={st.inp} value={ticker} onChange={e=>setTicker(e.target.value)}>
             {acoes.map(a=><option key={a.ticker} value={a.ticker}>{a.ticker}</option>)}
           </select>
         </div>
-
-        <div style={st.row}>
-          <div style={{flex:1}}>
-            <label style={st.label}>Quantidade {tipo==='comprar'?'comprada':'vendida'}</label>
-            <input style={st.input} type="number" min="0" step="1" placeholder="0" value={qtd} onChange={e=>setQtd(e.target.value)}/>
-          </div>
-          <div style={{flex:1}}>
-            <label style={st.label}>Preço {tipo==='comprar'?'pago':'recebido'} (R$)</label>
-            <input style={st.input} type="number" min="0" step="0.01" placeholder="0,00" value={preco} onChange={e=>setPreco(e.target.value)}/>
-          </div>
+        <div style={{display:'flex',gap:12,marginBottom:14}}>
+          <div style={{flex:1}}><label style={st.lbl}>Quantidade {tipo==='comprar'?'comprada':'vendida'}</label><input style={st.inp} type="number" min="0" placeholder="0" value={qtd} onChange={e=>setQtd(e.target.value)}/></div>
+          <div style={{flex:1}}><label style={st.lbl}>Preço {tipo==='comprar'?'pago':'recebido'} (R$)</label><input style={st.inp} type="number" min="0" step="0.01" placeholder="0,00" value={preco} onChange={e=>setPreco(e.target.value)}/></div>
         </div>
-
-        <div style={{marginBottom:18}}>
-          <label style={st.label}>Data da operação</label>
-          <input style={st.input} type="date" value={data} onChange={e=>setData(e.target.value)}/>
-        </div>
-
-        <div style={st.prev}>
+        <div style={{marginBottom:18}}><label style={st.lbl}>Data da operação</label><input style={st.inp} type="date" value={data} onChange={e=>setData(e.target.value)}/></div>
+        <div style={{background:'#F8F9FA',borderRadius:8,padding:'12px 14px',display:'flex',gap:16,marginBottom:18}}>
           <div><p style={{fontSize:11,color:'#8896A8',marginBottom:3}}>Qtd anterior</p><p style={{fontSize:15,fontWeight:700}}>{qtdAtual}</p></div>
           {tipo==='comprar'&&<div><p style={{fontSize:11,color:'#8896A8',marginBottom:3}}>PM anterior</p><p style={{fontSize:15,fontWeight:700}}>{fmt.brl(pmAtual)}</p></div>}
           <div><p style={{fontSize:11,color:'#8896A8',marginBottom:3}}>→ Nova qtd</p><p style={{fontSize:15,fontWeight:700,color:'#16A34A'}}>{novoQtd}</p></div>
           {tipo==='comprar'&&<div><p style={{fontSize:11,color:'#8896A8',marginBottom:3}}>→ Novo PM</p><p style={{fontSize:15,fontWeight:700,color:'#16A34A'}}>{fmt.brl(novoPM)}</p></div>}
         </div>
-
-        {erro && <p style={{fontSize:13,color:'#DC2626',marginBottom:12}}>{erro}</p>}
-
+        {erro&&<p style={{fontSize:13,color:'#DC2626',marginBottom:12}}>{erro}</p>}
         <div style={st.footer}>
-          <button onClick={onFechar} style={st.btnCancel}>Cancelar</button>
-          <button onClick={confirmar} disabled={salvando} style={st.btnConfirm}>
-            {salvando?'Salvando...': tipo==='comprar'?'Confirmar compra':'Confirmar venda'}
+          <button onClick={onFechar} style={{padding:'9px 20px',borderRadius:7,fontSize:13,fontWeight:600,border:'none',cursor:'pointer',background:'#EDF2F7',color:'#8896A8'}}>Cancelar</button>
+          <button onClick={confirmar} disabled={salvando} style={{padding:'9px 20px',borderRadius:7,fontSize:13,fontWeight:600,border:'none',cursor:'pointer',background:tipo==='comprar'?'#16A34A':'#DC2626',color:'#fff'}}>
+            {salvando?'Salvando...':tipo==='comprar'?'Confirmar compra':'Confirmar venda'}
           </button>
         </div>
       </div>
@@ -134,284 +111,177 @@ function ModalCompraVenda({ acoes, tipo, onFechar, onSalvar }) {
   );
 }
 
-// ─── PARSER B3 ────────────────────────────────────────────────────────────
-// Suporta CSV com separador ; ou , e detecta colunas pelo cabeçalho
-function parsearCsvB3(texto) {
-  const linhas = texto.trim().split(/\r?\n/).filter(l => l.trim());
-  if (linhas.length < 2) return [];
-
-  // Detecta separador
-  const sep = linhas[0].includes(';') ? ';' : ',';
-  const cabecalho = linhas[0].split(sep).map(c => c.replace(/['"]/g,'').trim().toLowerCase());
-
-  // Índices das colunas que nos interessam
-  const iTicker = cabecalho.findIndex(c =>
-    c.includes('produto') || c.includes('ativo') || c.includes('ticker') ||
-    c.includes('código') || c.includes('codigo') || c.includes('papel')
-  );
-  const iValor = cabecalho.findIndex(c =>
-    c.includes('preço unitário') || c.includes('preco unitario') ||
-    c.includes('valor unitário') || c.includes('valor unitario') ||
-    c.includes('valor por cota') || c.includes('valor líquido por ação') ||
-    c.includes('valor liquido por acao') || c.includes('valor bruto por cota')
-  );
-
-  if (iTicker === -1 || iValor === -1) return [];
-
-  const tickerRe = /^[A-Z]{3,6}\d{1,2}$/;
-  const resultado = [];
-
-  for (let i = 1; i < linhas.length; i++) {
-    const cols = linhas[i].split(sep).map(c => c.replace(/['"]/g,'').trim());
-    const ticker = (cols[iTicker] || '').toUpperCase().replace(/\s/g,'');
-    const valorStr = (cols[iValor] || '').replace('R$','').replace(/\./g,'').replace(',','.').trim();
-    const valor = parseFloat(valorStr);
-
-    if (tickerRe.test(ticker) && valor > 0) {
-      // Agrega se aparecer mais de uma vez (ex: JCP + dividendo no mesmo mês)
-      const existe = resultado.find(r => r.ticker === ticker);
-      if (existe) existe.valor += valor;
-      else resultado.push({ ticker, valor });
-    }
-  }
-  return resultado;
-}
-
-// ─── MODAL DIVIDENDOS ──────────────────────────────────────────────────────
-function ModalDividendos({ acoes, onFechar, onSalvar, onExcluirDividendo }) {
+// ─── MODAL PROVENTOS ──────────────────────────────────────────────────────
+function ModalProventos({ acoes, onFechar, onSalvar }) {
   const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   const hoje  = new Date();
   const [mes, setMes]           = useState(hoje.getMonth());
   const [ano, setAno]           = useState(hoje.getFullYear());
-  const [valores, setValores]   = useState({});
-  const [selecionados, setSel]  = useState({});
+  // { ticker: { selecionado: bool, tipo: string, valor: string } }
+  const [itens, setItens]       = useState({});
   const [salvando, setSalvando] = useState(false);
   const [arquivo, setArquivo]   = useState(null);
-  const [lancamentos, setLancamentos] = useState([]);
-  const [editando, setEditando] = useState(null);
-  const [valorEdit, setValorEdit] = useState('');
-  const [ignorados, setIgnorados] = useState([]); // tickers do CSV fora da carteira
-  const [fiisCarteira, setFiisCarteira] = useState([]);
+  // lançamentos já existentes no mês/ano
+  const [existentes, setExistentes] = useState([]);
+  const [carregando, setCarregando] = useState(false);
 
-  // Carrega FIIs da carteira para cruzamento
+  // Inicializa itens
   useEffect(() => {
-    import('@/lib/api').then(m =>
-      m.default.get('/fiis').then(r => setFiisCarteira(r.data.map(f => f.ticker))).catch(()=>{})
-    );
-  }, []);
+    const init = {};
+    acoes.forEach(a => { init[a.ticker] = { selecionado: false, tipo: 'Dividendo', valor: '' }; });
+    setItens(init);
+  }, [acoes]);
 
-  const carregarLancamentos = async () => {
-    try {
-      const r = await import('@/lib/api').then(m => m.default.get(`/acoes/dividendos?mes=${mes+1}&ano=${ano}`));
-      setLancamentos(r.data);
-    } catch { setLancamentos([]); }
-  };
+  // Carrega lançamentos existentes ao mudar mês/ano
+  useEffect(() => {
+    const carregar = async () => {
+      setCarregando(true);
+      try {
+        const r = await api.get(`/acoes/proventos?mes=${mes+1}&ano=${ano}`);
+        setExistentes(r.data);
+      } catch { setExistentes([]); }
+      finally { setCarregando(false); }
+    };
+    carregar();
+  }, [mes, ano]);
 
-  useEffect(() => { carregarLancamentos(); }, [mes, ano]);
-
-  const toggle = (ticker) => setSel(s => ({ ...s, [ticker]: !s[ticker] }));
+  const setItem = (ticker, campo, valor) => setItens(s => ({ ...s, [ticker]: { ...s[ticker], [campo]: valor } }));
 
   const total = acoes.reduce((acc, a) => {
-    if (selecionados[a.ticker] && valores[a.ticker])
-      return acc + (Number(valores[a.ticker]) * (a.quantidade || 0));
+    const it = itens[a.ticker];
+    if (it?.selecionado && it?.valor) return acc + (Number(it.valor) * (a.quantidade||0));
     return acc;
   }, 0);
-
-  const qtdSel = Object.values(selecionados).filter(Boolean).length;
-
-  // Processa o arquivo B3 e cruza com a carteira
-  const processarArquivo = async (file) => {
-    setArquivo(file);
-    setIgnorados([]);
-    try {
-      const texto = await file.text();
-      const itens = parsearCsvB3(texto);
-      if (!itens.length) return;
-
-      const tickersAcoes = new Set(acoes.map(a => a.ticker));
-      const tickersFiis  = new Set(fiisCarteira);
-      const naCarteira   = [];
-      const fora         = [];
-
-      for (const { ticker, valor } of itens) {
-        if (tickersAcoes.has(ticker) || tickersFiis.has(ticker)) naCarteira.push({ ticker, valor });
-        else fora.push(ticker);
-      }
-
-      // Preenche automaticamente valores e marca os checkboxes
-      const novosValores = {};
-      const novosSel = {};
-      for (const { ticker, valor } of naCarteira) {
-        novosValores[ticker] = valor.toFixed(4);
-        novosSel[ticker] = true;
-      }
-      setValores(v => ({ ...v, ...novosValores }));
-      setSel(s => ({ ...s, ...novosSel }));
-      setIgnorados(fora);
-    } catch (e) {
-      console.error('Erro ao processar arquivo B3:', e);
-    }
-  };
+  const qtdSel = Object.values(itens).filter(i => i?.selecionado).length;
 
   const confirmar = async () => {
-    const lista = acoes
-      .filter(a => selecionados[a.ticker] && valores[a.ticker])
-      .map(a => ({ ticker: a.ticker, valor_por_acao: Number(valores[a.ticker]), quantidade: a.quantidade || 0, mes: mes+1, ano }));
-    if (!lista.length) return;
+    const lancamentos = acoes
+      .filter(a => itens[a.ticker]?.selecionado && itens[a.ticker]?.valor)
+      .map(a => ({
+        ticker: a.ticker,
+        tipo_provento: itens[a.ticker].tipo,
+        valor_por_acao: Number(itens[a.ticker].valor),
+        quantidade: a.quantidade || 0,
+        mes: mes+1, ano
+      }));
+    if (!lancamentos.length) return;
     setSalvando(true);
-    try { await onSalvar(lista); setSel({}); setValores({}); setIgnorados([]); setArquivo(null); await carregarLancamentos(); }
+    try { await onSalvar(lancamentos); onFechar(); }
     finally { setSalvando(false); }
   };
 
-  const excluir = async (ticker) => {
-    await onExcluirDividendo(ticker, mes+1, ano);
-    await carregarLancamentos();
-  };
-
-  const salvarEdicao = async (ticker) => {
-    const acao = acoes.find(a => a.ticker === ticker);
-    await onSalvar([{ ticker, valor_por_acao: Number(valorEdit), quantidade: acao?.quantidade || 0, mes: mes+1, ano }]);
-    setEditando(null);
-    await carregarLancamentos();
+  const excluirExistente = async (item) => {
+    try {
+      await api.delete(`/acoes/proventos/${item.ticker}/${item.tipo_provento}/${item.mes}/${item.ano}`);
+      setExistentes(e => e.filter(x => !(x.ticker===item.ticker && x.tipo_provento===item.tipo_provento)));
+    } catch {}
   };
 
   const st = {
-    overlay:   { position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200 },
-    modal:     { background:'#fff',borderRadius:14,padding:28,width:500,boxShadow:'0 20px 60px rgba(0,0,0,0.2)',maxHeight:'90vh',overflowY:'auto' },
-    label:     { fontSize:12,color:'#8896A8',fontWeight:500,display:'block',marginBottom:5 },
-    input:     { width:'100%',padding:'9px 12px',border:'1px solid #E8ECF0',borderRadius:7,fontSize:13,outline:'none',color:'#1A1A2E' },
-    footer:    { display:'flex',gap:10,justifyContent:'flex-end' },
-    btnCancel: { padding:'9px 20px',borderRadius:7,fontSize:13,fontWeight:600,border:'none',cursor:'pointer',background:'#EDF2F7',color:'#8896A8' },
+    overlay: { position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200 },
+    modal:   { background:'#fff',borderRadius:14,padding:28,width:500,boxShadow:'0 20px 60px rgba(0,0,0,0.2)',maxHeight:'92vh',overflowY:'auto' },
+    lbl:     { fontSize:12,color:'#8896A8',fontWeight:500,display:'block',marginBottom:5 },
+    inp:     { width:'100%',padding:'9px 12px',border:'1px solid #E8ECF0',borderRadius:7,fontSize:13,outline:'none',color:'#1A1A2E' },
   };
 
   return (
-    <div style={st.overlay} onClick={e => e.target===e.currentTarget && onFechar()}>
+    <div style={st.overlay} onClick={e=>e.target===e.currentTarget&&onFechar()}>
       <div style={st.modal}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
-          <h3 style={{fontSize:17,fontWeight:700}}>💰 Lançar Dividendos</h3>
+          <h3 style={{fontSize:17,fontWeight:700}}>Lançar proventos</h3>
           <button onClick={onFechar} style={{background:'none',border:'none',cursor:'pointer',color:'#8896A8'}}><X size={18}/></button>
         </div>
-        <p style={{fontSize:13,color:'#8896A8',marginBottom:20}}>Registre os dividendos recebidos por ativo no mês</p>
+        <p style={{fontSize:13,color:'#8896A8',marginBottom:20}}>Registre os proventos recebidos por ativo no mês</p>
 
+        {/* Mês/Ano */}
         <div style={{display:'flex',gap:12,marginBottom:16}}>
-          <div style={{flex:2}}>
-            <label style={st.label}>Mês de referência</label>
-            <select style={st.input} value={mes} onChange={e=>setMes(Number(e.target.value))}>
+          <div style={{flex:2}}><label style={st.lbl}>Mês de referência</label>
+            <select style={st.inp} value={mes} onChange={e=>setMes(Number(e.target.value))}>
               {meses.map((m,i)=><option key={i} value={i}>{m}</option>)}
             </select>
           </div>
-          <div style={{flex:1}}>
-            <label style={st.label}>Ano</label>
-            <select style={st.input} value={ano} onChange={e=>setAno(Number(e.target.value))}>
+          <div style={{flex:1}}><label style={st.lbl}>Ano</label>
+            <select style={st.inp} value={ano} onChange={e=>setAno(Number(e.target.value))}>
               {[2024,2025,2026].map(y=><option key={y} value={y}>{y}</option>)}
             </select>
           </div>
         </div>
 
-        {/* Lançamentos anteriores */}
-        {lancamentos.length > 0 && (
-          <div style={{marginBottom:16}}>
-            <p style={{fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:8}}>Lançamentos em {meses[mes]} {ano}</p>
-            <div style={{display:'flex',flexDirection:'column',gap:6}}>
-              {lancamentos.map(l => (
-                <div key={l.ticker} style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#F0FDF4',border:'1px solid #BBF7D0',borderRadius:8,padding:'8px 12px'}}>
-                  <div>
-                    <p style={{fontWeight:700,fontSize:13,color:'#166534'}}>{l.ticker}</p>
-                    <p style={{fontSize:11,color:'#16A34A'}}>
-                      {editando===l.ticker ? '' : `R$ ${Number(l.valor_por_acao).toFixed(4)}/ação · Total: ${fmt.brl(Number(l.valor_total))}`}
-                    </p>
-                  </div>
-                  {editando===l.ticker ? (
-                    <div style={{display:'flex',alignItems:'center',gap:6}}>
-                      <input type="number" min="0" step="0.01" value={valorEdit}
-                        onChange={e=>setValorEdit(e.target.value)}
-                        style={{width:100,padding:'5px 8px',borderRadius:6,border:'1px solid #BBF7D0',fontSize:12,outline:'none',color:'#1A1A2E'}}
-                        autoFocus
-                      />
-                      <button onClick={()=>salvarEdicao(l.ticker)}
-                        style={{padding:'4px 10px',borderRadius:5,fontSize:11,fontWeight:700,border:'none',cursor:'pointer',background:'#16A34A',color:'#fff'}}>✓</button>
-                      <button onClick={()=>setEditando(null)}
-                        style={{padding:'4px 8px',borderRadius:5,fontSize:11,fontWeight:700,border:'none',cursor:'pointer',background:'#EDF2F7',color:'#8896A8'}}>✕</button>
-                    </div>
-                  ) : (
-                    <div style={{display:'flex',gap:6}}>
-                      <button onClick={()=>{setEditando(l.ticker);setValorEdit(Number(l.valor_por_acao).toFixed(4));}}
-                        style={{padding:'4px 10px',borderRadius:5,fontSize:11,fontWeight:600,border:'none',cursor:'pointer',background:'#DBEAFE',color:'#1D4ED8'}}>✏️ Editar</button>
-                      <button onClick={()=>excluir(l.ticker)}
-                        style={{padding:'4px 10px',borderRadius:5,fontSize:11,fontWeight:600,border:'none',cursor:'pointer',background:'#FEE2E2',color:'#DC2626'}}>🗑️</button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-            <div style={{display:'flex',alignItems:'center',gap:8,margin:'14px 0 4px'}}>
-              <div style={{flex:1,height:1,background:'#E8ECF0'}}/>
-              <span style={{fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em'}}>adicionar novo</span>
-              <div style={{flex:1,height:1,background:'#E8ECF0'}}/>
-            </div>
-          </div>
-        )}
-
         {/* Importar B3 */}
-        <div style={{background:'#EFF6FF',border:'1px dashed #93C5FD',borderRadius:8,padding:'14px 16px',marginBottom:arquivo?8:16,display:'flex',alignItems:'center',gap:12}}>
+        <div style={{background:'#EFF6FF',border:'1px dashed #93C5FD',borderRadius:8,padding:'14px 16px',marginBottom:16,display:'flex',alignItems:'center',gap:12}}>
           <span style={{fontSize:22}}>📂</span>
           <div style={{flex:1}}>
             <p style={{fontSize:13,fontWeight:600,color:'#2563EB',marginBottom:2}}>Importar relatório da B3</p>
-            <p style={{fontSize:12,color:'#4A90D9'}}>CSV com colunas: Produto/Ativo e Preço Unitário/Valor por Cota</p>
+            <p style={{fontSize:12,color:'#4A90D9'}}>Preenche todos os ativos automaticamente</p>
           </div>
           <label style={{background:'#EFF6FF',color:'#2563EB',border:'1px solid #93C5FD',padding:'7px 14px',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap'}}>
             Selecionar arquivo
-            <input type="file" accept=".csv" style={{display:'none'}}
-              onChange={e => e.target.files[0] && processarArquivo(e.target.files[0])}/>
+            <input type="file" accept=".csv,.xlsx,.xls" style={{display:'none'}} onChange={e=>setArquivo(e.target.files[0])}/>
           </label>
         </div>
+        {arquivo&&<p style={{fontSize:12,color:'#16A34A',marginBottom:12}}>✓ {arquivo.name} selecionado</p>}
 
-        {arquivo && <p style={{fontSize:12,color:'#16A34A',marginBottom:12}}>✓ {arquivo.name} processado</p>}
-
-        {/* Aviso: ativos ignorados por não estarem na carteira */}
-        {ignorados.length > 0 && (
-          <div style={{background:'#FFFBEB',border:'1px solid #FDE68A',borderRadius:8,padding:'10px 14px',marginBottom:16,display:'flex',gap:10,alignItems:'flex-start'}}>
-            <span style={{fontSize:18,flexShrink:0}}>⚠️</span>
-            <div>
-              <p style={{fontSize:13,fontWeight:600,color:'#92400E',marginBottom:3}}>Ativos não lançados</p>
-              <p style={{fontSize:12,color:'#B45309'}}>
-                Os seguintes ativos não foram lançados pois não fazem parte da sua carteira:{' '}
-                <strong>{ignorados.join(', ')}</strong>
-              </p>
-            </div>
-          </div>
-        )}
-
-        {lancamentos.length === 0 && (
-          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
-            <div style={{flex:1,height:1,background:'#E8ECF0'}}/>
-            <span style={{fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em'}}>ou informe manualmente</span>
-            <div style={{flex:1,height:1,background:'#E8ECF0'}}/>
-          </div>
-        )}
-
-        {/* Lista */}
-        <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:16}}>
-          {acoes.map(a=>(
-            <div key={a.ticker} style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#FFFDF0',border:'1px solid #F6E05E',borderRadius:8,padding:'10px 12px'}}>
-              <div style={{display:'flex',alignItems:'center',gap:10}}>
-                <input type="checkbox" checked={!!selecionados[a.ticker]} onChange={()=>toggle(a.ticker)} style={{accentColor:'#D4A017',width:15,height:15}}/>
-                <div>
-                  <p style={{fontWeight:700,fontSize:13}}>{a.ticker}</p>
-                  <p style={{fontSize:11,color:'#8896A8'}}>{a.quantidade||0} ações</p>
+        {/* Lançamentos existentes no mês */}
+        {existentes.length > 0 && (
+          <div style={{marginBottom:16}}>
+            <p style={{fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:8}}>Lançamentos do mês</p>
+            <div style={{display:'flex',flexDirection:'column',gap:6}}>
+              {existentes.map((item,i)=>(
+                <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#F8F9FA',border:'1px solid #E8ECF0',borderRadius:8,padding:'8px 12px'}}>
+                  <div style={{display:'flex',gap:10,alignItems:'center'}}>
+                    <span style={{fontWeight:700,fontSize:13}}>{item.ticker}</span>
+                    <span style={{fontSize:11,background:'#FEF3C7',color:'#92400E',padding:'2px 8px',borderRadius:20}}>{item.tipo_provento}</span>
+                    <span style={{fontSize:13,color:'#1A1A2E'}}>{fmt.brl(Number(item.valor_total))}</span>
+                    <span style={{fontSize:11,color:'#8896A8'}}>R$ {Number(item.valor_por_acao).toFixed(4)}/ação</span>
+                  </div>
+                  <button onClick={()=>excluirExistente(item)} style={{background:'#fff5f5',color:'#fc8181',border:'1px solid #fed7d7',borderRadius:5,padding:'3px 8px',fontSize:11,cursor:'pointer'}}>🗑</button>
                 </div>
-              </div>
-              <div style={{display:'flex',alignItems:'center',gap:6}}>
-                <span style={{fontSize:11,color:'#8896A8'}}>R$/ação</span>
-                <input type="number" min="0" step="0.01" placeholder="0,00"
-                  disabled={!selecionados[a.ticker]}
-                  value={valores[a.ticker]||''}
-                  onChange={e=>setValores(v=>({...v,[a.ticker]:e.target.value}))}
-                  style={{width:110,padding:'6px 10px',borderRadius:6,background:'#fff',border:'1px solid #F6E05E',color:'#1A1A2E',fontSize:13,textAlign:'right',outline:'none',opacity:selecionados[a.ticker]?1:0.4}}
-                />
-              </div>
+              ))}
             </div>
-          ))}
+          </div>
+        )}
+
+        {/* Separador */}
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
+          <div style={{flex:1,height:1,background:'#E8ECF0'}}/>
+          <span style={{fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em'}}>lançar novo provento</span>
+          <div style={{flex:1,height:1,background:'#E8ECF0'}}/>
+        </div>
+
+        {/* Lista de ativos */}
+        <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:16}}>
+          {acoes.map(a=>{
+            const it = itens[a.ticker] || { selecionado:false, tipo:'Dividendo', valor:'' };
+            return (
+              <div key={a.ticker} style={{background:'#FFFDF0',border:'1px solid #F6E05E',borderRadius:8,padding:'10px 12px'}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom: it.selecionado ? 10 : 0}}>
+                  <input type="checkbox" checked={it.selecionado} onChange={()=>setItem(a.ticker,'selecionado',!it.selecionado)}
+                    style={{accentColor:'#D4A017',width:15,height:15}}/>
+                  <div>
+                    <p style={{fontWeight:700,fontSize:13,margin:0}}>{a.ticker}</p>
+                    <p style={{fontSize:11,color:'#8896A8',margin:0}}>{a.quantidade||0} ações</p>
+                  </div>
+                </div>
+                {it.selecionado && (
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                    <div>
+                      <label style={{fontSize:11,color:'#B7791F',display:'block',marginBottom:4}}>Tipo de provento</label>
+                      <select value={it.tipo} onChange={e=>setItem(a.ticker,'tipo',e.target.value)}
+                        style={{width:'100%',padding:'6px 8px',border:'1px solid #F6E05E',borderRadius:6,fontSize:12,background:'#fff',outline:'none'}}>
+                        {TIPOS_PROVENTO.map(t=><option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{fontSize:11,color:'#B7791F',display:'block',marginBottom:4}}>Valor por ação (R$)</label>
+                      <input type="number" min="0" step="0.0001" placeholder="0,0000"
+                        value={it.valor} onChange={e=>setItem(a.ticker,'valor',e.target.value)}
+                        style={{width:'100%',padding:'6px 8px',border:'1px solid #F6E05E',borderRadius:6,background:'#fff',fontSize:12,textAlign:'right',outline:'none'}}/>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {/* Totalizador */}
@@ -420,11 +290,11 @@ function ModalDividendos({ acoes, onFechar, onSalvar, onExcluirDividendo }) {
           <div><p style={{fontSize:11,color:'#8896A8',marginBottom:3}}>Ativos selecionados</p><p style={{fontSize:15,fontWeight:700}}>{qtdSel} de {acoes.length}</p></div>
         </div>
 
-        <div style={st.footer}>
-          <button onClick={onFechar} style={st.btnCancel}>Cancelar</button>
+        <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+          <button onClick={onFechar} style={{padding:'9px 20px',borderRadius:7,fontSize:13,fontWeight:600,border:'none',cursor:'pointer',background:'#EDF2F7',color:'#8896A8'}}>Cancelar</button>
           <button onClick={confirmar} disabled={salvando||qtdSel===0}
             style={{padding:'9px 20px',borderRadius:7,fontSize:13,fontWeight:600,border:'none',cursor:'pointer',background:'#D4A017',color:'#fff',opacity:qtdSel===0?0.5:1}}>
-            {salvando?'Salvando...':'Lançar dividendos'}
+            {salvando?'Salvando...':'Lançar proventos'}
           </button>
         </div>
       </div>
@@ -432,8 +302,8 @@ function ModalDividendos({ acoes, onFechar, onSalvar, onExcluirDividendo }) {
   );
 }
 
-// ─── CARD ──────────────────────────────────────────────────────────────────
-function AcaoCard({ a, onRemover, onSalvar, onAbrirDividendo }) {
+// ─── CARD ─────────────────────────────────────────────────────────────────
+function AcaoCard({ a, onRemover, onSalvar, onAbrirProvento }) {
   const [editando, setEditando] = useState(false);
   const [qtd, setQtd]     = useState(String(a.quantidade ?? ''));
   const [preco, setPreco] = useState(String(a.preco_compra ?? ''));
@@ -443,18 +313,21 @@ function AcaoCard({ a, onRemover, onSalvar, onAbrirDividendo }) {
   const scoreNum = typeof a.score === 'string' ? parseInt(a.score) : (a.score ?? 0);
   const fillPct  = (scoreNum / maxScore) * 100;
 
-  const totalDiv = Number(a.dividendos_ano) || 0;
-  const yieldPM  = (a.preco_compra && totalDiv && a.quantidade)
-    ? (totalDiv / (a.preco_compra * a.quantidade)) * 100 : 0;
-  const numLanc  = Number(a.dividendos_lancamentos) || 0;
+  const totalProv  = Number(a.dividendos_ano) || 0;
+  const numLanc    = Number(a.dividendos_lancamentos) || 0;
+  const breakdown  = a.proventos_breakdown || {};
+  const yieldPM    = (perf.custo > 0 && totalProv > 0) ? (totalProv / perf.custo) * 100 : 0;
+  const ganhoTotal = perf.custo > 0 ? perf.ganho + totalProv : 0;
+  const pctAposP   = perf.custo > 0 ? (ganhoTotal / perf.custo) * 100 : 0;
+  const temRetorno = perf.custo > 0 && totalProv > 0;
 
   const salvar = async () => { await onSalvar(a.ticker, qtd, preco); setEditando(false); };
 
   const C = {
-    card:  { background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:14,padding:'18px 20px',display:'flex',flexDirection:'column',gap:12 },
-    lbl:   { fontSize:11,color:'#8896A8',marginBottom:2 },
-    val:   { fontSize:13,fontWeight:600,color:'#1A1A2E' },
-    grpLbl:{ fontSize:11,color:'#8896A8',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:8 },
+    card:   { background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:14,padding:'18px 20px',display:'flex',flexDirection:'column',gap:12 },
+    lbl:    { fontSize:11,color:'#8896A8',marginBottom:2 },
+    val:    { fontSize:13,fontWeight:600,color:'#1A1A2E' },
+    grpLbl: { fontSize:11,color:'#8896A8',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:8 },
   };
 
   return (
@@ -481,7 +354,6 @@ function AcaoCard({ a, onRemover, onSalvar, onAbrirDividendo }) {
           {criteriosAcao.map(({label,key,ok,fmt:fmtFn})=>{
             const v = a[key];
             const isDivida = key === 'divida_ebit';
-            // Div/EBIT: 0 ou null = sem dado → laranja
             const semDadoDivida = isDivida && (v == null || Number(v) === 0);
             const semDadoOutro  = !isDivida && (v == null || Number(v) === 0);
             const dotColor = semDadoDivida ? '#D97706' : semDadoOutro ? '#D0D8E0' : ok(v) ? '#16A34A' : '#DC2626';
@@ -520,14 +392,8 @@ function AcaoCard({ a, onRemover, onSalvar, onAbrirDividendo }) {
         {editando ? (
           <div style={{background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:10,padding:14}}>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
-              <div>
-                <label style={{...C.lbl,display:'block',marginBottom:4}}>Quantidade</label>
-                <input className="input" type="number" min="0" step="0.000001" value={qtd} onChange={e=>setQtd(e.target.value)}/>
-              </div>
-              <div>
-                <label style={{...C.lbl,display:'block',marginBottom:4}}>Preço médio (R$)</label>
-                <input className="input" type="number" min="0" step="0.01" value={preco} onChange={e=>setPreco(e.target.value)}/>
-              </div>
+              <div><label style={{...C.lbl,display:'block',marginBottom:4}}>Quantidade</label><input className="input" type="number" min="0" step="0.000001" value={qtd} onChange={e=>setQtd(e.target.value)}/></div>
+              <div><label style={{...C.lbl,display:'block',marginBottom:4}}>Preço médio (R$)</label><input className="input" type="number" min="0" step="0.01" value={preco} onChange={e=>setPreco(e.target.value)}/></div>
             </div>
             <div style={{display:'flex',gap:8}}>
               <button className="btn-primary" style={{flex:1,justifyContent:'center'}} onClick={salvar}>Salvar</button>
@@ -557,36 +423,45 @@ function AcaoCard({ a, onRemover, onSalvar, onAbrirDividendo }) {
         )}
       </div>
 
-      {/* Dividendos */}
+      {/* ── Proventos recebidos no ano ── */}
       <div style={{background:'#FFFDF0',border:'1px solid #F6E05E',borderRadius:10,padding:'10px 14px'}}>
-        <p style={{fontSize:11,fontWeight:700,color:'#B7791F',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:8}}>💰 Dividendos recebidos no ano</p>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
-          <div><p style={{fontSize:10,color:'#B7791F',marginBottom:2}}>Total recebido</p><p style={{fontSize:13,fontWeight:700,color:'#744210'}}>{fmt.brl(totalDiv)}</p></div>
+        <p style={{fontSize:11,fontWeight:700,color:'#B7791F',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:8}}>
+          Proventos recebidos no ano
+        </p>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom: Object.keys(breakdown).length > 0 ? 8 : 0}}>
+          <div><p style={{fontSize:10,color:'#B7791F',marginBottom:2}}>Total recebido</p><p style={{fontSize:13,fontWeight:700,color:'#744210'}}>{fmt.brl(totalProv)}</p></div>
           <div><p style={{fontSize:10,color:'#B7791F',marginBottom:2}}>Yield s/ PM</p><p style={{fontSize:13,fontWeight:700,color:'#744210'}}>{yieldPM>0?fmt.pct(yieldPM):'—'}</p></div>
           <div><p style={{fontSize:10,color:'#B7791F',marginBottom:2}}>Lançamentos</p><p style={{fontSize:13,fontWeight:700,color:'#744210'}}>{numLanc}</p></div>
         </div>
+        {/* Breakdown por tipo */}
+        {Object.keys(breakdown).length > 0 && (
+          <div style={{borderTop:'1px solid #F6E05E',paddingTop:8,display:'flex',gap:6,flexWrap:'wrap'}}>
+            {Object.entries(breakdown).map(([tipo,valor])=>(
+              <span key={tipo} style={{fontSize:11,background:'#FEF3C7',color:'#92400E',padding:'2px 8px',borderRadius:20}}>
+                {tipo} {fmt.brl(Number(valor))}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Retorno após dividendo */}
-      {totalDiv > 0 && perf.custo > 0 && (() => {
-        const retornoTotal = perf.ganho + totalDiv;
-        const pctTotal     = (retornoTotal / perf.custo) * 100;
-        return (
-          <div style={{background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:10,padding:'10px 14px'}}>
-            <p style={{fontSize:11,fontWeight:700,color:'#1D4ED8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:8}}>📊 Retorno após dividendo</p>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
-              <div><p style={{fontSize:10,color:'#3B82F6',marginBottom:2}}>Ganho na compra</p><p style={{fontSize:13,fontWeight:700,color:perf.ganho>=0?'#16A34A':'#DC2626'}}>{perf.ganho>=0?'+':''}{fmt.brl(perf.ganho)}</p></div>
-              <div><p style={{fontSize:10,color:'#3B82F6',marginBottom:2}}>+ Dividendos</p><p style={{fontSize:13,fontWeight:700,color:'#744210'}}>+{fmt.brl(totalDiv)}</p></div>
-              <div style={{textAlign:'right'}}>
-                <p style={{fontSize:10,color:'#3B82F6',marginBottom:2}}>= Retorno total</p>
-                <p style={{fontSize:13,fontWeight:700,color:retornoTotal>=0?'#16A34A':'#DC2626'}}>
-                  {retornoTotal>=0?'+':''}{fmt.brl(retornoTotal)} ({retornoTotal>=0?'+':''}{fmt.pct(pctTotal)})
-                </p>
-              </div>
-            </div>
+      {/* ── Retorno após proventos ── */}
+      {temRetorno && (
+        <div style={{background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:10,padding:'10px 14px'}}>
+          <p style={{fontSize:11,fontWeight:600,color:'#3B82F6',marginBottom:6}}>Retorno após proventos</p>
+          <div style={{display:'flex',alignItems:'baseline',gap:8}}>
+            <span style={{fontSize:15,fontWeight:700,color:ganhoTotal>=0?'#16A34A':'#DC2626'}}>
+              {ganhoTotal>=0?'+':''}{fmt.brl(ganhoTotal)}
+            </span>
+            <span style={{fontSize:12,fontWeight:600,color:pctAposP>=0?'#16A34A':'#DC2626'}}>
+              ({pctAposP>=0?'+':''}{fmt.pct(pctAposP)})
+            </span>
           </div>
-        );
-      })()}
+          <p style={{fontSize:11,color:'#93C5FD',marginTop:3}}>
+            compra {perf.ganho>=0?'+':''}{fmt.brl(perf.ganho)} + proventos {fmt.brl(totalProv)}
+          </p>
+        </div>
+      )}
 
       {/* Footer */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingTop:4,borderTop:'1px solid #E8ECF0'}}>
@@ -602,9 +477,9 @@ function AcaoCard({ a, onRemover, onSalvar, onAbrirDividendo }) {
           {a.peso_sugerido!=null&&<p style={{fontSize:12,color:'#8896A8',marginTop:2}}>Peso: {fmt.pct(a.peso_sugerido*100)}</p>}
         </div>
         <div style={{display:'flex',gap:6}}>
-          <button onClick={()=>onAbrirDividendo(a.ticker)}
+          <button onClick={onAbrirProvento}
             style={{padding:'4px 10px',borderRadius:5,fontSize:11,fontWeight:600,border:'none',cursor:'pointer',background:'#FEFCBF',color:'#7B6213'}}>
-            💰 Dividendo
+            Provento
           </button>
           {!editando&&<button className="btn-icon" onClick={()=>setEditando(true)}>✏️</button>}
           <button className="btn-icon" onClick={()=>onRemover(a.ticker)}>🗑️</button>
@@ -614,14 +489,14 @@ function AcaoCard({ a, onRemover, onSalvar, onAbrirDividendo }) {
   );
 }
 
-// ─── FORM ADICIONAR ────────────────────────────────────────────────────────
+// ─── FORM ADICIONAR ───────────────────────────────────────────────────────
 function AcoesForm({ onAdicionado }) {
   const searchParams = useSearchParams();
-  const [ticker, setTicker]         = useState(searchParams.get('ticker')||'');
-  const [quantidade, setQuantidade] = useState('');
+  const [ticker, setTicker]           = useState(searchParams.get('ticker')||'');
+  const [quantidade, setQuantidade]   = useState('');
   const [precoCompra, setPrecoCompra] = useState('');
-  const [buscando, setBuscando]     = useState(false);
-  const [erro, setErro]             = useState('');
+  const [buscando, setBuscando]       = useState(false);
+  const [erro, setErro]               = useState('');
 
   const adicionar = async (e) => {
     e.preventDefault();
@@ -631,9 +506,8 @@ function AcoesForm({ onAdicionado }) {
       await api.post('/acoes', { ticker: ticker.trim().toUpperCase(), quantidade: Number(quantidade)||0, preco_compra: Number(precoCompra)||0 });
       setTicker(''); setQuantidade(''); setPrecoCompra('');
       onAdicionado();
-    } catch (err) {
-      setErro(err.response?.data?.error||'Erro ao adicionar ação.');
-    } finally { setBuscando(false); }
+    } catch (err) { setErro(err.response?.data?.error||'Erro ao adicionar ação.'); }
+    finally { setBuscando(false); }
   };
 
   return (
@@ -665,31 +539,26 @@ function AcoesForm({ onAdicionado }) {
 // ─── DASHBOARD ────────────────────────────────────────────────────────────
 function Dashboard({ acoes }) {
   if (!acoes.length) return null;
-
-  const patrimonio  = acoes.reduce((s,a)=>s+(a.preco_atual*(a.quantidade||0)),0);
-  const custo       = acoes.reduce((s,a)=>{ const p=calcPerformance(a.preco_atual,a.preco_compra,a.quantidade); return s+p.custo; },0);
-  const resultado   = patrimonio - custo;
-  const pctTotal    = custo > 0 ? (resultado/custo)*100 : 0;
-  const dividendosAno = acoes.reduce((s,a)=>s+Number(a.dividendos_ano||0),0);
-  const scores      = acoes.map(a=>typeof a.score==='string'?parseInt(a.score):(a.score||0));
-  const scoreMedio  = scores.length?(scores.reduce((s,v)=>s+v,0)/scores.length).toFixed(1):0;
-
-  const sorted = [...acoes].map(a=>({ ...a, pct: calcPerformance(a.preco_atual,a.preco_compra,a.quantidade).pct }));
-  const melhor = [...sorted].sort((a,b)=>b.pct-a.pct)[0];
-  const pior   = [...sorted].sort((a,b)=>a.pct-b.pct)[0];
-
-  const totalPort = patrimonio;
+  const patrimonio    = acoes.reduce((s,a)=>s+(a.preco_atual*(a.quantidade||0)),0);
+  const custo         = acoes.reduce((s,a)=>{ const p=calcPerformance(a.preco_atual,a.preco_compra,a.quantidade); return s+p.custo; },0);
+  const resultado     = patrimonio - custo;
+  const pctTotal      = custo > 0 ? (resultado/custo)*100 : 0;
+  const proventosAno  = acoes.reduce((s,a)=>s+Number(a.dividendos_ano||0),0);
+  const scores        = acoes.map(a=>typeof a.score==='string'?parseInt(a.score):(a.score||0));
+  const scoreMedio    = scores.length?(scores.reduce((s,v)=>s+v,0)/scores.length).toFixed(1):0;
+  const sorted        = [...acoes].map(a=>({ ...a, pct: calcPerformance(a.preco_atual,a.preco_compra,a.quantidade).pct }));
+  const melhor        = [...sorted].sort((a,b)=>b.pct-a.pct)[0];
+  const pior          = [...sorted].sort((a,b)=>a.pct-b.pct)[0];
   const CORES = ['#2563EB','#16A34A','#D4A017','#7C3AED','#D97706','#DC2626','#718096','#0891B2','#BE185D'];
 
   return (
     <div style={{marginBottom:20}}>
-      {/* 4 cards */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:14,marginBottom:14}}>
         {[
-          { label:'Patrimônio Total',   val: fmt.brl(patrimonio),  sub:`${acoes.length} ativos`,  cor:'#2563EB' },
-          { label:'Resultado Total',    val:`${resultado>=0?'+':''}${fmt.brl(resultado)}`, sub:`${resultado>=0?'+':''}${fmt.pct(pctTotal)} desde aporte`, cor: resultado>=0?'#16A34A':'#DC2626' },
-          { label:'Melhor / Pior ativo',val: melhor?`${melhor.ticker} ${melhor.pct>=0?'+':''}${fmt.pct(melhor.pct)}`:'—', sub: pior&&pior.ticker!==melhor?.ticker?`Pior: ${pior.ticker} ${fmt.pct(pior.pct)}`:'', cor:'#1A1A2E' },
-          { label:'Score médio',        val:`${scoreMedio} / ${acoes[0]?.max_score||6}`, sub:`${acoes.filter(a=>(typeof a.score==='string'?parseInt(a.score):a.score)>=4).length} MANTER · ${acoes.filter(a=>(typeof a.score==='string'?parseInt(a.score):a.score)===3).length} ATENÇÃO`, cor:'#2563EB' },
+          { label:'Patrimônio Total',    val:fmt.brl(patrimonio),  sub:`${acoes.length} ativos`, cor:'#2563EB' },
+          { label:'Resultado Total',     val:`${resultado>=0?'+':''}${fmt.brl(resultado)}`, sub:`${resultado>=0?'+':''}${fmt.pct(pctTotal)} desde aporte`, cor:resultado>=0?'#16A34A':'#DC2626' },
+          { label:'Melhor / Pior ativo', val:melhor?`${melhor.ticker} ${melhor.pct>=0?'+':''}${fmt.pct(melhor.pct)}`:'—', sub:pior&&pior.ticker!==melhor?.ticker?`Pior: ${pior.ticker} ${fmt.pct(pior.pct)}`:'', cor:'#1A1A2E' },
+          { label:'Score médio',         val:`${scoreMedio} / ${acoes[0]?.max_score||6}`, sub:`${acoes.filter(a=>(typeof a.score==='string'?parseInt(a.score):a.score)>=4).length} MANTER · ${acoes.filter(a=>(typeof a.score==='string'?parseInt(a.score):a.score)===3).length} ATENÇÃO`, cor:'#2563EB' },
         ].map((c,i)=>(
           <div key={i} style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:10,padding:16}}>
             <p style={{fontSize:11,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:6}}>{c.label}</p>
@@ -698,38 +567,22 @@ function Dashboard({ acoes }) {
           </div>
         ))}
       </div>
-
-      {/* Distribuição */}
       <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:10,padding:16,marginBottom:14}}>
         <p style={{fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:12}}>Distribuição da carteira</p>
         <div style={{display:'flex',height:26,borderRadius:6,overflow:'hidden',marginBottom:10}}>
-          {acoes.map((a,i)=>{
-            const val = a.preco_atual*(a.quantidade||0);
-            const pct = totalPort>0?(val/totalPort)*100:0;
-            return <div key={a.ticker} style={{flex:pct,background:CORES[i%CORES.length],display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700,color:'#fff',overflow:'hidden'}}>
-              {pct>7?a.ticker:''}
-            </div>;
-          })}
+          {acoes.map((a,i)=>{ const val=a.preco_atual*(a.quantidade||0); const pct=patrimonio>0?(val/patrimonio)*100:0; return <div key={a.ticker} style={{flex:pct,background:CORES[i%CORES.length],display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700,color:'#fff',overflow:'hidden'}}>{pct>7?a.ticker:''}</div>; })}
         </div>
         <div style={{display:'flex',gap:14,flexWrap:'wrap'}}>
-          {acoes.map((a,i)=>{
-            const val=a.preco_atual*(a.quantidade||0);
-            const pct=totalPort>0?(val/totalPort)*100:0;
-            return <div key={a.ticker} style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'#8896A8'}}>
-              <div style={{width:8,height:8,borderRadius:'50%',background:CORES[i%CORES.length]}}/>
-              {a.ticker} {fmt.pct(pct)}
-            </div>;
-          })}
+          {acoes.map((a,i)=>{ const val=a.preco_atual*(a.quantidade||0); const pct=patrimonio>0?(val/patrimonio)*100:0; return <div key={a.ticker} style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'#8896A8'}}><div style={{width:8,height:8,borderRadius:'50%',background:CORES[i%CORES.length]}}/>{a.ticker} {fmt.pct(pct)}</div>; })}
         </div>
       </div>
-
-      {/* Faixa dividendos */}
+      {/* Faixa proventos */}
       <div style={{background:'linear-gradient(135deg,#FFFDF0,#FEFCE8)',border:'1px solid #F6E05E',borderRadius:10,padding:16,display:'flex',marginBottom:4}}>
         {[
-          { label:'💰 Dividendos no Ano', val:fmt.brl(dividendosAno), sub:'Todos os ativos' },
-          { label:'Yield médio s/ PM', val:()=>{ const c=acoes.reduce((s,a)=>s+((a.preco_compra||0)*(a.quantidade||0)),0); return c>0?fmt.pct((dividendosAno/c)*100):'—'; }, sub:'Sobre preço médio pago' },
-          { label:'Maior pagador', val:()=>{ const m=[...acoes].sort((a,b)=>(b.dividendos_ano||0)-(a.dividendos_ano||0))[0]; return m&&m.dividendos_ano>0?m.ticker:'—'; }, sub:()=>{ const m=[...acoes].sort((a,b)=>(b.dividendos_ano||0)-(a.dividendos_ano||0))[0]; return m&&m.dividendos_ano>0?`${fmt.brl(m.dividendos_ano)} no ano`:''; } },
-          { label:'Lançamentos totais', val:acoes.reduce((s,a)=>s+(a.dividendos_lancamentos||0),0), sub:'Todos os ativos no ano' },
+          { label:'Proventos no Ano', val:fmt.brl(proventosAno), sub:'Todos os ativos' },
+          { label:'Yield médio s/ PM', val:()=>{ const c=acoes.reduce((s,a)=>s+((a.preco_compra||0)*(a.quantidade||0)),0); return c>0?fmt.pct((proventosAno/c)*100):'—'; }, sub:'Sobre preço médio pago' },
+          { label:'Maior pagador', val:()=>{ const m=[...acoes].sort((a,b)=>Number(b.dividendos_ano||0)-Number(a.dividendos_ano||0))[0]; return m&&Number(m.dividendos_ano)>0?m.ticker:'—'; }, sub:()=>{ const m=[...acoes].sort((a,b)=>Number(b.dividendos_ano||0)-Number(a.dividendos_ano||0))[0]; return m&&Number(m.dividendos_ano)>0?`${fmt.brl(Number(m.dividendos_ano))} no ano`:''; } },
+          { label:'Lançamentos totais', val:acoes.reduce((s,a)=>s+Number(a.dividendos_lancamentos||0),0), sub:'Todos os ativos no ano' },
         ].map((item,i,arr)=>(
           <div key={i} style={{flex:1,padding:'0 16px',borderRight:i<arr.length-1?'1px solid #F6E05E':'none',paddingLeft:i===0?0:16}}>
             <p style={{fontSize:11,color:'#B7791F',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:5}}>{item.label}</p>
@@ -742,13 +595,13 @@ function Dashboard({ acoes }) {
   );
 }
 
-// ─── PÁGINA ────────────────────────────────────────────────────────────────
+// ─── PÁGINA ───────────────────────────────────────────────────────────────
 export default function AcoesPage() {
   const [acoes, setAcoes]             = useState([]);
   const [loading, setLoading]         = useState(true);
   const [atualizando, setAtualizando] = useState(false);
   const [modalCompra, setModalCompra] = useState(null);
-  const [modalDiv, setModalDiv]       = useState(false);
+  const [modalProv, setModalProv]     = useState(false);
 
   const carregar = async () => {
     try { const r = await api.get('/acoes'); setAcoes(r.data); }
@@ -788,13 +641,8 @@ export default function AcoesPage() {
     await carregar();
   };
 
-  const salvarDividendos = async (lancamentos) => {
-    await api.post('/acoes/dividendos', { lancamentos });
-    await carregar();
-  };
-
-  const excluirDividendo = async (ticker, mes, ano) => {
-    await api.delete(`/acoes/dividendos/${ticker}/${mes}/${ano}`);
+  const salvarProventos = async (lancamentos) => {
+    await api.post('/acoes/proventos', { lancamentos });
     await carregar();
   };
 
@@ -806,7 +654,6 @@ export default function AcoesPage() {
 
   return (
     <div>
-      {/* Cabeçalho */}
       <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:4,flexWrap:'wrap',gap:8}}>
         <div>
           <h2 style={{fontSize:22,fontWeight:600,color:'#1A1A2E',marginBottom:4}}>Carteira Ações</h2>
@@ -818,35 +665,20 @@ export default function AcoesPage() {
             {atualizando?'Atualizando...':'Atualizar todos'}
           </button>
           {acoes.length > 0 && <>
-            <button onClick={()=>setModalCompra('comprar')}
-              style={{padding:'8px 14px',borderRadius:7,fontSize:12,fontWeight:600,border:'1px solid #9AE6B4',background:'#C6F6D5',color:'#276749',cursor:'pointer'}}>
-              ▲ Comprar ação
-            </button>
-            <button onClick={()=>setModalCompra('vender')}
-              style={{padding:'8px 14px',borderRadius:7,fontSize:12,fontWeight:600,border:'1px solid #FC8181',background:'#FED7D7',color:'#9B2C2C',cursor:'pointer'}}>
-              ▼ Vender ação
-            </button>
-            <button onClick={()=>setModalDiv(true)}
-              style={{padding:'8px 14px',borderRadius:7,fontSize:12,fontWeight:600,border:'1px solid #F6E05E',background:'#FEFCBF',color:'#7B6213',cursor:'pointer'}}>
-              💰 Lançar dividendos
-            </button>
-            <button onClick={()=>setModalDiv(true)}
-              style={{padding:'8px 14px',borderRadius:7,fontSize:12,fontWeight:600,border:'1px solid #90CDF4',background:'#EBF8FF',color:'#2B6CB0',cursor:'pointer'}}>
-              ⬆ Importar B3
-            </button>
+            <button onClick={()=>setModalCompra('comprar')} style={{padding:'8px 14px',borderRadius:7,fontSize:12,fontWeight:600,border:'1px solid #9AE6B4',background:'#C6F6D5',color:'#276749',cursor:'pointer'}}>▲ Comprar ação</button>
+            <button onClick={()=>setModalCompra('vender')}  style={{padding:'8px 14px',borderRadius:7,fontSize:12,fontWeight:600,border:'1px solid #FC8181',background:'#FED7D7',color:'#9B2C2C',cursor:'pointer'}}>▼ Vender ação</button>
+            <button onClick={()=>setModalProv(true)}        style={{padding:'8px 14px',borderRadius:7,fontSize:12,fontWeight:600,border:'1px solid #F6E05E',background:'#FEFCBF',color:'#7B6213',cursor:'pointer'}}>💰 Lançar proventos</button>
+            <button onClick={()=>setModalProv(true)}        style={{padding:'8px 14px',borderRadius:7,fontSize:12,fontWeight:600,border:'1px solid #90CDF4',background:'#EBF8FF',color:'#2B6CB0',cursor:'pointer'}}>⬆ Importar B3</button>
           </>}
         </div>
       </div>
 
-      {/* Dashboard */}
       {acoes.length > 0 && <Dashboard acoes={acoes}/>}
 
-      {/* Form */}
       <Suspense fallback={<div style={{background:'#FFF',border:'1px solid #E8ECF0',borderRadius:14,padding:20,marginBottom:24,height:90}}/>}>
         <AcoesForm onAdicionado={carregar}/>
       </Suspense>
 
-      {/* Critérios */}
       <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:12,padding:'12px 20px',marginBottom:8,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
         <span style={{fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginRight:4}}>Critérios de avaliação (Score /6)</span>
         {['P/L < 15','P/VP < 1,5','Margem Liq. > 10%','ROE > 10%','Dívida/EBIT < 2x','DY ≥ 6%'].map(c=>(
@@ -854,21 +686,19 @@ export default function AcoesPage() {
         ))}
       </div>
 
-      {/* Legenda */}
       <div style={{display:'flex',alignItems:'center',gap:16,fontSize:11,color:'#8896A8',marginBottom:16}}>
         {[{c:'#16A34A',l:'Aprovado'},{c:'#DC2626',l:'Reprovado'},{c:'#D97706',l:'Sem dado'}].map(({c,l})=>(
           <span key={l}><span style={{display:'inline-block',width:7,height:7,borderRadius:'50%',background:c,marginRight:4}}/>{l}</span>
         ))}
       </div>
 
-      {/* Cards */}
       {acoes.length > 0 ? (
         <div className="grid-cards">
           {acoes.map(a=>(
             <AcaoCard key={a.ticker} a={a}
               onRemover={remover}
               onSalvar={salvarEdicao}
-              onAbrirDividendo={()=>setModalDiv(true)}
+              onAbrirProvento={()=>setModalProv(true)}
             />
           ))}
         </div>
@@ -880,14 +710,13 @@ export default function AcoesPage() {
         </div>
       )}
 
-      {/* Modais */}
       {modalCompra && (
         <ModalCompraVenda acoes={acoes} tipo={modalCompra}
           onFechar={()=>setModalCompra(null)} onSalvar={salvarOperacao}/>
       )}
-      {modalDiv && (
-        <ModalDividendos acoes={acoes}
-          onFechar={()=>setModalDiv(false)} onSalvar={salvarDividendos} onExcluirDividendo={excluirDividendo}/>
+      {modalProv && (
+        <ModalProventos acoes={acoes}
+          onFechar={()=>setModalProv(false)} onSalvar={salvarProventos}/>
       )}
     </div>
   );
