@@ -27,7 +27,7 @@ function scoreBarColor(c = '') {
 const criteriosFII = [
   { label: 'DY Mensal', key: 'dy_mensal', ok: v => v >= 1,          temCriterio: true,  fmt: v => fmt.pct(v) },
   { label: 'DY Anual',  key: 'dy_anual',  ok: null,                  temCriterio: false, fmt: v => fmt.pct(v) },
-  { label: 'P/VP',      key: 'pvp',       ok: v => v > 0 && v < 1.05, temCriterio: true, fmt: v => fmt.num(v) },
+  { label: 'P/VP',      key: 'pvp',       ok: v => v > 0 && v < 1,    temCriterio: true, fmt: v => fmt.num(v) },
   { label: 'Volume Dia',key: 'volume_financeiro', ok: v => v > 1000000, temCriterio: true, fmt: v => fmt.abrev(v) },
   { label: 'Patrimônio',key: 'patrimonio_liquido', ok: v => v > 1e9,  temCriterio: true, fmt: v => fmt.abrev(v) },
   { label: 'Peso',      key: 'peso_sugerido', ok: null,               temCriterio: false, fmt: v => fmt.pct((v||0)*100) },

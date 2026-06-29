@@ -267,10 +267,8 @@ async function buscarFII(ticker, ajustes = {}) {
     buscar(quote, ['dividendYield','dy'])
   ]));
 
-  let dyMensal = percentual(primeiroNumero([
-    fiiBrapi.dividendYield1m,
-    fiiBrapi.monthlyReturn
-  ]));
+  // monthlyReturn é retorno de preço, não DY — não usar
+  let dyMensal = percentual(fiiBrapi.dividendYield1m || 0);
   if (dyMensal === 0 && dyAnual > 0) dyMensal = dyAnual / 12;
 
   let pvp = primeiroNumero([
