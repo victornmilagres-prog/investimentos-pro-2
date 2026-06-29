@@ -40,6 +40,9 @@ async function parsearArquivoB3(file) {
   };
 
   const parseNum = s => {
+    // xlsx já retorna números como JS number — retorna direto sem manipular string
+    if (typeof s === 'number') return s;
+    // strings no formato BR: "1.234,56" → remove ponto de milhar, troca vírgula por ponto
     const n = Number(String(s).replace('R$','').replace(/\./g,'').replace(',','.').trim());
     return isNaN(n) ? 0 : n;
   };
