@@ -257,11 +257,10 @@ router.get('/proventos/resumo', async (req, res) => {
   try {
     let query, params;
     if (ano && Number(ano) > 0) {
-      // Resumo de um ano específico por ticker
       query = `
         SELECT ticker,
-          COALESCE(SUM(valor_total), 0) AS total,
-          COUNT(*) AS lancamentos,
+          COALESCE(SUM(soma), 0) AS total,
+          SUM(lancamentos) AS lancamentos,
           json_object_agg(tipo_provento, soma) AS breakdown
         FROM (
           SELECT ticker, tipo_provento, SUM(valor_total) AS soma, COUNT(*) AS lancamentos
@@ -273,11 +272,10 @@ router.get('/proventos/resumo', async (req, res) => {
       `;
       params = [req.userId, Number(ano)];
     } else {
-      // Geral: todos os anos
       query = `
         SELECT ticker,
-          COALESCE(SUM(valor_total), 0) AS total,
-          COUNT(*) AS lancamentos,
+          COALESCE(SUM(soma), 0) AS total,
+          SUM(lancamentos) AS lancamentos,
           json_object_agg(tipo_provento, soma) AS breakdown
         FROM (
           SELECT ticker, tipo_provento, SUM(valor_total) AS soma, COUNT(*) AS lancamentos
