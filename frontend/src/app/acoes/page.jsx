@@ -58,7 +58,9 @@ async function parsearArquivoB3(file) {
 
   const tickerRe = /^[A-Z][A-Z0-9]{2,5}\d{1,2}$/; // aceita B3SA3, PETR4, BBAS3 etc
 
-  // Agrupa por ticker + tipo + mes + ano (mesmo ticker pode vir em várias corretoras)
+  // Agrupa por ticker + tipo + mes + ano + preço_unitário
+  // Mesmo evento tem sempre o mesmo preço em todas as corretoras → agrega corretoras
+  // Eventos distintos no mesmo mês têm preços diferentes → ficam separados
   const mapa = new Map();
   for (const row of rows) {
     const produtoRaw = String(row[colProduto] || '').trim();
@@ -72,12 +74,13 @@ async function parsearArquivoB3(file) {
     const valorLiq       = colValorLiq ? parseNum(row[colValorLiq]) : 0;
     if (precoUnit <= 0 && valorLiq <= 0) continue;
 
-    const chave = `${ticker}|${tipo}|${mes}|${ano}`;
+    // Inclui preço na chave: mesmo evento = mesmo preço (corretoras diferentes somam)
+    // Eventos distintos no mesmo mês = preços diferentes = linhas separadas
+    const chave = `${ticker}|${tipo}|${mes}|${ano}|${precoUnit}`;
     if (mapa.has(chave)) {
       const ex = mapa.get(chave);
       ex.quantidade    += qtd;
       ex.valor_liquido += valorLiq;
-      // preço unitário é o mesmo para todas as corretoras — mantém o primeiro
     } else {
       mapa.set(chave, { ticker, tipo_provento: tipo, mes, ano, quantidade: qtd, preco_unitario: precoUnit, valor_liquido: valorLiq });
     }
