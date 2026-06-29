@@ -374,7 +374,7 @@ function AcaoCard({ a, onRemover, onSalvar, onAbrirDividendo }) {
             <div style={{display:'flex',justifyContent:'space-between'}}>
               <div><p style={C.lbl}>Val. atual</p><p style={C.val}>{perf.valorAtual>0?fmt.brl(perf.valorAtual):'-'}</p></div>
               <div style={{textAlign:'right'}}>
-                <p style={C.lbl}>Retorno</p>
+                <p style={C.lbl}>Retorno sobre a compra</p>
                 {perf.custo>0?(
                   <p style={{fontSize:13,fontWeight:600,color:perf.ganho>=0?'#16A34A':'#DC2626'}}>
                     {perf.ganho>=0?'+':''}{fmt.brl(perf.ganho)} ({perf.ganho>=0?'+':''}{fmt.pct(perf.pct)})
@@ -395,6 +395,27 @@ function AcaoCard({ a, onRemover, onSalvar, onAbrirDividendo }) {
           <div><p style={{fontSize:10,color:'#B7791F',marginBottom:2}}>Lançamentos</p><p style={{fontSize:13,fontWeight:700,color:'#744210'}}>{numLanc}</p></div>
         </div>
       </div>
+
+      {/* Retorno após dividendo */}
+      {totalDiv > 0 && perf.custo > 0 && (() => {
+        const retornoTotal = perf.ganho + totalDiv;
+        const pctTotal     = (retornoTotal / perf.custo) * 100;
+        return (
+          <div style={{background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:10,padding:'10px 14px'}}>
+            <p style={{fontSize:11,fontWeight:700,color:'#1D4ED8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:8}}>📊 Retorno após dividendo</p>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8}}>
+              <div><p style={{fontSize:10,color:'#3B82F6',marginBottom:2}}>Ganho na compra</p><p style={{fontSize:13,fontWeight:700,color:perf.ganho>=0?'#16A34A':'#DC2626'}}>{perf.ganho>=0?'+':''}{fmt.brl(perf.ganho)}</p></div>
+              <div><p style={{fontSize:10,color:'#3B82F6',marginBottom:2}}>+ Dividendos</p><p style={{fontSize:13,fontWeight:700,color:'#744210'}}>+{fmt.brl(totalDiv)}</p></div>
+              <div style={{textAlign:'right'}}>
+                <p style={{fontSize:10,color:'#3B82F6',marginBottom:2}}>= Retorno total</p>
+                <p style={{fontSize:13,fontWeight:700,color:retornoTotal>=0?'#16A34A':'#DC2626'}}>
+                  {retornoTotal>=0?'+':''}{fmt.brl(retornoTotal)} ({retornoTotal>=0?'+':''}{fmt.pct(pctTotal)})
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Footer */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingTop:4,borderTop:'1px solid #E8ECF0'}}>
