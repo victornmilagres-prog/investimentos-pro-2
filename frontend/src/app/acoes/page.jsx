@@ -190,58 +190,61 @@ function ModalCompraVenda({ acoes, tipo, onFechar, onSalvar }) {
 function ModalProventos({ acoes, onFechar, onSalvar }) {
   const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   const hoje  = new Date();
-  const [mes, setMes]           = useState(hoje.getMonth());
-  const [ano, setAno]           = useState(hoje.getFullYear());
-  // { ticker: { selecionado: bool, tipo: string, valor: string } }
-  const [itens, setItens]             = useState({});
+  const [mesFiltro, setMesFiltro] = useState(hoje.getMonth());
+  const [anoFiltro, setAnoFiltro] = useState(hoje.getFullYear());
+
+  // Array de linhas: [{ id, ticker, tipo, valor, mes, ano, selecionado }]
+  // Cada linha é independente — o mesmo ticker pode ter várias linhas (JCP + Rendimento, etc.)
+  const [linhas, setLinhas]           = useState(() =>
+    acoes.map((a, i) => ({ id: i, ticker: a.ticker, tipo: 'Dividendo', valor: '', mes: hoje.getMonth()+1, ano: hoje.getFullYear(), selecionado: false }))
+  );
   const [salvando, setSalvando]       = useState(false);
   const [arquivo, setArquivo]         = useState(null);
   const [parsendo, setParsendo]       = useState(false);
   const [avisoFora, setAvisoFora]     = useState([]);
   const [feedbackImport, setFeedback] = useState('');
-  // lançamentos já existentes no mês/ano
-  const [existentes, setExistentes] = useState([]);
-  const [carregando, setCarregando] = useState(false);
+  const [existentes, setExistentes]   = useState([]);
+  const [modoImport, setModoImport]   = useState(false); // true = veio do arquivo
 
-  // Inicializa itens
-  useEffect(() => {
-    const init = {};
-    acoes.forEach(a => { init[a.ticker] = { selecionado: false, tipo: 'Dividendo', valor: '' }; });
-    setItens(init);
-  }, [acoes]);
-
-  // Carrega lançamentos existentes ao mudar mês/ano
+  // Carrega lançamentos existentes ao mudar filtro mês/ano
   useEffect(() => {
     const carregar = async () => {
-      setCarregando(true);
       try {
-        const r = await api.get(`/acoes/proventos?mes=${mes+1}&ano=${ano}`);
+        const r = await api.get(`/acoes/proventos?mes=${mesFiltro+1}&ano=${anoFiltro}`);
         setExistentes(r.data);
       } catch { setExistentes([]); }
-      finally { setCarregando(false); }
     };
     carregar();
-  }, [mes, ano]);
+  }, [mesFiltro, anoFiltro]);
 
-  const setItem = (ticker, campo, valor) => setItens(s => ({ ...s, [ticker]: { ...s[ticker], [campo]: valor } }));
+  const setLinha = (id, campo, valor) =>
+    setLinhas(ls => ls.map(l => l.id === id ? { ...l, [campo]: valor } : l));
 
-  const total = acoes.reduce((acc, a) => {
-    const it = itens[a.ticker];
-    if (it?.selecionado && it?.valor) return acc + (Number(it.valor) * (a.quantidade||0));
-    return acc;
+  const removerLinha = (id) => setLinhas(ls => ls.filter(l => l.id !== id));
+
+  const adicionarLinha = (ticker) => {
+    const qtdExistente = linhas.filter(l => l.ticker === ticker).length;
+    setLinhas(ls => [...ls, {
+      id: Date.now() + qtdExistente,
+      ticker, tipo: 'Dividendo', valor: '',
+      mes: mesFiltro+1, ano: anoFiltro, selecionado: false,
+    }]);
+  };
+
+  const linhasSelecionadas = linhas.filter(l => l.selecionado && l.valor);
+  const total = linhasSelecionadas.reduce((acc, l) => {
+    const qtd = acoes.find(a => a.ticker === l.ticker)?.quantidade || 0;
+    return acc + (Number(l.valor) * qtd);
   }, 0);
-  const qtdSel = Object.values(itens).filter(i => i?.selecionado).length;
 
   const confirmar = async () => {
-    const lancamentos = acoes
-      .filter(a => itens[a.ticker]?.selecionado && itens[a.ticker]?.valor)
-      .map(a => ({
-        ticker: a.ticker,
-        tipo_provento: itens[a.ticker].tipo,
-        valor_por_acao: Number(itens[a.ticker].valor),
-        quantidade: a.quantidade || 0,
-        mes: mes+1, ano
-      }));
+    const lancamentos = linhasSelecionadas.map(l => ({
+      ticker: l.ticker,
+      tipo_provento: l.tipo,
+      valor_por_acao: Number(l.valor),
+      quantidade: acoes.find(a => a.ticker === l.ticker)?.quantidade || 0,
+      mes: l.mes, ano: l.ano,
+    }));
     if (!lancamentos.length) return;
     setSalvando(true);
     try { await onSalvar(lancamentos); onFechar(); }
@@ -251,16 +254,19 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
   const excluirExistente = async (item) => {
     try {
       await api.delete(`/acoes/proventos/${item.ticker}/${item.tipo_provento}/${item.mes}/${item.ano}`);
-      setExistentes(e => e.filter(x => !(x.ticker===item.ticker && x.tipo_provento===item.tipo_provento)));
+      setExistentes(e => e.filter(x => !(x.ticker===item.ticker && x.tipo_provento===item.tipo_provento && x.mes===item.mes && x.ano===item.ano)));
     } catch {}
   };
 
   const st = {
     overlay: { position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200 },
-    modal:   { background:'#fff',borderRadius:14,padding:28,width:500,boxShadow:'0 20px 60px rgba(0,0,0,0.2)',maxHeight:'92vh',overflowY:'auto' },
+    modal:   { background:'#fff',borderRadius:14,padding:28,width:540,boxShadow:'0 20px 60px rgba(0,0,0,0.2)',maxHeight:'92vh',overflowY:'auto' },
     lbl:     { fontSize:12,color:'#8896A8',fontWeight:500,display:'block',marginBottom:5 },
     inp:     { width:'100%',padding:'9px 12px',border:'1px solid #E8ECF0',borderRadius:7,fontSize:13,outline:'none',color:'#1A1A2E' },
   };
+
+  // Agrupa linhas por ticker para exibição
+  const tickersUnicos = [...new Set(acoes.map(a => a.ticker))];
 
   return (
     <div style={st.overlay} onClick={e=>e.target===e.currentTarget&&onFechar()}>
@@ -269,66 +275,50 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
           <h3 style={{fontSize:17,fontWeight:700}}>Lançar proventos</h3>
           <button onClick={onFechar} style={{background:'none',border:'none',cursor:'pointer',color:'#8896A8'}}><X size={18}/></button>
         </div>
-        <p style={{fontSize:13,color:'#8896A8',marginBottom:20}}>Registre os proventos recebidos por ativo no mês</p>
-
-        {/* Mês/Ano */}
-        <div style={{display:'flex',gap:12,marginBottom:16}}>
-          <div style={{flex:2}}><label style={st.lbl}>Mês de referência</label>
-            <select style={st.inp} value={mes} onChange={e=>setMes(Number(e.target.value))}>
-              {meses.map((m,i)=><option key={i} value={i}>{m}</option>)}
-            </select>
-          </div>
-          <div style={{flex:1}}><label style={st.lbl}>Ano</label>
-            <select style={st.inp} value={ano} onChange={e=>setAno(Number(e.target.value))}>
-              {[2024,2025,2026].map(y=><option key={y} value={y}>{y}</option>)}
-            </select>
-          </div>
-        </div>
+        <p style={{fontSize:13,color:'#8896A8',marginBottom:20}}>Registre os proventos recebidos por ativo. Importe da B3 ou lance manualmente.</p>
 
         {/* Importar B3 */}
-        <div style={{background:'#EFF6FF',border:'1px dashed #93C5FD',borderRadius:8,padding:'14px 16px',marginBottom:16,display:'flex',alignItems:'center',gap:12}}>
+        <div style={{background:'#EFF6FF',border:'1px dashed #93C5FD',borderRadius:8,padding:'14px 16px',marginBottom:10,display:'flex',alignItems:'center',gap:12}}>
           <span style={{fontSize:22}}>📂</span>
           <div style={{flex:1}}>
             <p style={{fontSize:13,fontWeight:600,color:'#2563EB',marginBottom:2}}>Importar relatório da B3</p>
-            <p style={{fontSize:12,color:'#4A90D9'}}>Preenche todos os ativos automaticamente</p>
+            <p style={{fontSize:12,color:'#4A90D9'}}>Importa todos os meses do arquivo automaticamente</p>
           </div>
           <label style={{background:'#EFF6FF',color:'#2563EB',border:'1px solid #93C5FD',padding:'7px 14px',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap'}}>
-            Selecionar arquivo
-            <input type="file" accept=".csv,.xlsx,.xls" style={{display:'none'}} onChange={async e => {
+            {parsendo ? 'Lendo...' : 'Selecionar arquivo'}
+            <input type="file" accept=".csv,.xlsx,.xls" style={{display:'none'}} disabled={parsendo} onChange={async e => {
               const f = e.target.files[0];
               if (!f) return;
-              setArquivo(f);
-              setAvisoFora([]);
-              setFeedback('');
-              setParsendo(true);
+              setArquivo(f); setAvisoFora([]); setFeedback(''); setParsendo(true);
               try {
-                const linhas = await parsearArquivoB3(f);
+                const resultado = await parsearArquivoB3(f);
                 const tickersCarteira = new Set(acoes.map(a => a.ticker));
                 const fora = [];
-                const novosItens = { ...itens };
-
-                for (const linha of linhas) {
+                // Constrói novas linhas a partir do arquivo (substituindo as manuais)
+                const novasLinhas = [];
+                let idSeq = Date.now();
+                for (const linha of resultado) {
                   const { ticker, tipo_provento, valor_por_acao, mes: mesArq, ano: anoArq } = linha;
-                  if (!tickersCarteira.has(ticker)) {
-                    fora.push(ticker);
-                    continue;
-                  }
-                  // Se o arquivo tem data, sincroniza mês/ano
-                  if (mesArq && anoArq) {
-                    setMes(mesArq - 1);
-                    setAno(anoArq);
-                  }
-                  novosItens[ticker] = {
-                    selecionado: true,
-                    tipo: tipo_provento,
+                  if (!tickersCarteira.has(ticker)) { fora.push(ticker); continue; }
+                  novasLinhas.push({
+                    id: idSeq++,
+                    ticker, tipo: tipo_provento,
                     valor: String(valor_por_acao.toFixed(6)),
-                  };
+                    mes: mesArq || mesFiltro+1,
+                    ano: anoArq || anoFiltro,
+                    selecionado: true,
+                  });
                 }
-
-                setItens(novosItens);
+                // Mantém linhas manuais dos tickers que não vieram no arquivo
+                const tickersNoArquivo = new Set(novasLinhas.map(l => l.ticker));
+                const linhasManuais = acoes
+                  .filter(a => !tickersNoArquivo.has(a.ticker))
+                  .map((a, i) => ({ id: idSeq + i, ticker: a.ticker, tipo: 'Dividendo', valor: '', mes: mesFiltro+1, ano: anoFiltro, selecionado: false }));
+                setLinhas([...novasLinhas, ...linhasManuais]);
                 setAvisoFora([...new Set(fora)]);
-                const encontrados = linhas.filter(l => tickersCarteira.has(l.ticker));
-                setFeedback(encontrados.length > 0 ? `✓ ${encontrados.length} ativo(s) encontrado(s) no arquivo` : '⚠ Nenhum ativo do arquivo está na carteira');
+                setModoImport(true);
+                const mesesUnicos = [...new Set(novasLinhas.map(l => `${l.mes}/${l.ano}`))];
+                setFeedback(`✓ ${novasLinhas.length} lançamento(s) em ${mesesUnicos.length} mês(es) importado(s)`);
               } catch (err) {
                 console.error(err);
                 setFeedback('⚠ Erro ao ler o arquivo. Verifique o formato.');
@@ -338,21 +328,37 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
             }}/>
           </label>
         </div>
-        {parsendo && <p style={{fontSize:12,color:'#2563EB',marginBottom:12}}>⏳ Lendo arquivo...</p>}
-        {!parsendo && arquivo && feedbackImport && (
-          <p style={{fontSize:12,color:feedbackImport.startsWith('✓')?'#16A34A':'#D97706',marginBottom:8}}>{feedbackImport} — {arquivo.name}</p>
+
+        {feedbackImport && (
+          <p style={{fontSize:12,color:feedbackImport.startsWith('✓')?'#16A34A':'#D97706',marginBottom:8}}>{feedbackImport}{arquivo ? ` — ${arquivo.name}` : ''}</p>
         )}
         {avisoFora.length > 0 && (
-          <div style={{background:'#FFFBEB',border:'1px solid #F6D860',borderRadius:8,padding:'10px 14px',marginBottom:12}}>
-            <p style={{fontSize:12,fontWeight:600,color:'#92400E',marginBottom:4}}>⚠ Ativos ignorados (não estão na sua carteira):</p>
+          <div style={{background:'#FFFBEB',border:'1px solid #F6D860',borderRadius:8,padding:'10px 14px',marginBottom:10}}>
+            <p style={{fontSize:12,fontWeight:600,color:'#92400E',marginBottom:3}}>⚠ Ativos ignorados (não estão na sua carteira):</p>
             <p style={{fontSize:12,color:'#92400E'}}>{avisoFora.join(', ')}</p>
           </div>
         )}
 
-        {/* Lançamentos existentes no mês */}
+        {/* Filtro mês/ano para ver lançamentos existentes */}
+        <div style={{display:'flex',gap:12,marginBottom:10,marginTop:6}}>
+          <div style={{flex:2}}><label style={st.lbl}>Ver lançamentos do mês</label>
+            <select style={st.inp} value={mesFiltro} onChange={e=>setMesFiltro(Number(e.target.value))}>
+              {meses.map((m,i)=><option key={i} value={i}>{m}</option>)}
+            </select>
+          </div>
+          <div style={{flex:1}}><label style={st.lbl}>Ano</label>
+            <select style={st.inp} value={anoFiltro} onChange={e=>setAnoFiltro(Number(e.target.value))}>
+              {[2024,2025,2026].map(y=><option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Lançamentos existentes no mês selecionado */}
         {existentes.length > 0 && (
-          <div style={{marginBottom:16}}>
-            <p style={{fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:8}}>Lançamentos do mês</p>
+          <div style={{marginBottom:14}}>
+            <p style={{fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:8}}>
+              Já lançados em {meses[mesFiltro]}/{anoFiltro}
+            </p>
             <div style={{display:'flex',flexDirection:'column',gap:6}}>
               {existentes.map((item,i)=>(
                 <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#F8F9FA',border:'1px solid #E8ECF0',borderRadius:8,padding:'8px 12px'}}>
@@ -370,43 +376,56 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
         )}
 
         {/* Separador */}
-        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:14}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
           <div style={{flex:1,height:1,background:'#E8ECF0'}}/>
-          <span style={{fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em'}}>lançar novo provento</span>
+          <span style={{fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em'}}>
+            {modoImport ? 'lançamentos importados — edite antes de confirmar' : 'lançar manualmente'}
+          </span>
           <div style={{flex:1,height:1,background:'#E8ECF0'}}/>
         </div>
 
-        {/* Lista de ativos */}
+        {/* Lista de linhas agrupadas por ticker */}
         <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:16}}>
-          {acoes.map(a=>{
-            const it = itens[a.ticker] || { selecionado:false, tipo:'Dividendo', valor:'' };
+          {tickersUnicos.map(ticker => {
+            const acao = acoes.find(a => a.ticker === ticker);
+            const linhasTicker = linhas.filter(l => l.ticker === ticker);
             return (
-              <div key={a.ticker} style={{background:'#FFFDF0',border:'1px solid #F6E05E',borderRadius:8,padding:'10px 12px'}}>
-                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom: it.selecionado ? 10 : 0}}>
-                  <input type="checkbox" checked={it.selecionado} onChange={()=>setItem(a.ticker,'selecionado',!it.selecionado)}
-                    style={{accentColor:'#D4A017',width:15,height:15}}/>
+              <div key={ticker} style={{background:'#FFFDF0',border:'1px solid #F6E05E',borderRadius:8,padding:'10px 12px'}}>
+                {/* Cabeçalho do ativo */}
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
                   <div>
-                    <p style={{fontWeight:700,fontSize:13,margin:0}}>{a.ticker}</p>
-                    <p style={{fontSize:11,color:'#8896A8',margin:0}}>{a.quantidade||0} ações</p>
+                    <span style={{fontWeight:700,fontSize:13}}>{ticker}</span>
+                    <span style={{fontSize:11,color:'#8896A8',marginLeft:8}}>{acao?.quantidade||0} ações</span>
                   </div>
+                  <button onClick={()=>adicionarLinha(ticker)}
+                    style={{fontSize:11,color:'#B7791F',background:'#FEF3C7',border:'1px solid #F6E05E',borderRadius:5,padding:'2px 8px',cursor:'pointer'}}>
+                    + tipo
+                  </button>
                 </div>
-                {it.selecionado && (
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-                    <div>
-                      <label style={{fontSize:11,color:'#B7791F',display:'block',marginBottom:4}}>Tipo de provento</label>
-                      <select value={it.tipo} onChange={e=>setItem(a.ticker,'tipo',e.target.value)}
-                        style={{width:'100%',padding:'6px 8px',border:'1px solid #F6E05E',borderRadius:6,fontSize:12,background:'#fff',outline:'none'}}>
+                {/* Linhas do ticker */}
+                <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                  {linhasTicker.map(l => (
+                    <div key={l.id} style={{display:'grid',gridTemplateColumns:'18px 1fr 1fr 1fr auto',gap:8,alignItems:'center'}}>
+                      <input type="checkbox" checked={l.selecionado} onChange={()=>setLinha(l.id,'selecionado',!l.selecionado)}
+                        style={{accentColor:'#D4A017',width:15,height:15}}/>
+                      <select value={l.tipo} onChange={e=>setLinha(l.id,'tipo',e.target.value)}
+                        style={{padding:'5px 6px',border:'1px solid #F6E05E',borderRadius:6,fontSize:12,background:'#fff',outline:'none'}}>
                         {TIPOS_PROVENTO.map(t=><option key={t} value={t}>{t}</option>)}
                       </select>
+                      <input type="number" min="0" step="0.0001" placeholder="R$/ação"
+                        value={l.valor} onChange={e=>setLinha(l.id,'valor',e.target.value)}
+                        style={{padding:'5px 6px',border:'1px solid #F6E05E',borderRadius:6,background:'#fff',fontSize:12,textAlign:'right',outline:'none'}}/>
+                      <span style={{fontSize:11,color:'#B7791F',textAlign:'center'}}>
+                        {meses[l.mes-1]?.slice(0,3)}/{l.ano}
+                      </span>
+                      {linhasTicker.length > 1 && (
+                        <button onClick={()=>removerLinha(l.id)}
+                          style={{background:'none',border:'none',cursor:'pointer',color:'#FC8181',fontSize:14,padding:0}}>✕</button>
+                      )}
+                      {linhasTicker.length === 1 && <span/>}
                     </div>
-                    <div>
-                      <label style={{fontSize:11,color:'#B7791F',display:'block',marginBottom:4}}>Valor por ação (R$)</label>
-                      <input type="number" min="0" step="0.0001" placeholder="0,0000"
-                        value={it.valor} onChange={e=>setItem(a.ticker,'valor',e.target.value)}
-                        style={{width:'100%',padding:'6px 8px',border:'1px solid #F6E05E',borderRadius:6,background:'#fff',fontSize:12,textAlign:'right',outline:'none'}}/>
-                    </div>
-                  </div>
-                )}
+                  ))}
+                </div>
               </div>
             );
           })}
@@ -415,13 +434,13 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
         {/* Totalizador */}
         <div style={{background:'#FFFDF0',border:'1px solid #F6E05E',borderRadius:8,padding:'12px 16px',display:'flex',gap:24,marginBottom:18}}>
           <div><p style={{fontSize:11,color:'#8896A8',marginBottom:3}}>Total a lançar</p><p style={{fontSize:15,fontWeight:700,color:'#744210'}}>{fmt.brl(total)}</p></div>
-          <div><p style={{fontSize:11,color:'#8896A8',marginBottom:3}}>Ativos selecionados</p><p style={{fontSize:15,fontWeight:700}}>{qtdSel} de {acoes.length}</p></div>
+          <div><p style={{fontSize:11,color:'#8896A8',marginBottom:3}}>Lançamentos selecionados</p><p style={{fontSize:15,fontWeight:700}}>{linhasSelecionadas.length}</p></div>
         </div>
 
         <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
           <button onClick={onFechar} style={{padding:'9px 20px',borderRadius:7,fontSize:13,fontWeight:600,border:'none',cursor:'pointer',background:'#EDF2F7',color:'#8896A8'}}>Cancelar</button>
-          <button onClick={confirmar} disabled={salvando||qtdSel===0}
-            style={{padding:'9px 20px',borderRadius:7,fontSize:13,fontWeight:600,border:'none',cursor:'pointer',background:'#D4A017',color:'#fff',opacity:qtdSel===0?0.5:1}}>
+          <button onClick={confirmar} disabled={salvando||linhasSelecionadas.length===0}
+            style={{padding:'9px 20px',borderRadius:7,fontSize:13,fontWeight:600,border:'none',cursor:'pointer',background:'#D4A017',color:'#fff',opacity:linhasSelecionadas.length===0?0.5:1}}>
             {salvando?'Salvando...':'Lançar proventos'}
           </button>
         </div>
