@@ -7,6 +7,81 @@ import { fmt, calcPerformance } from '@/lib/utils';
 
 const TIPOS_PROVENTO = ['Dividendo', 'JCP', 'Rendimento', 'Outros'];
 
+// ─── PARSE ARQUIVO B3 ─────────────────────────────────────────────────────
+async function parsearArquivoB3(file) {
+  const XLSX = await import('xlsx');
+
+  const buffer = await file.arrayBuffer();
+  const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+  if (!rows.length) return [];
+
+  // Normaliza nomes de colunas para lower sem acentos
+  const norm = s => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+
+  const colMap = {};
+  Object.keys(rows[0]).forEach(k => { colMap[norm(k)] = k; });
+
+  const colProduto  = colMap['produto']  || colMap['ativo'] || colMap['ticker'] || colMap['codigo'];
+  const colTipo     = colMap['tipo de evento'] || colMap['tipo evento'] || colMap['tipo'];
+  const colData     = colMap['data pagamento'] || colMap['data de pagamento'] || colMap['data com'] || colMap['data'];
+  const colPreco    = colMap['preco unitario'] || colMap['valor unitario'] || colMap['valor por cota'] || colMap['preco'] || colMap['valor liquido por acao'];
+  const colValorLiq = colMap['valor liquido'] || colMap['valor bruto'] || colMap['valor'];
+
+  if (!colProduto) return [];
+
+  const maparTipo = (t = '') => {
+    const v = t.toUpperCase();
+    if (v.includes('JCP') || v.includes('JUROS')) return 'JCP';
+    if (v.includes('REND')) return 'Rendimento';
+    if (v.includes('DIV')) return 'Dividendo';
+    return 'Outros';
+  };
+
+  const tickerRe = /^[A-Z]{3,6}\d{1,2}$/;
+  const resultado = [];
+
+  for (const row of rows) {
+    // Extrai ticker: pega só a parte antes do primeiro espaço ou hífen
+    const produtoRaw = String(row[colProduto] || '').trim();
+    const ticker = produtoRaw.split(/[\s\-–]/)[0].toUpperCase().replace(/[^A-Z0-9]/g,'');
+    if (!tickerRe.test(ticker)) continue;
+
+    const tipo = maparTipo(String(row[colTipo] || ''));
+
+    // Extrai mes/ano da data
+    let mes = null, ano = null;
+    const dataVal = row[colData];
+    if (dataVal instanceof Date) {
+      mes = dataVal.getMonth() + 1;
+      ano = dataVal.getFullYear();
+    } else if (dataVal) {
+      const partes = String(dataVal).match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+      if (partes) { mes = Number(partes[1]); ano = Number(partes[3]); }
+    }
+
+    // Valor por ação: prefere coluna de preço unitário, fallback valor líquido
+    const parseNum = s => {
+      const n = Number(String(s).replace('R$','').replace(/\./g,'').replace(',','.').trim());
+      return isNaN(n) ? 0 : n;
+    };
+    const valor = colPreco ? parseNum(row[colPreco]) : parseNum(row[colValorLiq]);
+    if (valor <= 0) continue;
+
+    // Agrega por ticker + tipo (somando se aparecer mais de uma vez)
+    const existe = resultado.find(r => r.ticker === ticker && r.tipo_provento === tipo);
+    if (existe) {
+      existe.valor_por_acao += valor;
+    } else {
+      resultado.push({ ticker, tipo_provento: tipo, valor_por_acao: valor, mes, ano });
+    }
+  }
+
+  return resultado;
+}
+
 function badgeDecisao(d = '') {
   const v = (d || '').toUpperCase();
   if (v.includes('COMPRAR') || v.includes('ACUMULAR')) return 'badge-comprar';
@@ -118,9 +193,12 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
   const [mes, setMes]           = useState(hoje.getMonth());
   const [ano, setAno]           = useState(hoje.getFullYear());
   // { ticker: { selecionado: bool, tipo: string, valor: string } }
-  const [itens, setItens]       = useState({});
-  const [salvando, setSalvando] = useState(false);
-  const [arquivo, setArquivo]   = useState(null);
+  const [itens, setItens]             = useState({});
+  const [salvando, setSalvando]       = useState(false);
+  const [arquivo, setArquivo]         = useState(null);
+  const [parsendo, setParsendo]       = useState(false);
+  const [avisoFora, setAvisoFora]     = useState([]);
+  const [feedbackImport, setFeedback] = useState('');
   // lançamentos já existentes no mês/ano
   const [existentes, setExistentes] = useState([]);
   const [carregando, setCarregando] = useState(false);
@@ -216,10 +294,60 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
           </div>
           <label style={{background:'#EFF6FF',color:'#2563EB',border:'1px solid #93C5FD',padding:'7px 14px',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap'}}>
             Selecionar arquivo
-            <input type="file" accept=".csv,.xlsx,.xls" style={{display:'none'}} onChange={e=>setArquivo(e.target.files[0])}/>
+            <input type="file" accept=".csv,.xlsx,.xls" style={{display:'none'}} onChange={async e => {
+              const f = e.target.files[0];
+              if (!f) return;
+              setArquivo(f);
+              setAvisoFora([]);
+              setFeedback('');
+              setParsendo(true);
+              try {
+                const linhas = await parsearArquivoB3(f);
+                const tickersCarteira = new Set(acoes.map(a => a.ticker));
+                const fora = [];
+                const novosItens = { ...itens };
+
+                for (const linha of linhas) {
+                  const { ticker, tipo_provento, valor_por_acao, mes: mesArq, ano: anoArq } = linha;
+                  if (!tickersCarteira.has(ticker)) {
+                    fora.push(ticker);
+                    continue;
+                  }
+                  // Se o arquivo tem data, sincroniza mês/ano
+                  if (mesArq && anoArq) {
+                    setMes(mesArq - 1);
+                    setAno(anoArq);
+                  }
+                  novosItens[ticker] = {
+                    selecionado: true,
+                    tipo: tipo_provento,
+                    valor: String(valor_por_acao.toFixed(6)),
+                  };
+                }
+
+                setItens(novosItens);
+                setAvisoFora([...new Set(fora)]);
+                const encontrados = linhas.filter(l => tickersCarteira.has(l.ticker));
+                setFeedback(encontrados.length > 0 ? `✓ ${encontrados.length} ativo(s) encontrado(s) no arquivo` : '⚠ Nenhum ativo do arquivo está na carteira');
+              } catch (err) {
+                console.error(err);
+                setFeedback('⚠ Erro ao ler o arquivo. Verifique o formato.');
+              } finally {
+                setParsendo(false);
+              }
+            }}/>
           </label>
         </div>
-        {arquivo&&<p style={{fontSize:12,color:'#16A34A',marginBottom:12}}>✓ {arquivo.name} selecionado</p>}
+        {parsendo && <p style={{fontSize:12,color:'#2563EB',marginBottom:12}}>⏳ Lendo arquivo...</p>}
+        {!parsendo && arquivo && feedbackImport && (
+          <p style={{fontSize:12,color:feedbackImport.startsWith('✓')?'#16A34A':'#D97706',marginBottom:8}}>{feedbackImport} — {arquivo.name}</p>
+        )}
+        {avisoFora.length > 0 && (
+          <div style={{background:'#FFFBEB',border:'1px solid #F6D860',borderRadius:8,padding:'10px 14px',marginBottom:12}}>
+            <p style={{fontSize:12,fontWeight:600,color:'#92400E',marginBottom:4}}>⚠ Ativos ignorados (não estão na sua carteira):</p>
+            <p style={{fontSize:12,color:'#92400E'}}>{avisoFora.join(', ')}</p>
+          </div>
+        )}
 
         {/* Lançamentos existentes no mês */}
         {existentes.length > 0 && (
