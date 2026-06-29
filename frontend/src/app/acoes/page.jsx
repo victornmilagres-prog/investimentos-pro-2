@@ -83,17 +83,16 @@ async function parsearArquivoB3(file) {
     }
   }
 
+  // Usa Valor líquido como total (já desconta IR na fonte do JCP)
+  // valor_por_acao = valor_liquido_total / quantidade_total
   return Array.from(mapa.values()).map(r => ({
     ticker:         r.ticker,
     tipo_provento:  r.tipo_provento,
     mes:            r.mes,
     ano:            r.ano,
-    quantidade:     r.quantidade,                       // soma de todas as corretoras
-    valor_por_acao: r.preco_unitario > 0 ? r.preco_unitario
-                    : (r.quantidade > 0 ? r.valor_liquido / r.quantidade : 0),
-    valor_total:    r.preco_unitario > 0
-                    ? r.quantidade * r.preco_unitario   // qtd × preço unitário
-                    : r.valor_liquido,                  // fallback: valor líquido já somado
+    quantidade:     r.quantidade,
+    valor_por_acao: r.quantidade > 0 ? r.valor_liquido / r.quantidade : 0,
+    valor_total:    r.valor_liquido,
   }));
 }
 
