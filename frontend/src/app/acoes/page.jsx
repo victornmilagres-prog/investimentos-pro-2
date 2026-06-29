@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { RefreshCw, TrendingUp, X } from 'lucide-react';
@@ -8,28 +8,27 @@ import { fmt, calcPerformance } from '@/lib/utils';
 const TIPOS_PROVENTO = ['Dividendo', 'JCP', 'Rendimento', 'Outros'];
 
 // ─── PARSE ARQUIVO B3 ─────────────────────────────────────────────────────
+// Colunas B3: Produto | Pagamento | Tipo de Evento | Instituição | Quantidade | Preço unitário | Valor líquido
 async function parsearArquivoB3(file) {
   const XLSX = await import('xlsx');
-
   const buffer = await file.arrayBuffer();
   const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-
   if (!rows.length) return [];
 
-  // Normaliza nomes de colunas para lower sem acentos
-  const norm = s => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
-
+  // Normaliza nomes de colunas (lower, sem acentos) para busca flexível
+  const norm = s => String(s).toLowerCase().replace(/[àáâãä]/g,'a').replace(/[èéêë]/g,'e').replace(/[ìíîï]/g,'i').replace(/[òóôõö]/g,'o').replace(/[ùúûü]/g,'u').replace(/[ç]/g,'c').trim();
   const colMap = {};
   Object.keys(rows[0]).forEach(k => { colMap[norm(k)] = k; });
 
-  const colProduto  = colMap['produto']  || colMap['ativo'] || colMap['ticker'] || colMap['codigo'];
-  const colTipo     = colMap['tipo de evento'] || colMap['tipo evento'] || colMap['tipo'];
-  const colData     = colMap['data pagamento'] || colMap['data de pagamento'] || colMap['data com'] || colMap['data'];
-  const colPreco    = colMap['preco unitario'] || colMap['valor unitario'] || colMap['valor por cota'] || colMap['preco'] || colMap['valor liquido por acao'];
-  const colValorLiq = colMap['valor liquido'] || colMap['valor bruto'] || colMap['valor'];
-
+  const col = (...nomes) => nomes.map(n => colMap[n]).find(Boolean);
+  const colProduto  = col('produto','ativo','ticker');
+  const colTipo     = col('tipo de evento','tipo evento','tipo');
+  const colData     = col('pagamento','data pagamento','data de pagamento','data com','data');
+  const colQtd      = col('quantidade','qtd');
+  const colPreco    = col('preco unitario','preco','valor unitario','valor por cota');
+  const colValorLiq = col('valor liquido','valor bruto','valor');
   if (!colProduto) return [];
 
   const maparTipo = (t = '') => {
@@ -40,46 +39,59 @@ async function parsearArquivoB3(file) {
     return 'Outros';
   };
 
-  const tickerRe = /^[A-Z]{3,6}\d{1,2}$/;
-  const resultado = [];
+  const parseNum = s => {
+    const n = Number(String(s).replace('R$','').replace(/\./g,'').replace(',','.').trim());
+    return isNaN(n) ? 0 : n;
+  };
 
+  const parsarData = val => {
+    if (!val) return { mes: null, ano: null };
+    if (val instanceof Date) return { mes: val.getMonth()+1, ano: val.getFullYear() };
+    const m = String(val).match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+    // formato DD/MM/YYYY
+    if (m) return { mes: Number(m[2]), ano: Number(m[3]) };
+    return { mes: null, ano: null };
+  };
+
+  const tickerRe = /^[A-Z]{3,6}\d{1,2}$/;
+
+  // Agrupa por ticker + tipo + mes + ano (mesmo ticker pode vir em várias corretoras)
+  const mapa = new Map();
   for (const row of rows) {
-    // Extrai ticker: pega só a parte antes do primeiro espaço ou hífen
     const produtoRaw = String(row[colProduto] || '').trim();
     const ticker = produtoRaw.split(/[\s\-–]/)[0].toUpperCase().replace(/[^A-Z0-9]/g,'');
     if (!tickerRe.test(ticker)) continue;
 
-    const tipo = maparTipo(String(row[colTipo] || ''));
+    const tipo           = maparTipo(String(row[colTipo] || ''));
+    const { mes, ano }   = parsarData(row[colData]);
+    const qtd            = colQtd ? parseNum(row[colQtd]) : 0;
+    const precoUnit      = colPreco ? parseNum(row[colPreco]) : 0;
+    const valorLiq       = colValorLiq ? parseNum(row[colValorLiq]) : 0;
+    if (precoUnit <= 0 && valorLiq <= 0) continue;
 
-    // Extrai mes/ano da data
-    let mes = null, ano = null;
-    const dataVal = row[colData];
-    if (dataVal instanceof Date) {
-      mes = dataVal.getMonth() + 1;
-      ano = dataVal.getFullYear();
-    } else if (dataVal) {
-      const partes = String(dataVal).match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
-      if (partes) { mes = Number(partes[1]); ano = Number(partes[3]); }
-    }
-
-    // Valor por ação: prefere coluna de preço unitário, fallback valor líquido
-    const parseNum = s => {
-      const n = Number(String(s).replace('R$','').replace(/\./g,'').replace(',','.').trim());
-      return isNaN(n) ? 0 : n;
-    };
-    const valor = colPreco ? parseNum(row[colPreco]) : parseNum(row[colValorLiq]);
-    if (valor <= 0) continue;
-
-    // Agrega por ticker + tipo (somando se aparecer mais de uma vez)
-    const existe = resultado.find(r => r.ticker === ticker && r.tipo_provento === tipo);
-    if (existe) {
-      existe.valor_por_acao += valor;
+    const chave = `${ticker}|${tipo}|${mes}|${ano}`;
+    if (mapa.has(chave)) {
+      const ex = mapa.get(chave);
+      ex.quantidade    += qtd;
+      ex.valor_liquido += valorLiq;
+      // preço unitário é o mesmo para todas as corretoras — mantém o primeiro
     } else {
-      resultado.push({ ticker, tipo_provento: tipo, valor_por_acao: valor, mes, ano });
+      mapa.set(chave, { ticker, tipo_provento: tipo, mes, ano, quantidade: qtd, preco_unitario: precoUnit, valor_liquido: valorLiq });
     }
   }
 
-  return resultado;
+  return Array.from(mapa.values()).map(r => ({
+    ticker:         r.ticker,
+    tipo_provento:  r.tipo_provento,
+    mes:            r.mes,
+    ano:            r.ano,
+    quantidade:     r.quantidade,                       // soma de todas as corretoras
+    valor_por_acao: r.preco_unitario > 0 ? r.preco_unitario
+                    : (r.quantidade > 0 ? r.valor_liquido / r.quantidade : 0),
+    valor_total:    r.preco_unitario > 0
+                    ? r.quantidade * r.preco_unitario   // qtd × preço unitário
+                    : r.valor_liquido,                  // fallback: valor líquido já somado
+  }));
 }
 
 function badgeDecisao(d = '') {
@@ -232,17 +244,15 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
   };
 
   const linhasSelecionadas = linhas.filter(l => l.selecionado && l.valor);
-  const total = linhasSelecionadas.reduce((acc, l) => {
-    const qtd = acoes.find(a => a.ticker === l.ticker)?.quantidade || 0;
-    return acc + (Number(l.valor) * qtd);
-  }, 0);
+  const resolverQtd = (l) => l.quantidade != null ? l.quantidade : (acoes.find(a => a.ticker === l.ticker)?.quantidade || 0);
+  const total = linhasSelecionadas.reduce((acc, l) => acc + (Number(l.valor) * resolverQtd(l)), 0);
 
   const confirmar = async () => {
     const lancamentos = linhasSelecionadas.map(l => ({
       ticker: l.ticker,
       tipo_provento: l.tipo,
       valor_por_acao: Number(l.valor),
-      quantidade: acoes.find(a => a.ticker === l.ticker)?.quantidade || 0,
+      quantidade: resolverQtd(l),
       mes: l.mes, ano: l.ano,
     }));
     if (!lancamentos.length) return;
@@ -298,12 +308,13 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
                 const novasLinhas = [];
                 let idSeq = Date.now();
                 for (const linha of resultado) {
-                  const { ticker, tipo_provento, valor_por_acao, mes: mesArq, ano: anoArq } = linha;
+                  const { ticker, tipo_provento, valor_por_acao, quantidade: qtdArq, mes: mesArq, ano: anoArq } = linha;
                   if (!tickersCarteira.has(ticker)) { fora.push(ticker); continue; }
                   novasLinhas.push({
                     id: idSeq++,
                     ticker, tipo: tipo_provento,
                     valor: String(valor_por_acao.toFixed(6)),
+                    quantidade: qtdArq || null,  // null = usar qtd do portfolio
                     mes: mesArq || mesFiltro+1,
                     ano: anoArq || anoFiltro,
                     selecionado: true,
@@ -395,7 +406,11 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
                   <div>
                     <span style={{fontWeight:700,fontSize:13}}>{ticker}</span>
-                    <span style={{fontSize:11,color:'#8896A8',marginLeft:8}}>{acao?.quantidade||0} ações</span>
+                    <span style={{fontSize:11,color:'#8896A8',marginLeft:8}}>
+                      {linhasTicker.some(l=>l.quantidade!=null)
+                        ? `${linhasTicker.reduce((s,l)=>s+(l.quantidade||0),0)} ações (planilha)`
+                        : `${acao?.quantidade||0} ações`}
+                    </span>
                   </div>
                   <button onClick={()=>adicionarLinha(ticker)}
                     style={{fontSize:11,color:'#B7791F',background:'#FEF3C7',border:'1px solid #F6E05E',borderRadius:5,padding:'2px 8px',cursor:'pointer'}}>
@@ -405,13 +420,17 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
                 {/* Linhas do ticker */}
                 <div style={{display:'flex',flexDirection:'column',gap:6}}>
                   {linhasTicker.map(l => (
-                    <div key={l.id} style={{display:'grid',gridTemplateColumns:'18px 1fr 1fr 1fr auto',gap:8,alignItems:'center'}}>
+                    <div key={l.id} style={{display:'grid',gridTemplateColumns:'18px 1fr 80px 80px 70px auto',gap:6,alignItems:'center'}}>
                       <input type="checkbox" checked={l.selecionado} onChange={()=>setLinha(l.id,'selecionado',!l.selecionado)}
                         style={{accentColor:'#D4A017',width:15,height:15}}/>
                       <select value={l.tipo} onChange={e=>setLinha(l.id,'tipo',e.target.value)}
                         style={{padding:'5px 6px',border:'1px solid #F6E05E',borderRadius:6,fontSize:12,background:'#fff',outline:'none'}}>
                         {TIPOS_PROVENTO.map(t=><option key={t} value={t}>{t}</option>)}
                       </select>
+                      {/* Quantidade da linha (editável) */}
+                      <input type="number" min="0" step="1" placeholder="Qtd"
+                        value={l.quantidade ?? ''} onChange={e=>setLinha(l.id,'quantidade', e.target.value === '' ? null : Number(e.target.value))}
+                        style={{padding:'5px 6px',border:'1px solid #F6E05E',borderRadius:6,background:'#fff',fontSize:12,textAlign:'right',outline:'none'}}/>
                       <input type="number" min="0" step="0.0001" placeholder="R$/ação"
                         value={l.valor} onChange={e=>setLinha(l.id,'valor',e.target.value)}
                         style={{padding:'5px 6px',border:'1px solid #F6E05E',borderRadius:6,background:'#fff',fontSize:12,textAlign:'right',outline:'none'}}/>
