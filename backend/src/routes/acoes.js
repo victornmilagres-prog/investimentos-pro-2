@@ -306,11 +306,11 @@ router.delete('/dividendos/:ticker/:mes/:ano', async (req, res) => {
 async function recalcularProventos(usuarioId, ticker, anoAtual) {
   const totais = await pool.query(`
     SELECT
-      COALESCE(SUM(valor_total), 0) AS total,
-      COUNT(*) AS lancamentos,
+      COALESCE(SUM(soma), 0) AS total,
+      SUM(lancamentos) AS lancamentos,
       json_object_agg(tipo_provento, COALESCE(soma, 0)) AS breakdown
     FROM (
-      SELECT tipo_provento, SUM(valor_total) AS soma
+      SELECT tipo_provento, SUM(valor_total) AS soma, COUNT(*) AS lancamentos
       FROM dividendos_acoes
       WHERE usuario_id=$1 AND ticker=$2 AND ano=$3
       GROUP BY tipo_provento
