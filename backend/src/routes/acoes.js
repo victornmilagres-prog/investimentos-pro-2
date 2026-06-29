@@ -170,10 +170,13 @@ router.post('/proventos', async (req, res) => {
     const anoAtual = new Date().getFullYear();
 
     for (const lanc of lancamentos) {
-      const { ticker, tipo_provento = 'Dividendo', valor_por_acao, quantidade, mes, ano } = lanc;
+      const { ticker, tipo_provento = 'Dividendo', valor_por_acao, quantidade, valor_total_override, mes, ano } = lanc;
       if (!ticker || !valor_por_acao || !mes || !ano) continue;
 
-      const valorTotal = Number(valor_por_acao) * Number(quantidade || 0);
+      // Usa o total exato do arquivo (Valor líquido) quando disponível, senão recalcula
+      const valorTotal = valor_total_override != null
+        ? Number(valor_total_override)
+        : Number(valor_por_acao) * Number(quantidade || 0);
 
       // Upsert por ticker + mes + ano + tipo_provento
       await pool.query(`

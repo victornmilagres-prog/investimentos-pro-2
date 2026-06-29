@@ -247,7 +247,8 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
 
   const linhasSelecionadas = linhas.filter(l => l.selecionado && l.valor);
   const resolverQtd = (l) => l.quantidade != null ? l.quantidade : (acoes.find(a => a.ticker === l.ticker)?.quantidade || 0);
-  const total = linhasSelecionadas.reduce((acc, l) => acc + (Number(l.valor) * resolverQtd(l)), 0);
+  const resolverTotal = (l) => l.valor_total != null ? l.valor_total : (Number(l.valor) * resolverQtd(l));
+  const total = linhasSelecionadas.reduce((acc, l) => acc + resolverTotal(l), 0);
 
   const confirmar = async () => {
     const lancamentos = linhasSelecionadas.map(l => ({
@@ -255,6 +256,7 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
       tipo_provento: l.tipo,
       valor_por_acao: Number(l.valor),
       quantidade: resolverQtd(l),
+      valor_total_override: l.valor_total ?? null,  // total exato do arquivo, sem recomputing
       mes: l.mes, ano: l.ano,
     }));
     if (!lancamentos.length) return;
@@ -316,7 +318,8 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
                     id: idSeq++,
                     ticker, tipo: tipo_provento,
                     valor: String(valor_por_acao.toFixed(6)),
-                    quantidade: qtdArq || null,  // null = usar qtd do portfolio
+                    valor_total: linha.valor_total,   // total exato da planilha (sem recomputing)
+                    quantidade: qtdArq || null,
                     mes: mesArq || mesFiltro+1,
                     ano: anoArq || anoFiltro,
                     selecionado: true,
