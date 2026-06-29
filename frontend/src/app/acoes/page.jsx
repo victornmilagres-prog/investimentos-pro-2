@@ -86,16 +86,16 @@ async function parsearArquivoB3(file) {
     }
   }
 
-  // Usa Valor líquido como total (já desconta IR na fonte do JCP)
-  // valor_por_acao = valor_liquido_total / quantidade_total
+  // Exibe o Preço unitário da planilha (bruto, para o usuário ver o valor declarado)
+  // Total usa Valor líquido (já com IR descontado — o que realmente foi recebido)
   return Array.from(mapa.values()).map(r => ({
     ticker:         r.ticker,
     tipo_provento:  r.tipo_provento,
     mes:            r.mes,
     ano:            r.ano,
     quantidade:     r.quantidade,
-    valor_por_acao: r.quantidade > 0 ? r.valor_liquido / r.quantidade : 0,
-    valor_total:    r.valor_liquido,
+    valor_por_acao: r.preco_unitario,   // Preço unitário exato da planilha
+    valor_total:    r.valor_liquido,    // Valor líquido como total (o que recebeu)
   }));
 }
 
