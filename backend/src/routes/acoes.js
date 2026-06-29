@@ -207,6 +207,45 @@ router.post('/dividendos', async (req, res) => {
   }
 });
 
+// GET /api/acoes/dividendos?mes=X&ano=Y
+router.get('/dividendos', async (req, res) => {
+  const { mes, ano } = req.query;
+  if (!mes || !ano) return res.status(400).json({ error: 'mes e ano obrigatórios.' });
+  try {
+    const r = await pool.query(
+      'SELECT ticker, valor_por_acao, valor_total, mes, ano FROM dividendos_acoes WHERE usuario_id=$1 AND mes=$2 AND ano=$3 ORDER BY ticker',
+      [req.userId, Number(mes), Number(ano)]
+    );
+    res.json(r.rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar dividendos.' });
+  }
+});
+
+// DELETE /api/acoes/dividendos/:ticker/:mes/:ano
+router.delete('/dividendos/:ticker/:mes/:ano', async (req, res) => {
+  const { ticker, mes, ano } = req.params;
+  const anoAtual = new Date().getFullYear();
+  try {
+    await pool.query(
+      'DELETE FROM dividendos_acoes WHERE usuario_id=$1 AND ticker=$2 AND mes=$3 AND ano=$4',
+      [req.userId, ticker.toUpperCase(), Number(mes), Number(ano)]
+    );
+    const totais = await pool.query(
+      'SELECT COALESCE(SUM(valor_total),0) AS total, COUNT(*) AS lancamentos FROM dividendos_acoes WHERE usuario_id=$1 AND ticker=$2 AND ano=$3',
+      [req.userId, ticker.toUpperCase(), anoAtual]
+    );
+    const { total, lancamentos } = totais.rows[0];
+    await pool.query(
+      'UPDATE acoes_carteira SET dividendos_ano=$1, dividendos_lancamentos=$2, updated_at=NOW() WHERE usuario_id=$3 AND ticker=$4',
+      [Number(total), Number(lancamentos), req.userId, ticker.toUpperCase()]
+    );
+    res.json({ message: 'Lançamento removido.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao remover lançamento.' });
+  }
+});
+
 async function recalcularPesos(usuarioId) {
   const acoes = await pool.query(
     'SELECT id, classificacao FROM acoes_carteira WHERE usuario_id=$1',

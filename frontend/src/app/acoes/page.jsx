@@ -135,7 +135,7 @@ function ModalCompraVenda({ acoes, tipo, onFechar, onSalvar }) {
 }
 
 // ─── MODAL DIVIDENDOS ──────────────────────────────────────────────────────
-function ModalDividendos({ acoes, onFechar, onSalvar }) {
+function ModalDividendos({ acoes, onFechar, onSalvar, onExcluirDividendo }) {
   const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   const hoje  = new Date();
   const [mes, setMes]           = useState(hoje.getMonth());
@@ -144,6 +144,18 @@ function ModalDividendos({ acoes, onFechar, onSalvar }) {
   const [selecionados, setSel]  = useState({});
   const [salvando, setSalvando] = useState(false);
   const [arquivo, setArquivo]   = useState(null);
+  const [lancamentos, setLancamentos] = useState([]);
+  const [editando, setEditando] = useState(null); // ticker em edição
+  const [valorEdit, setValorEdit] = useState('');
+
+  const carregarLancamentos = async () => {
+    try {
+      const r = await import('@/lib/api').then(m => m.default.get(`/acoes/dividendos?mes=${mes+1}&ano=${ano}`));
+      setLancamentos(r.data);
+    } catch { setLancamentos([]); }
+  };
+
+  useEffect(() => { carregarLancamentos(); }, [mes, ano]);
 
   const toggle = (ticker) => setSel(s => ({ ...s, [ticker]: !s[ticker] }));
 
@@ -156,21 +168,33 @@ function ModalDividendos({ acoes, onFechar, onSalvar }) {
   const qtdSel = Object.values(selecionados).filter(Boolean).length;
 
   const confirmar = async () => {
-    const lancamentos = acoes
+    const lista = acoes
       .filter(a => selecionados[a.ticker] && valores[a.ticker])
       .map(a => ({ ticker: a.ticker, valor_por_acao: Number(valores[a.ticker]), quantidade: a.quantidade || 0, mes: mes+1, ano }));
-    if (!lancamentos.length) return;
+    if (!lista.length) return;
     setSalvando(true);
-    try { await onSalvar(lancamentos); onFechar(); }
+    try { await onSalvar(lista); setSel({}); setValores({}); await carregarLancamentos(); }
     finally { setSalvando(false); }
   };
 
+  const excluir = async (ticker) => {
+    await onExcluirDividendo(ticker, mes+1, ano);
+    await carregarLancamentos();
+  };
+
+  const salvarEdicao = async (ticker) => {
+    const acao = acoes.find(a => a.ticker === ticker);
+    await onSalvar([{ ticker, valor_por_acao: Number(valorEdit), quantidade: acao?.quantidade || 0, mes: mes+1, ano }]);
+    setEditando(null);
+    await carregarLancamentos();
+  };
+
   const st = {
-    overlay: { position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200 },
-    modal:   { background:'#fff',borderRadius:14,padding:28,width:480,boxShadow:'0 20px 60px rgba(0,0,0,0.2)',maxHeight:'90vh',overflowY:'auto' },
-    label:   { fontSize:12,color:'#8896A8',fontWeight:500,display:'block',marginBottom:5 },
-    input:   { width:'100%',padding:'9px 12px',border:'1px solid #E8ECF0',borderRadius:7,fontSize:13,outline:'none',color:'#1A1A2E' },
-    footer:  { display:'flex',gap:10,justifyContent:'flex-end' },
+    overlay:   { position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200 },
+    modal:     { background:'#fff',borderRadius:14,padding:28,width:500,boxShadow:'0 20px 60px rgba(0,0,0,0.2)',maxHeight:'90vh',overflowY:'auto' },
+    label:     { fontSize:12,color:'#8896A8',fontWeight:500,display:'block',marginBottom:5 },
+    input:     { width:'100%',padding:'9px 12px',border:'1px solid #E8ECF0',borderRadius:7,fontSize:13,outline:'none',color:'#1A1A2E' },
+    footer:    { display:'flex',gap:10,justifyContent:'flex-end' },
     btnCancel: { padding:'9px 20px',borderRadius:7,fontSize:13,fontWeight:600,border:'none',cursor:'pointer',background:'#EDF2F7',color:'#8896A8' },
   };
 
@@ -198,6 +222,50 @@ function ModalDividendos({ acoes, onFechar, onSalvar }) {
           </div>
         </div>
 
+        {/* Lançamentos anteriores */}
+        {lancamentos.length > 0 && (
+          <div style={{marginBottom:16}}>
+            <p style={{fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:8}}>Lançamentos em {meses[mes]} {ano}</p>
+            <div style={{display:'flex',flexDirection:'column',gap:6}}>
+              {lancamentos.map(l => (
+                <div key={l.ticker} style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#F0FDF4',border:'1px solid #BBF7D0',borderRadius:8,padding:'8px 12px'}}>
+                  <div>
+                    <p style={{fontWeight:700,fontSize:13,color:'#166534'}}>{l.ticker}</p>
+                    <p style={{fontSize:11,color:'#16A34A'}}>
+                      {editando===l.ticker ? '' : `R$ ${Number(l.valor_por_acao).toFixed(4)}/ação · Total: ${fmt.brl(Number(l.valor_total))}`}
+                    </p>
+                  </div>
+                  {editando===l.ticker ? (
+                    <div style={{display:'flex',alignItems:'center',gap:6}}>
+                      <input type="number" min="0" step="0.01" value={valorEdit}
+                        onChange={e=>setValorEdit(e.target.value)}
+                        style={{width:100,padding:'5px 8px',borderRadius:6,border:'1px solid #BBF7D0',fontSize:12,outline:'none',color:'#1A1A2E'}}
+                        autoFocus
+                      />
+                      <button onClick={()=>salvarEdicao(l.ticker)}
+                        style={{padding:'4px 10px',borderRadius:5,fontSize:11,fontWeight:700,border:'none',cursor:'pointer',background:'#16A34A',color:'#fff'}}>✓</button>
+                      <button onClick={()=>setEditando(null)}
+                        style={{padding:'4px 8px',borderRadius:5,fontSize:11,fontWeight:700,border:'none',cursor:'pointer',background:'#EDF2F7',color:'#8896A8'}}>✕</button>
+                    </div>
+                  ) : (
+                    <div style={{display:'flex',gap:6}}>
+                      <button onClick={()=>{setEditando(l.ticker);setValorEdit(Number(l.valor_por_acao).toFixed(4));}}
+                        style={{padding:'4px 10px',borderRadius:5,fontSize:11,fontWeight:600,border:'none',cursor:'pointer',background:'#DBEAFE',color:'#1D4ED8'}}>✏️ Editar</button>
+                      <button onClick={()=>excluir(l.ticker)}
+                        style={{padding:'4px 10px',borderRadius:5,fontSize:11,fontWeight:600,border:'none',cursor:'pointer',background:'#FEE2E2',color:'#DC2626'}}>🗑️</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:8,margin:'14px 0 4px'}}>
+              <div style={{flex:1,height:1,background:'#E8ECF0'}}/>
+              <span style={{fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em'}}>adicionar novo</span>
+              <div style={{flex:1,height:1,background:'#E8ECF0'}}/>
+            </div>
+          </div>
+        )}
+
         {/* Importar B3 */}
         <div style={{background:'#EFF6FF',border:'1px dashed #93C5FD',borderRadius:8,padding:'14px 16px',marginBottom:16,display:'flex',alignItems:'center',gap:12}}>
           <span style={{fontSize:22}}>📂</span>
@@ -212,12 +280,13 @@ function ModalDividendos({ acoes, onFechar, onSalvar }) {
         </div>
         {arquivo && <p style={{fontSize:12,color:'#16A34A',marginBottom:12}}>✓ {arquivo.name} selecionado</p>}
 
-        {/* Separador */}
-        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
-          <div style={{flex:1,height:1,background:'#E8ECF0'}}/>
-          <span style={{fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em'}}>ou informe manualmente</span>
-          <div style={{flex:1,height:1,background:'#E8ECF0'}}/>
-        </div>
+        {lancamentos.length === 0 && (
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+            <div style={{flex:1,height:1,background:'#E8ECF0'}}/>
+            <span style={{fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em'}}>ou informe manualmente</span>
+            <div style={{flex:1,height:1,background:'#E8ECF0'}}/>
+          </div>
+        )}
 
         {/* Lista */}
         <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:16}}>
@@ -272,10 +341,10 @@ function AcaoCard({ a, onRemover, onSalvar, onAbrirDividendo }) {
   const scoreNum = typeof a.score === 'string' ? parseInt(a.score) : (a.score ?? 0);
   const fillPct  = (scoreNum / maxScore) * 100;
 
-  const totalDiv = a.dividendos_ano || 0;
+  const totalDiv = Number(a.dividendos_ano) || 0;
   const yieldPM  = (a.preco_compra && totalDiv && a.quantidade)
     ? (totalDiv / (a.preco_compra * a.quantidade)) * 100 : 0;
-  const numLanc  = a.dividendos_lancamentos || 0;
+  const numLanc  = Number(a.dividendos_lancamentos) || 0;
 
   const salvar = async () => { await onSalvar(a.ticker, qtd, preco); setEditando(false); };
 
@@ -499,7 +568,7 @@ function Dashboard({ acoes }) {
   const custo       = acoes.reduce((s,a)=>{ const p=calcPerformance(a.preco_atual,a.preco_compra,a.quantidade); return s+p.custo; },0);
   const resultado   = patrimonio - custo;
   const pctTotal    = custo > 0 ? (resultado/custo)*100 : 0;
-  const dividendosAno = acoes.reduce((s,a)=>s+(a.dividendos_ano||0),0);
+  const dividendosAno = acoes.reduce((s,a)=>s+Number(a.dividendos_ano||0),0);
   const scores      = acoes.map(a=>typeof a.score==='string'?parseInt(a.score):(a.score||0));
   const scoreMedio  = scores.length?(scores.reduce((s,v)=>s+v,0)/scores.length).toFixed(1):0;
 
@@ -622,6 +691,11 @@ export default function AcoesPage() {
     await carregar();
   };
 
+  const excluirDividendo = async (ticker, mes, ano) => {
+    await api.delete(`/acoes/dividendos/${ticker}/${mes}/${ano}`);
+    await carregar();
+  };
+
   if (loading) return (
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:256}}>
       <div style={{width:32,height:32,border:'2px solid #C9A84C',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>
@@ -711,7 +785,7 @@ export default function AcoesPage() {
       )}
       {modalDiv && (
         <ModalDividendos acoes={acoes}
-          onFechar={()=>setModalDiv(false)} onSalvar={salvarDividendos}/>
+          onFechar={()=>setModalDiv(false)} onSalvar={salvarDividendos} onExcluirDividendo={excluirDividendo}/>
       )}
     </div>
   );
