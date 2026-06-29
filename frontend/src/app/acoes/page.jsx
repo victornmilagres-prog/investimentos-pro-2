@@ -56,7 +56,7 @@ async function parsearArquivoB3(file) {
     return { mes: null, ano: null };
   };
 
-  const tickerRe = /^[A-Z]{3,6}\d{1,2}$/;
+  const tickerRe = /^[A-Z][A-Z0-9]{2,5}\d{1,2}$/; // aceita B3SA3, PETR4, BBAS3 etc
 
   // Agrupa por ticker + tipo + mes + ano (mesmo ticker pode vir em várias corretoras)
   const mapa = new Map();
