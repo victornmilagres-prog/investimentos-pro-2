@@ -178,12 +178,12 @@ router.post('/proventos', async (req, res) => {
         ? Number(valor_total_override)
         : Number(valor_por_acao) * Number(quantidade || 0);
 
-      // Upsert por ticker + mes + ano + tipo_provento
+      // Upsert por ticker + mes + ano + tipo_provento + valor_por_acao
+      // (inclui preço para permitir dois eventos do mesmo tipo no mesmo mês com preços diferentes)
       await pool.query(`
         INSERT INTO dividendos_acoes (usuario_id, ticker, tipo_provento, valor_por_acao, valor_total, mes, ano, created_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-        ON CONFLICT (usuario_id, ticker, mes, ano, tipo_provento) DO UPDATE SET
-          valor_por_acao = EXCLUDED.valor_por_acao,
+        ON CONFLICT (usuario_id, ticker, mes, ano, tipo_provento, valor_por_acao) DO UPDATE SET
           valor_total = EXCLUDED.valor_total,
           created_at = NOW()
       `, [req.userId, ticker.toUpperCase(), tipo_provento, Number(valor_por_acao), valorTotal, mes, ano]);
