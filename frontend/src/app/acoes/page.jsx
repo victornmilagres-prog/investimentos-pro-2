@@ -7,6 +7,173 @@ import { fmt, calcPerformance } from '@/lib/utils';
 
 const TIPOS_PROVENTO = ['Dividendo', 'JCP', 'Rendimento', 'Outros'];
 
+// ─── HOOK: anos disponíveis + resumo por ano + resumo geral ──────────────
+function useProventosExtras(acoes) {
+  const [anosDisponiveis, setAnosDisponiveis] = useState([]);
+  const [anoFiltro, setAnoFiltro] = useState(new Date().getFullYear());
+  const [resumoAno, setResumoAno] = useState({});
+  const [resumoGeral, setResumoGeral] = useState({});
+
+  const carregarDados = async () => {
+    try {
+      const [rAnos, rAno, rGeral] = await Promise.all([
+        api.get('/acoes/proventos/anos'),
+        api.get(`/acoes/proventos/resumo?ano=${anoFiltro}`),
+        api.get('/acoes/proventos/resumo?ano=0'),
+      ]);
+      setAnosDisponiveis(rAnos.data.anos || []);
+      setResumoAno(rAno.data || {});
+      setResumoGeral(rGeral.data || {});
+    } catch {}
+  };
+
+  useEffect(() => { if (acoes.length) carregarDados(); }, [acoes.length, anoFiltro]);
+
+  return { anosDisponiveis, anoFiltro, setAnoFiltro, resumoAno, resumoGeral, carregarDados };
+}
+
+// ─── FAIXA PROVENTOS (com filtro de anos dinâmico) ───────────────────────
+const FaixaProventos = ({ acoes, anoFiltro, setAnoFiltro, anosDisponiveis, resumoAno }) => {
+  const proventosAno = Object.values(resumoAno).reduce((s, v) => s + (v.total || 0), 0);
+  const custoTotal   = acoes.reduce((s, a) => s + ((a.preco_compra||0)*(a.quantidade||0)), 0);
+  const yieldAno     = custoTotal > 0 ? (proventosAno / custoTotal) * 100 : 0;
+  const lancAno      = Object.values(resumoAno).reduce((s, v) => s + (v.lancamentos || 0), 0);
+  const maiorTicker  = Object.entries(resumoAno).sort((a,b)=>(b[1].total||0)-(a[1].total||0))[0];
+
+  return (
+    <div style={{ marginBottom: 4 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10, flexWrap:'wrap' }}>
+        <span style={{ fontSize:11, fontWeight:500, color:'#8896A8', textTransform:'uppercase', letterSpacing:'0.05em' }}>Proventos</span>
+        {anosDisponiveis.map(ano => (
+          <button key={ano} onClick={() => setAnoFiltro(ano)}
+            style={{ fontSize:12, padding:'3px 12px', borderRadius:20, border:'none', cursor:'pointer',
+              background: anoFiltro === ano ? '#EBF8FF' : '#F0F2F5',
+              color: anoFiltro === ano ? '#2B6CB0' : '#718096',
+              fontWeight: anoFiltro === ano ? 600 : 400 }}>
+            {ano}
+          </button>
+        ))}
+        <button onClick={() => setAnoFiltro(0)}
+          style={{ fontSize:12, padding:'3px 12px', borderRadius:20, border:'none', cursor:'pointer',
+            background: anoFiltro === 0 ? '#EBF8FF' : '#F0F2F5',
+            color: anoFiltro === 0 ? '#2B6CB0' : '#718096',
+            fontWeight: anoFiltro === 0 ? 600 : 400 }}>
+          Geral
+        </button>
+      </div>
+      <div style={{ background:'linear-gradient(135deg,#FFFDF0,#FEFCE8)', border:'1px solid #F6E05E', borderRadius:10, padding:16, display:'flex' }}>
+        {[
+          { label: anoFiltro === 0 ? 'Proventos geral' : `Proventos ${anoFiltro}`,
+            val: fmt.brl(proventosAno), sub: 'Todos os ativos' },
+          { label: 'Yield s/ PM',
+            val: custoTotal > 0 ? fmt.pct(yieldAno) : '—',
+            sub: 'Sobre preço médio pago' },
+          { label: 'Maior pagador',
+            val: maiorTicker ? maiorTicker[0] : '—',
+            sub: maiorTicker ? `${fmt.brl(maiorTicker[1].total)} ${anoFiltro === 0 ? 'no geral' : `em ${anoFiltro}`}` : '' },
+          { label: 'Lançamentos',
+            val: lancAno, sub: anoFiltro === 0 ? 'Total histórico' : `Em ${anoFiltro}` },
+        ].map((item, i, arr) => (
+          <div key={i} style={{ flex:1, padding:'0 16px', borderRight: i < arr.length-1 ? '1px solid #F6E05E' : 'none', paddingLeft: i === 0 ? 0 : 16 }}>
+            <p style={{ fontSize:11, color:'#B7791F', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:5 }}>{item.label}</p>
+            <p style={{ fontSize:17, fontWeight:800, color:'#744210' }}>{item.val}</p>
+            {item.sub && <p style={{ fontSize:11, color:'#B7791F', marginTop:2 }}>{item.sub}</p>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ─── BLOCO PROVENTOS DO CARD ──────────────────────────────────────────────
+const BlocoProventosCard = ({ a, perf, resumoAno, resumoGeral }) => {
+  const dadosAno     = resumoAno?.[a.ticker] || {};
+  const totalAno     = dadosAno.total || 0;
+  const lancAno      = dadosAno.lancamentos || 0;
+  const breakdownAno = dadosAno.breakdown || {};
+  const yieldPMAno   = perf.custo > 0 && totalAno > 0 ? (totalAno / perf.custo) * 100 : 0;
+  const ganhoAno     = perf.custo > 0 ? perf.ganho + totalAno : 0;
+  const pctAno       = perf.custo > 0 ? (ganhoAno / perf.custo) * 100 : 0;
+
+  const dadosGeral   = resumoGeral?.[a.ticker] || {};
+  const totalGeral   = dadosGeral.total || 0;
+  const lancGeral    = dadosGeral.lancamentos || 0;
+  const yieldPMGeral = perf.custo > 0 && totalGeral > 0 ? (totalGeral / perf.custo) * 100 : 0;
+  const ganhoGeral   = perf.custo > 0 ? perf.ganho + totalGeral : 0;
+  const pctGeral     = perf.custo > 0 ? (ganhoGeral / perf.custo) * 100 : 0;
+
+  return (
+    <>
+      <div style={{ background:'#FFFDF0', border:'1px solid #F6E05E', borderRadius:10, padding:'10px 14px' }}>
+        <p style={{ fontSize:11, fontWeight:700, color:'#B7791F', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:8 }}>
+          Proventos recebidos no ano
+        </p>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8, marginBottom: Object.keys(breakdownAno).length > 0 ? 8 : 0 }}>
+          <div><p style={{ fontSize:10, color:'#B7791F', marginBottom:2 }}>Total recebido</p><p style={{ fontSize:13, fontWeight:700, color:'#744210' }}>{fmt.brl(totalAno)}</p></div>
+          <div><p style={{ fontSize:10, color:'#B7791F', marginBottom:2 }}>Yield s/ PM</p><p style={{ fontSize:13, fontWeight:700, color:'#744210' }}>{yieldPMAno > 0 ? fmt.pct(yieldPMAno) : '—'}</p></div>
+          <div><p style={{ fontSize:10, color:'#B7791F', marginBottom:2 }}>Lançamentos</p><p style={{ fontSize:13, fontWeight:700, color:'#744210' }}>{lancAno}</p></div>
+        </div>
+        {Object.keys(breakdownAno).length > 0 && (
+          <div style={{ borderTop:'1px solid #F6E05E', paddingTop:8, display:'flex', gap:6, flexWrap:'wrap' }}>
+            {Object.entries(breakdownAno).map(([tipo, valor]) => (
+              <span key={tipo} style={{ fontSize:11, background:'#FEF3C7', color:'#92400E', padding:'2px 8px', borderRadius:20 }}>
+                {tipo} {fmt.brl(Number(valor))}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {perf.custo > 0 && totalAno > 0 && (
+        <div style={{ background:'#EFF6FF', border:'1px solid #BFDBFE', borderRadius:10, padding:'10px 14px' }}>
+          <p style={{ fontSize:11, fontWeight:600, color:'#3B82F6', marginBottom:6 }}>Retorno após proventos do ano</p>
+          <div style={{ display:'flex', alignItems:'baseline', gap:8 }}>
+            <span style={{ fontSize:15, fontWeight:700, color: ganhoAno >= 0 ? '#16A34A' : '#DC2626' }}>
+              {ganhoAno >= 0 ? '+' : ''}{fmt.brl(ganhoAno)}
+            </span>
+            <span style={{ fontSize:12, fontWeight:600, color: pctAno >= 0 ? '#16A34A' : '#DC2626' }}>
+              ({pctAno >= 0 ? '+' : ''}{fmt.pct(pctAno)})
+            </span>
+          </div>
+          <p style={{ fontSize:11, color:'#93C5FD', marginTop:3 }}>
+            compra {perf.ganho >= 0 ? '+' : ''}{fmt.brl(perf.ganho)} + proventos ano {fmt.brl(totalAno)}
+          </p>
+        </div>
+      )}
+
+      {totalGeral > 0 && (
+        <div style={{ background:'#F0FDF4', border:'1px solid #BBF7D0', borderRadius:10, padding:'10px 14px' }}>
+          <p style={{ fontSize:11, fontWeight:700, color:'#276749', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:8 }}>
+            Proventos recebidos geral
+          </p>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:8 }}>
+            <div><p style={{ fontSize:10, color:'#276749', marginBottom:2 }}>Total histórico</p><p style={{ fontSize:13, fontWeight:700, color:'#14532D' }}>{fmt.brl(totalGeral)}</p></div>
+            <div><p style={{ fontSize:10, color:'#276749', marginBottom:2 }}>Yield s/ PM</p><p style={{ fontSize:13, fontWeight:700, color:'#14532D' }}>{yieldPMGeral > 0 ? fmt.pct(yieldPMGeral) : '—'}</p></div>
+            <div><p style={{ fontSize:10, color:'#276749', marginBottom:2 }}>Lançamentos</p><p style={{ fontSize:13, fontWeight:700, color:'#14532D' }}>{lancGeral}</p></div>
+          </div>
+        </div>
+      )}
+
+      {perf.custo > 0 && totalGeral > 0 && (
+        <div style={{ background:'#F0FDF4', border:'1px solid #BBF7D0', borderRadius:10, padding:'10px 14px' }}>
+          <p style={{ fontSize:11, fontWeight:600, color:'#276749', marginBottom:6 }}>Retorno após proventos gerais</p>
+          <div style={{ display:'flex', alignItems:'baseline', gap:8 }}>
+            <span style={{ fontSize:15, fontWeight:700, color: ganhoGeral >= 0 ? '#16A34A' : '#DC2626' }}>
+              {ganhoGeral >= 0 ? '+' : ''}{fmt.brl(ganhoGeral)}
+            </span>
+            <span style={{ fontSize:12, fontWeight:600, color: pctGeral >= 0 ? '#16A34A' : '#DC2626' }}>
+              ({pctGeral >= 0 ? '+' : ''}{fmt.pct(pctGeral)})
+            </span>
+          </div>
+          <p style={{ fontSize:11, color:'#276749', marginTop:3, opacity:0.8 }}>
+            compra {perf.ganho >= 0 ? '+' : ''}{fmt.brl(perf.ganho)} + proventos geral {fmt.brl(totalGeral)}
+          </p>
+        </div>
+      )}
+    </>
+  );
+};
+
 // ─── PARSE ARQUIVO B3 ─────────────────────────────────────────────────────
 // Colunas B3: Produto | Pagamento | Tipo de Evento | Instituição | Quantidade | Preço unitário | Valor líquido
 async function parsearArquivoB3(file) {
@@ -477,7 +644,7 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
 }
 
 // ─── CARD ─────────────────────────────────────────────────────────────────
-function AcaoCard({ a, onRemover, onSalvar, onAbrirProvento }) {
+function AcaoCard({ a, onRemover, onSalvar, onAbrirProvento, resumoAno, resumoGeral }) {
   const [editando, setEditando] = useState(false);
   const [qtd, setQtd]     = useState(String(a.quantidade ?? ''));
   const [preco, setPreco] = useState(String(a.preco_compra ?? ''));
@@ -486,14 +653,6 @@ function AcaoCard({ a, onRemover, onSalvar, onAbrirProvento }) {
   const maxScore = a.max_score || 6;
   const scoreNum = typeof a.score === 'string' ? parseInt(a.score) : (a.score ?? 0);
   const fillPct  = (scoreNum / maxScore) * 100;
-
-  const totalProv  = Number(a.dividendos_ano) || 0;
-  const numLanc    = Number(a.dividendos_lancamentos) || 0;
-  const breakdown  = a.proventos_breakdown || {};
-  const yieldPM    = (perf.custo > 0 && totalProv > 0) ? (totalProv / perf.custo) * 100 : 0;
-  const ganhoTotal = perf.custo > 0 ? perf.ganho + totalProv : 0;
-  const pctAposP   = perf.custo > 0 ? (ganhoTotal / perf.custo) * 100 : 0;
-  const temRetorno = perf.custo > 0 && totalProv > 0;
 
   const salvar = async () => { await onSalvar(a.ticker, qtd, preco); setEditando(false); };
 
@@ -597,45 +756,7 @@ function AcaoCard({ a, onRemover, onSalvar, onAbrirProvento }) {
         )}
       </div>
 
-      {/* ── Proventos recebidos no ano ── */}
-      <div style={{background:'#FFFDF0',border:'1px solid #F6E05E',borderRadius:10,padding:'10px 14px'}}>
-        <p style={{fontSize:11,fontWeight:700,color:'#B7791F',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:8}}>
-          Proventos recebidos no ano
-        </p>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom: Object.keys(breakdown).length > 0 ? 8 : 0}}>
-          <div><p style={{fontSize:10,color:'#B7791F',marginBottom:2}}>Total recebido</p><p style={{fontSize:13,fontWeight:700,color:'#744210'}}>{fmt.brl(totalProv)}</p></div>
-          <div><p style={{fontSize:10,color:'#B7791F',marginBottom:2}}>Yield s/ PM</p><p style={{fontSize:13,fontWeight:700,color:'#744210'}}>{yieldPM>0?fmt.pct(yieldPM):'—'}</p></div>
-          <div><p style={{fontSize:10,color:'#B7791F',marginBottom:2}}>Lançamentos</p><p style={{fontSize:13,fontWeight:700,color:'#744210'}}>{numLanc}</p></div>
-        </div>
-        {/* Breakdown por tipo */}
-        {Object.keys(breakdown).length > 0 && (
-          <div style={{borderTop:'1px solid #F6E05E',paddingTop:8,display:'flex',gap:6,flexWrap:'wrap'}}>
-            {Object.entries(breakdown).map(([tipo,valor])=>(
-              <span key={tipo} style={{fontSize:11,background:'#FEF3C7',color:'#92400E',padding:'2px 8px',borderRadius:20}}>
-                {tipo} {fmt.brl(Number(valor))}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ── Retorno após proventos ── */}
-      {temRetorno && (
-        <div style={{background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:10,padding:'10px 14px'}}>
-          <p style={{fontSize:11,fontWeight:600,color:'#3B82F6',marginBottom:6}}>Retorno após proventos</p>
-          <div style={{display:'flex',alignItems:'baseline',gap:8}}>
-            <span style={{fontSize:15,fontWeight:700,color:ganhoTotal>=0?'#16A34A':'#DC2626'}}>
-              {ganhoTotal>=0?'+':''}{fmt.brl(ganhoTotal)}
-            </span>
-            <span style={{fontSize:12,fontWeight:600,color:pctAposP>=0?'#16A34A':'#DC2626'}}>
-              ({pctAposP>=0?'+':''}{fmt.pct(pctAposP)})
-            </span>
-          </div>
-          <p style={{fontSize:11,color:'#93C5FD',marginTop:3}}>
-            compra {perf.ganho>=0?'+':''}{fmt.brl(perf.ganho)} + proventos {fmt.brl(totalProv)}
-          </p>
-        </div>
-      )}
+      <BlocoProventosCard a={a} perf={perf} resumoAno={resumoAno} resumoGeral={resumoGeral} />
 
       {/* Footer */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingTop:4,borderTop:'1px solid #E8ECF0'}}>
@@ -711,7 +832,7 @@ function AcoesForm({ onAdicionado }) {
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────
-function Dashboard({ acoes }) {
+function Dashboard({ acoes, anoFiltro, setAnoFiltro, anosDisponiveis, resumoAno }) {
   if (!acoes.length) return null;
   const patrimonio    = acoes.reduce((s,a)=>s+(a.preco_atual*(a.quantidade||0)),0);
   const custo         = acoes.reduce((s,a)=>{ const p=calcPerformance(a.preco_atual,a.preco_compra,a.quantidade); return s+p.custo; },0);
@@ -750,21 +871,7 @@ function Dashboard({ acoes }) {
           {acoes.map((a,i)=>{ const val=a.preco_atual*(a.quantidade||0); const pct=patrimonio>0?(val/patrimonio)*100:0; return <div key={a.ticker} style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'#8896A8'}}><div style={{width:8,height:8,borderRadius:'50%',background:CORES[i%CORES.length]}}/>{a.ticker} {fmt.pct(pct)}</div>; })}
         </div>
       </div>
-      {/* Faixa proventos */}
-      <div style={{background:'linear-gradient(135deg,#FFFDF0,#FEFCE8)',border:'1px solid #F6E05E',borderRadius:10,padding:16,display:'flex',marginBottom:4}}>
-        {[
-          { label:'Proventos no Ano', val:fmt.brl(proventosAno), sub:'Todos os ativos' },
-          { label:'Yield médio s/ PM', val:()=>{ const c=acoes.reduce((s,a)=>s+((a.preco_compra||0)*(a.quantidade||0)),0); return c>0?fmt.pct((proventosAno/c)*100):'—'; }, sub:'Sobre preço médio pago' },
-          { label:'Maior pagador', val:()=>{ const m=[...acoes].sort((a,b)=>Number(b.dividendos_ano||0)-Number(a.dividendos_ano||0))[0]; return m&&Number(m.dividendos_ano)>0?m.ticker:'—'; }, sub:()=>{ const m=[...acoes].sort((a,b)=>Number(b.dividendos_ano||0)-Number(a.dividendos_ano||0))[0]; return m&&Number(m.dividendos_ano)>0?`${fmt.brl(Number(m.dividendos_ano))} no ano`:''; } },
-          { label:'Lançamentos totais', val:acoes.reduce((s,a)=>s+Number(a.dividendos_lancamentos||0),0), sub:'Todos os ativos no ano' },
-        ].map((item,i,arr)=>(
-          <div key={i} style={{flex:1,padding:'0 16px',borderRight:i<arr.length-1?'1px solid #F6E05E':'none',paddingLeft:i===0?0:16}}>
-            <p style={{fontSize:11,color:'#B7791F',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:5}}>{item.label}</p>
-            <p style={{fontSize:17,fontWeight:800,color:'#744210'}}>{typeof item.val==='function'?item.val():item.val}</p>
-            {item.sub&&<p style={{fontSize:11,color:'#B7791F',marginTop:2}}>{typeof item.sub==='function'?item.sub():item.sub}</p>}
-          </div>
-        ))}
-      </div>
+      <FaixaProventos acoes={acoes} anoFiltro={anoFiltro} setAnoFiltro={setAnoFiltro} anosDisponiveis={anosDisponiveis} resumoAno={resumoAno} />
     </div>
   );
 }
@@ -776,6 +883,8 @@ export default function AcoesPage() {
   const [atualizando, setAtualizando] = useState(false);
   const [modalCompra, setModalCompra] = useState(null);
   const [modalProv, setModalProv]     = useState(false);
+
+  const { anosDisponiveis, anoFiltro, setAnoFiltro, resumoAno, resumoGeral, carregarDados } = useProventosExtras(acoes);
 
   const carregar = async () => {
     try { const r = await api.get('/acoes'); setAcoes(r.data); }
@@ -818,6 +927,7 @@ export default function AcoesPage() {
   const salvarProventos = async (lancamentos) => {
     await api.post('/acoes/proventos', { lancamentos });
     await carregar();
+    await carregarDados();
   };
 
   if (loading) return (
@@ -847,7 +957,7 @@ export default function AcoesPage() {
         </div>
       </div>
 
-      {acoes.length > 0 && <Dashboard acoes={acoes}/>}
+      {acoes.length > 0 && <Dashboard acoes={acoes} anoFiltro={anoFiltro} setAnoFiltro={setAnoFiltro} anosDisponiveis={anosDisponiveis} resumoAno={resumoAno}/>}
 
       <Suspense fallback={<div style={{background:'#FFF',border:'1px solid #E8ECF0',borderRadius:14,padding:20,marginBottom:24,height:90}}/>}>
         <AcoesForm onAdicionado={carregar}/>
@@ -873,6 +983,8 @@ export default function AcoesPage() {
               onRemover={remover}
               onSalvar={salvarEdicao}
               onAbrirProvento={()=>setModalProv(true)}
+              resumoAno={resumoAno}
+              resumoGeral={resumoGeral}
             />
           ))}
         </div>

@@ -115,10 +115,7 @@ router.delete('/:ticker', async (req, res) => {
 // POST /api/acoes/atualizar-todos
 router.post('/atualizar-todos', async (req, res) => {
   try {
-    const acoes = await pool.query(
-      'SELECT ticker FROM acoes_carteira WHERE usuario_id=$1',
-      [req.userId]
-    );
+    const acoes = await pool.query('SELECT ticker FROM acoes_carteira WHERE usuario_id=$1', [req.userId]);
     const resultados = [];
     for (const acao of acoes.rows) {
       try {
@@ -159,42 +156,30 @@ router.post('/atualizar-todos', async (req, res) => {
 });
 
 // ─── POST /api/acoes/proventos ────────────────────────────────────────────
-// Recebe: { lancamentos: [{ ticker, tipo_provento, valor_por_acao, quantidade, mes, ano }] }
-// tipo_provento: 'Dividendo' | 'JCP' | 'Rendimento' | 'Outros'
 router.post('/proventos', async (req, res) => {
   const { lancamentos } = req.body;
   if (!Array.isArray(lancamentos) || !lancamentos.length)
     return res.status(400).json({ error: 'Nenhum lançamento informado.' });
-
   try {
     const anoAtual = new Date().getFullYear();
-
     for (const lanc of lancamentos) {
       const { ticker, tipo_provento = 'Dividendo', valor_por_acao, quantidade, valor_total_override, mes, ano } = lanc;
       if (!ticker || !valor_por_acao || !mes || !ano) continue;
-
-      // Usa o total exato do arquivo (Valor líquido) quando disponível, senão recalcula
       const valorTotal = valor_total_override != null
         ? Number(valor_total_override)
         : Number(valor_por_acao) * Number(quantidade || 0);
-
-      // Upsert por ticker + mes + ano + tipo_provento + valor_por_acao
-      // (inclui preço para permitir dois eventos do mesmo tipo no mesmo mês com preços diferentes)
       await pool.query(`
         INSERT INTO dividendos_acoes (usuario_id, ticker, tipo_provento, valor_por_acao, valor_total, mes, ano, created_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
         ON CONFLICT (usuario_id, ticker, mes, ano, tipo_provento, valor_por_acao) DO UPDATE SET
-          valor_total = EXCLUDED.valor_total,
-          created_at = NOW()
+          valor_total = EXCLUDED.valor_total, created_at = NOW()
       `, [req.userId, ticker.toUpperCase(), tipo_provento, Number(valor_por_acao), valorTotal, mes, ano]);
     }
-
-    // Recalcula totais por ticker afetado
     const tickers = [...new Set(lancamentos.map(l => l.ticker.toUpperCase()))];
     for (const ticker of tickers) {
-      await recalcularProventos(req.userId, ticker, anoAtual);
+      await recalcularProventosAno(req.userId, ticker, anoAtual);
+      await recalcularProventosGeral(req.userId, ticker);
     }
-
     res.json({ message: 'Proventos lançados com sucesso.' });
   } catch (err) {
     console.error('[proventos]', err);
@@ -202,7 +187,7 @@ router.post('/proventos', async (req, res) => {
   }
 });
 
-// Mantém compatibilidade com rota antiga /dividendos
+// Compatibilidade rota antiga
 router.post('/dividendos', async (req, res) => {
   const { lancamentos } = req.body;
   if (!Array.isArray(lancamentos) || !lancamentos.length)
@@ -216,15 +201,14 @@ router.post('/dividendos', async (req, res) => {
       await pool.query(`
         INSERT INTO dividendos_acoes (usuario_id, ticker, tipo_provento, valor_por_acao, valor_total, mes, ano, created_at)
         VALUES ($1, $2, 'Dividendo', $3, $4, $5, $6, NOW())
-        ON CONFLICT (usuario_id, ticker, mes, ano, tipo_provento) DO UPDATE SET
-          valor_por_acao = EXCLUDED.valor_por_acao,
-          valor_total = EXCLUDED.valor_total,
-          created_at = NOW()
+        ON CONFLICT (usuario_id, ticker, mes, ano, tipo_provento, valor_por_acao) DO UPDATE SET
+          valor_total = EXCLUDED.valor_total, created_at = NOW()
       `, [req.userId, ticker.toUpperCase(), Number(valor_por_acao), valorTotal, mes, ano]);
     }
     const tickers = [...new Set(lancamentos.map(l => l.ticker.toUpperCase()))];
     for (const ticker of tickers) {
-      await recalcularProventos(req.userId, ticker, anoAtual);
+      await recalcularProventosAno(req.userId, ticker, anoAtual);
+      await recalcularProventosGeral(req.userId, ticker);
     }
     res.json({ message: 'Proventos lançados com sucesso.' });
   } catch (err) {
@@ -251,6 +235,77 @@ router.get('/proventos', async (req, res) => {
   }
 });
 
+// ─── NOVO: GET /api/acoes/proventos/anos — anos disponíveis dinamicamente ──
+router.get('/proventos/anos', async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT DISTINCT ano FROM dividendos_acoes
+       WHERE usuario_id=$1 ORDER BY ano DESC`,
+      [req.userId]
+    );
+    const anos = r.rows.map(row => row.ano);
+    res.json({ anos });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar anos.' });
+  }
+});
+
+// ─── NOVO: GET /api/acoes/proventos/resumo?ano=X — totais do ano por ticker ─
+// ano=0 ou ausente = geral (todos os anos)
+router.get('/proventos/resumo', async (req, res) => {
+  const { ano } = req.query;
+  try {
+    let query, params;
+    if (ano && Number(ano) > 0) {
+      // Resumo de um ano específico por ticker
+      query = `
+        SELECT ticker,
+          COALESCE(SUM(valor_total), 0) AS total,
+          COUNT(*) AS lancamentos,
+          json_object_agg(tipo_provento, soma) AS breakdown
+        FROM (
+          SELECT ticker, tipo_provento, SUM(valor_total) AS soma, COUNT(*) AS lancamentos
+          FROM dividendos_acoes
+          WHERE usuario_id=$1 AND ano=$2
+          GROUP BY ticker, tipo_provento
+        ) t
+        GROUP BY ticker
+      `;
+      params = [req.userId, Number(ano)];
+    } else {
+      // Geral: todos os anos
+      query = `
+        SELECT ticker,
+          COALESCE(SUM(valor_total), 0) AS total,
+          COUNT(*) AS lancamentos,
+          json_object_agg(tipo_provento, soma) AS breakdown
+        FROM (
+          SELECT ticker, tipo_provento, SUM(valor_total) AS soma, COUNT(*) AS lancamentos
+          FROM dividendos_acoes
+          WHERE usuario_id=$1
+          GROUP BY ticker, tipo_provento
+        ) t
+        GROUP BY ticker
+      `;
+      params = [req.userId];
+    }
+    const r = await pool.query(query, params);
+    // Formata como objeto { PETR4: { total, lancamentos, breakdown }, ... }
+    const resultado = {};
+    for (const row of r.rows) {
+      resultado[row.ticker] = {
+        total: Number(row.total),
+        lancamentos: Number(row.lancamentos),
+        breakdown: row.breakdown || {}
+      };
+    }
+    res.json(resultado);
+  } catch (err) {
+    console.error('[proventos/resumo]', err);
+    res.status(500).json({ error: 'Erro ao buscar resumo de proventos.' });
+  }
+});
+
 // DELETE /api/acoes/proventos/:ticker/:tipo/:mes/:ano
 router.delete('/proventos/:ticker/:tipo/:mes/:ano', async (req, res) => {
   const { ticker, tipo, mes, ano } = req.params;
@@ -261,14 +316,15 @@ router.delete('/proventos/:ticker/:tipo/:mes/:ano', async (req, res) => {
        WHERE usuario_id=$1 AND ticker=$2 AND tipo_provento=$3 AND mes=$4 AND ano=$5`,
       [req.userId, ticker.toUpperCase(), tipo, Number(mes), Number(ano)]
     );
-    await recalcularProventos(req.userId, ticker.toUpperCase(), anoAtual);
+    await recalcularProventosAno(req.userId, ticker.toUpperCase(), anoAtual);
+    await recalcularProventosGeral(req.userId, ticker.toUpperCase());
     res.json({ message: 'Lançamento removido.' });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao remover lançamento.' });
   }
 });
 
-// GET /api/acoes/dividendos (compatibilidade)
+// Compatibilidade
 router.get('/dividendos', async (req, res) => {
   const { mes, ano } = req.query;
   if (!mes || !ano) return res.status(400).json({ error: 'mes e ano obrigatórios.' });
@@ -286,7 +342,6 @@ router.get('/dividendos', async (req, res) => {
   }
 });
 
-// DELETE /api/acoes/dividendos/:ticker/:mes/:ano (compatibilidade)
 router.delete('/dividendos/:ticker/:mes/:ano', async (req, res) => {
   const { ticker, mes, ano } = req.params;
   const anoAtual = new Date().getFullYear();
@@ -295,16 +350,19 @@ router.delete('/dividendos/:ticker/:mes/:ano', async (req, res) => {
       `DELETE FROM dividendos_acoes WHERE usuario_id=$1 AND ticker=$2 AND mes=$3 AND ano=$4`,
       [req.userId, ticker.toUpperCase(), Number(mes), Number(ano)]
     );
-    await recalcularProventos(req.userId, ticker.toUpperCase(), anoAtual);
+    await recalcularProventosAno(req.userId, ticker.toUpperCase(), anoAtual);
+    await recalcularProventosGeral(req.userId, ticker.toUpperCase());
     res.json({ message: 'Lançamento removido.' });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao remover lançamento.' });
   }
 });
 
-// ─── helper: recalcula total + breakdown por tipo ─────────────────────────
-async function recalcularProventos(usuarioId, ticker, anoAtual) {
-  const totais = await pool.query(`
+// ─── helpers ──────────────────────────────────────────────────────────────
+
+// Recalcula proventos do ano atual (salva em dividendos_ano + proventos_breakdown)
+async function recalcularProventosAno(usuarioId, ticker, ano) {
+  const r = await pool.query(`
     SELECT
       COALESCE(SUM(soma), 0) AS total,
       SUM(lancamentos) AS lancamentos,
@@ -315,15 +373,38 @@ async function recalcularProventos(usuarioId, ticker, anoAtual) {
       WHERE usuario_id=$1 AND ticker=$2 AND ano=$3
       GROUP BY tipo_provento
     ) t
-  `, [usuarioId, ticker, anoAtual]);
+  `, [usuarioId, ticker, ano]);
 
-  const { total, lancamentos, breakdown } = totais.rows[0];
-
+  const { total, lancamentos, breakdown } = r.rows[0];
   await pool.query(`
     UPDATE acoes_carteira
     SET dividendos_ano=$1, dividendos_lancamentos=$2, proventos_breakdown=$3, updated_at=NOW()
     WHERE usuario_id=$4 AND ticker=$5
   `, [Number(total), Number(lancamentos), JSON.stringify(breakdown || {}), usuarioId, ticker]);
+}
+
+// Recalcula proventos gerais (todos os anos — salva em proventos_geral + proventos_geral_lancamentos)
+async function recalcularProventosGeral(usuarioId, ticker) {
+  const r = await pool.query(`
+    SELECT
+      COALESCE(SUM(valor_total), 0) AS total,
+      COUNT(*) AS lancamentos
+    FROM dividendos_acoes
+    WHERE usuario_id=$1 AND ticker=$2
+  `, [usuarioId, ticker]);
+
+  const { total, lancamentos } = r.rows[0];
+  await pool.query(`
+    UPDATE acoes_carteira
+    SET proventos_geral=$1, proventos_geral_lancamentos=$2, updated_at=NOW()
+    WHERE usuario_id=$3 AND ticker=$4
+  `, [Number(total), Number(lancamentos), usuarioId, ticker]);
+}
+
+// Mantém compatibilidade com código antigo que chama recalcularProventos
+async function recalcularProventos(usuarioId, ticker, ano) {
+  await recalcularProventosAno(usuarioId, ticker, ano);
+  await recalcularProventosGeral(usuarioId, ticker);
 }
 
 async function recalcularPesos(usuarioId) {
