@@ -134,6 +134,49 @@ function ModalCompraVenda({ acoes, tipo, onFechar, onSalvar }) {
   );
 }
 
+// ─── PARSER B3 ────────────────────────────────────────────────────────────
+// Suporta CSV com separador ; ou , e detecta colunas pelo cabeçalho
+function parsearCsvB3(texto) {
+  const linhas = texto.trim().split(/\r?\n/).filter(l => l.trim());
+  if (linhas.length < 2) return [];
+
+  // Detecta separador
+  const sep = linhas[0].includes(';') ? ';' : ',';
+  const cabecalho = linhas[0].split(sep).map(c => c.replace(/['"]/g,'').trim().toLowerCase());
+
+  // Índices das colunas que nos interessam
+  const iTicker = cabecalho.findIndex(c =>
+    c.includes('produto') || c.includes('ativo') || c.includes('ticker') ||
+    c.includes('código') || c.includes('codigo') || c.includes('papel')
+  );
+  const iValor = cabecalho.findIndex(c =>
+    c.includes('preço unitário') || c.includes('preco unitario') ||
+    c.includes('valor unitário') || c.includes('valor unitario') ||
+    c.includes('valor por cota') || c.includes('valor líquido por ação') ||
+    c.includes('valor liquido por acao') || c.includes('valor bruto por cota')
+  );
+
+  if (iTicker === -1 || iValor === -1) return [];
+
+  const tickerRe = /^[A-Z]{3,6}\d{1,2}$/;
+  const resultado = [];
+
+  for (let i = 1; i < linhas.length; i++) {
+    const cols = linhas[i].split(sep).map(c => c.replace(/['"]/g,'').trim());
+    const ticker = (cols[iTicker] || '').toUpperCase().replace(/\s/g,'');
+    const valorStr = (cols[iValor] || '').replace('R$','').replace(/\./g,'').replace(',','.').trim();
+    const valor = parseFloat(valorStr);
+
+    if (tickerRe.test(ticker) && valor > 0) {
+      // Agrega se aparecer mais de uma vez (ex: JCP + dividendo no mesmo mês)
+      const existe = resultado.find(r => r.ticker === ticker);
+      if (existe) existe.valor += valor;
+      else resultado.push({ ticker, valor });
+    }
+  }
+  return resultado;
+}
+
 // ─── MODAL DIVIDENDOS ──────────────────────────────────────────────────────
 function ModalDividendos({ acoes, onFechar, onSalvar, onExcluirDividendo }) {
   const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -145,8 +188,17 @@ function ModalDividendos({ acoes, onFechar, onSalvar, onExcluirDividendo }) {
   const [salvando, setSalvando] = useState(false);
   const [arquivo, setArquivo]   = useState(null);
   const [lancamentos, setLancamentos] = useState([]);
-  const [editando, setEditando] = useState(null); // ticker em edição
+  const [editando, setEditando] = useState(null);
   const [valorEdit, setValorEdit] = useState('');
+  const [ignorados, setIgnorados] = useState([]); // tickers do CSV fora da carteira
+  const [fiisCarteira, setFiisCarteira] = useState([]);
+
+  // Carrega FIIs da carteira para cruzamento
+  useEffect(() => {
+    import('@/lib/api').then(m =>
+      m.default.get('/fiis').then(r => setFiisCarteira(r.data.map(f => f.ticker))).catch(()=>{})
+    );
+  }, []);
 
   const carregarLancamentos = async () => {
     try {
@@ -167,13 +219,47 @@ function ModalDividendos({ acoes, onFechar, onSalvar, onExcluirDividendo }) {
 
   const qtdSel = Object.values(selecionados).filter(Boolean).length;
 
+  // Processa o arquivo B3 e cruza com a carteira
+  const processarArquivo = async (file) => {
+    setArquivo(file);
+    setIgnorados([]);
+    try {
+      const texto = await file.text();
+      const itens = parsearCsvB3(texto);
+      if (!itens.length) return;
+
+      const tickersAcoes = new Set(acoes.map(a => a.ticker));
+      const tickersFiis  = new Set(fiisCarteira);
+      const naCarteira   = [];
+      const fora         = [];
+
+      for (const { ticker, valor } of itens) {
+        if (tickersAcoes.has(ticker) || tickersFiis.has(ticker)) naCarteira.push({ ticker, valor });
+        else fora.push(ticker);
+      }
+
+      // Preenche automaticamente valores e marca os checkboxes
+      const novosValores = {};
+      const novosSel = {};
+      for (const { ticker, valor } of naCarteira) {
+        novosValores[ticker] = valor.toFixed(4);
+        novosSel[ticker] = true;
+      }
+      setValores(v => ({ ...v, ...novosValores }));
+      setSel(s => ({ ...s, ...novosSel }));
+      setIgnorados(fora);
+    } catch (e) {
+      console.error('Erro ao processar arquivo B3:', e);
+    }
+  };
+
   const confirmar = async () => {
     const lista = acoes
       .filter(a => selecionados[a.ticker] && valores[a.ticker])
       .map(a => ({ ticker: a.ticker, valor_por_acao: Number(valores[a.ticker]), quantidade: a.quantidade || 0, mes: mes+1, ano }));
     if (!lista.length) return;
     setSalvando(true);
-    try { await onSalvar(lista); setSel({}); setValores({}); await carregarLancamentos(); }
+    try { await onSalvar(lista); setSel({}); setValores({}); setIgnorados([]); setArquivo(null); await carregarLancamentos(); }
     finally { setSalvando(false); }
   };
 
@@ -267,18 +353,34 @@ function ModalDividendos({ acoes, onFechar, onSalvar, onExcluirDividendo }) {
         )}
 
         {/* Importar B3 */}
-        <div style={{background:'#EFF6FF',border:'1px dashed #93C5FD',borderRadius:8,padding:'14px 16px',marginBottom:16,display:'flex',alignItems:'center',gap:12}}>
+        <div style={{background:'#EFF6FF',border:'1px dashed #93C5FD',borderRadius:8,padding:'14px 16px',marginBottom:arquivo?8:16,display:'flex',alignItems:'center',gap:12}}>
           <span style={{fontSize:22}}>📂</span>
           <div style={{flex:1}}>
             <p style={{fontSize:13,fontWeight:600,color:'#2563EB',marginBottom:2}}>Importar relatório da B3</p>
-            <p style={{fontSize:12,color:'#4A90D9'}}>Sobe o arquivo e preenche todos os ativos automaticamente</p>
+            <p style={{fontSize:12,color:'#4A90D9'}}>CSV com colunas: Produto/Ativo e Preço Unitário/Valor por Cota</p>
           </div>
           <label style={{background:'#EFF6FF',color:'#2563EB',border:'1px solid #93C5FD',padding:'7px 14px',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap'}}>
             Selecionar arquivo
-            <input type="file" accept=".csv,.xlsx,.xls" style={{display:'none'}} onChange={e=>setArquivo(e.target.files[0])}/>
+            <input type="file" accept=".csv" style={{display:'none'}}
+              onChange={e => e.target.files[0] && processarArquivo(e.target.files[0])}/>
           </label>
         </div>
-        {arquivo && <p style={{fontSize:12,color:'#16A34A',marginBottom:12}}>✓ {arquivo.name} selecionado</p>}
+
+        {arquivo && <p style={{fontSize:12,color:'#16A34A',marginBottom:12}}>✓ {arquivo.name} processado</p>}
+
+        {/* Aviso: ativos ignorados por não estarem na carteira */}
+        {ignorados.length > 0 && (
+          <div style={{background:'#FFFBEB',border:'1px solid #FDE68A',borderRadius:8,padding:'10px 14px',marginBottom:16,display:'flex',gap:10,alignItems:'flex-start'}}>
+            <span style={{fontSize:18,flexShrink:0}}>⚠️</span>
+            <div>
+              <p style={{fontSize:13,fontWeight:600,color:'#92400E',marginBottom:3}}>Ativos não lançados</p>
+              <p style={{fontSize:12,color:'#B45309'}}>
+                Os seguintes ativos não foram lançados pois não fazem parte da sua carteira:{' '}
+                <strong>{ignorados.join(', ')}</strong>
+              </p>
+            </div>
+          </div>
+        )}
 
         {lancamentos.length === 0 && (
           <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
