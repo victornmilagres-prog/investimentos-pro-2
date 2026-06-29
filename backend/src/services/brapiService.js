@@ -232,6 +232,35 @@ async function buscarAcao(ticker, dividaManual = null) {
   };
 }
 
+// ─── Status Invest fallback (cache 1h) ───────────────────────────────────
+let siCache = { data: null, timestamp: 0 };
+
+async function buscarStatusInvest() {
+  const agora = Date.now();
+  if (siCache.data && agora - siCache.timestamp < 3600000) return siCache.data;
+  const url = 'https://statusinvest.com.br/category/advancedsearchresult?search=' +
+    encodeURIComponent(JSON.stringify({ Segment: '' })) + '&categoryType=2';
+  const res = await axios.get(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
+    timeout: 15000
+  });
+  siCache = { data: res.data, timestamp: agora };
+  return res.data;
+}
+
+async function buscarFIIStatusInvest(ticker) {
+  const lista = await buscarStatusInvest();
+  const item = lista.find(f => f.ticker === ticker.toUpperCase());
+  if (!item) return null;
+  return {
+    preco: item.price || 0,
+    dyAnual: item.dy || 0,
+    pvp: item.p_vp || 0,
+    patrimonioLiquido: item.patrimonio || 0,
+    volumeFinanceiro: item.liquidezmediadiaria || 0,
+  };
+}
+
 async function buscarFII(ticker, ajustes = {}) {
   ticker = ticker.trim().toUpperCase();
 
@@ -286,11 +315,29 @@ async function buscarFII(ticker, ajustes = {}) {
     buscar(quote, ['netAssets','equity','netWorth','totalAssets'])
   ]);
 
+  // Fallback Status Invest quando Brapi não tem pvp/dy
+  if (pvp === 0 && dyAnual === 0) {
+    try {
+      const si = await buscarFIIStatusInvest(ticker);
+      if (si) {
+        if (pvp === 0) pvp = si.pvp;
+        if (dyAnual === 0) dyAnual = si.dyAnual;
+        if (patrimonio === 0) patrimonio = si.patrimonioLiquido;
+        if (volume === 0) volume = si.volumeFinanceiro;
+        if (preco === 0) preco = si.preco;
+        console.log(`[FII ${ticker}] fallback SI: dy=${dyAnual} pvp=${pvp}`);
+      }
+    } catch(e) { console.log(`[FII ${ticker}] SI fallback erro:`, e.message); }
+  }
+
   if (ajustes.dyMensal) dyMensal = numero(ajustes.dyMensal);
   if (ajustes.dyAnual) dyAnual = numero(ajustes.dyAnual);
   if (ajustes.pvp) pvp = numero(ajustes.pvp);
   if (ajustes.volumeFinanceiroDia) volume = numero(ajustes.volumeFinanceiroDia);
   if (ajustes.patrimonioLiquido) patrimonio = numero(ajustes.patrimonioLiquido);
+
+  // Recalcula dyMensal com dyAnual possivelmente atualizado pelo fallback
+  if (dyMensal === 0 && dyAnual > 0) dyMensal = dyAnual / 12;
 
   const score = scoreFII(dyMensal, pvp, volume, patrimonio);
   console.log(`[FII ${ticker}] dy=${dyMensal} pvp=${pvp} vol=${volume} pat=${patrimonio} score=${score}`);
