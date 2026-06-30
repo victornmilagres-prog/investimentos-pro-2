@@ -40,9 +40,10 @@ router.post('/', async (req, res) => {
         dy_mensal, dy_anual, pvp, volume_financeiro, patrimonio_liquido,
         variacao_dia, variacao_dia_reais, preco_abertura, preco_minimo, preco_maximo,
         observacoes, ultima_atualizacao,
+        nome_fundo, administradora, tipo_fundo, vpa, preco_justo, status_justo,
         dividendos_ano, dividendos_lancamentos, dividendos_breakdown,
         dividendos_geral, dividendos_geral_lancamentos
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,0,0,'{}',0,0)
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,0,0,'{}',0,0)
       ON CONFLICT (usuario_id, ticker) DO UPDATE SET
         quantidade = EXCLUDED.quantidade,
         preco_compra = CASE WHEN fiis_carteira.preco_compra = 0 THEN EXCLUDED.preco_compra ELSE fiis_carteira.preco_compra END,
@@ -55,6 +56,12 @@ router.post('/', async (req, res) => {
         preco_abertura = EXCLUDED.preco_abertura, preco_minimo = EXCLUDED.preco_minimo,
         preco_maximo = EXCLUDED.preco_maximo,
         observacoes = EXCLUDED.observacoes, ultima_atualizacao = EXCLUDED.ultima_atualizacao,
+        nome_fundo = EXCLUDED.nome_fundo,
+        administradora = EXCLUDED.administradora,
+        tipo_fundo = EXCLUDED.tipo_fundo,
+        vpa = EXCLUDED.vpa,
+        preco_justo = EXCLUDED.preco_justo,
+        status_justo = EXCLUDED.status_justo,
         updated_at = NOW()
       RETURNING *
     `, [
@@ -62,7 +69,8 @@ router.post('/', async (req, res) => {
       dados.score, dados.classificacao, dados.decisao, dados.preco,
       dyMensal, dados.dyAnual, dados.pvp, dados.volumeFinanceiro, dados.patrimonioLiquido,
       dados.variacaoDia, dados.variacaoDiaReais, dados.precoAbertura, dados.precoMinimo, dados.precoMaximo,
-      dados.observacoes, dados.ultimaAtualizacao
+      dados.observacoes, dados.ultimaAtualizacao,
+      dados.nomeFundo, dados.administradora, dados.tipoFundo, dados.vpa, dados.precoJusto, dados.statusJusto
     ]);
 
     await recalcularPesosFII(req.userId);
@@ -128,13 +136,16 @@ router.post('/atualizar-todos', async (req, res) => {
           UPDATE fiis_carteira SET score=$1, classificacao=$2, decisao=$3, preco_atual=$4,
             dy_mensal=$5, dy_anual=$6, pvp=$7, volume_financeiro=$8, patrimonio_liquido=$9,
             variacao_dia=$10, variacao_dia_reais=$11, preco_abertura=$12, preco_minimo=$13, preco_maximo=$14,
-            observacoes=$15, ultima_atualizacao=$16, updated_at=NOW()
-          WHERE usuario_id=$17 AND ticker=$18
+            observacoes=$15, ultima_atualizacao=$16,
+            nome_fundo=$17, administradora=$18, tipo_fundo=$19, vpa=$20, preco_justo=$21, status_justo=$22,
+            updated_at=NOW()
+          WHERE usuario_id=$23 AND ticker=$24
         `, [
           dados.score, dados.classificacao, dados.decisao, dados.preco,
           dyMensal, dados.dyAnual, dados.pvp, dados.volumeFinanceiro, dados.patrimonioLiquido,
           dados.variacaoDia, dados.variacaoDiaReais, dados.precoAbertura, dados.precoMinimo, dados.precoMaximo,
           dados.observacoes, dados.ultimaAtualizacao,
+          dados.nomeFundo, dados.administradora, dados.tipoFundo, dados.vpa, dados.precoJusto, dados.statusJusto,
           req.userId, fii.ticker
         ]);
         resultados.push({ ticker: fii.ticker, status: 'ok' });

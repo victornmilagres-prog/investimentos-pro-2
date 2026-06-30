@@ -39,8 +39,9 @@ router.post('/', async (req, res) => {
         pl, pvp, margem_liquida, roe, divida_ebit, dy,
         variacao_dia, variacao_dia_reais, preco_abertura, preco_minimo, preco_maximo,
         observacoes, ultima_atualizacao,
+        nome_empresa, preco_bazin, status_bazin,
         dividendos_ano, dividendos_lancamentos, proventos_breakdown
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,0,0,'{}')
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,0,0,'{}')
       ON CONFLICT (usuario_id, ticker) DO UPDATE SET
         quantidade = EXCLUDED.quantidade,
         preco_compra = CASE WHEN acoes_carteira.preco_compra = 0 THEN EXCLUDED.preco_compra ELSE acoes_carteira.preco_compra END,
@@ -54,6 +55,9 @@ router.post('/', async (req, res) => {
         preco_abertura = EXCLUDED.preco_abertura, preco_minimo = EXCLUDED.preco_minimo,
         preco_maximo = EXCLUDED.preco_maximo,
         observacoes = EXCLUDED.observacoes, ultima_atualizacao = EXCLUDED.ultima_atualizacao,
+        nome_empresa = EXCLUDED.nome_empresa,
+        preco_bazin = EXCLUDED.preco_bazin,
+        status_bazin = EXCLUDED.status_bazin,
         updated_at = NOW()
       RETURNING *
     `, [
@@ -62,7 +66,8 @@ router.post('/', async (req, res) => {
       dados.preco, dados.precoGraham, dados.statusGraham,
       dados.pl, dados.pvp, dados.margemLiquida, dados.roe, dados.dividaEbit, dados.dy,
       dados.variacaoDia, dados.variacaoDiaReais, dados.precoAbertura, dados.precoMinimo, dados.precoMaximo,
-      dados.observacoes, dados.ultimaAtualizacao
+      dados.observacoes, dados.ultimaAtualizacao,
+      dados.nomeEmpresa, dados.precoBazin, dados.statusBazin
     ]);
 
     await recalcularPesos(req.userId);
@@ -132,8 +137,10 @@ router.post('/atualizar-todos', async (req, res) => {
             roe=$11, divida_ebit=$12, dy=$13,
             variacao_dia=$14, variacao_dia_reais=$15, preco_abertura=$16,
             preco_minimo=$17, preco_maximo=$18,
-            observacoes=$19, ultima_atualizacao=$20, updated_at=NOW()
-          WHERE usuario_id=$21 AND ticker=$22
+            observacoes=$19, ultima_atualizacao=$20,
+            nome_empresa=$21, preco_bazin=$22, status_bazin=$23,
+            updated_at=NOW()
+          WHERE usuario_id=$24 AND ticker=$25
         `, [
           dados.score, dados.maxScore, dados.classificacao, dados.decisao, dados.preco,
           dados.precoGraham, dados.statusGraham, dados.pl, dados.pvp, dados.margemLiquida,
@@ -141,6 +148,7 @@ router.post('/atualizar-todos', async (req, res) => {
           dados.variacaoDia, dados.variacaoDiaReais, dados.precoAbertura,
           dados.precoMinimo, dados.precoMaximo,
           dados.observacoes, dados.ultimaAtualizacao,
+          dados.nomeEmpresa, dados.precoBazin, dados.statusBazin,
           req.userId, acao.ticker
         ]);
         resultados.push({ ticker: acao.ticker, status: 'ok' });

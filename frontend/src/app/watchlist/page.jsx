@@ -38,7 +38,7 @@ const CRITERIOS_FII = [
   { label: 'Patrimônio > R$ 1B',    fn: f => f.patrimonio_liquido != null && f.patrimonio_liquido > 1e9,      val: f => f.patrimonio_liquido != null ? fmt.abrev(f.patrimonio_liquido) : '-' },
 ];
 
-function RadarCard({ item, onRemover, onAddCarteira }) {
+function RadarCard({ item, onRemover, onAddCarteira, onToggleFavorito }) {
   const isAcao = (item.tipo||'').toUpperCase()==='ACAO' || (item.tipo||'').toUpperCase()==='AÇÃO';
   const criterios = isAcao ? CRITERIOS_ACAO : CRITERIOS_FII;
   const maxScore  = item.max_score || (isAcao ? 6 : 4);
@@ -52,12 +52,27 @@ function RadarCard({ item, onRemover, onAddCarteira }) {
   return (
     <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:14,padding:'18px 20px',display:'flex',flexDirection:'column',gap:12}}>
       {/* Header */}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <span style={{fontSize:18,fontWeight:700,color:'#2563EB'}}>{item.ticker}</span>
-          <span style={{fontSize:11,fontWeight:600,padding:'2px 8px',borderRadius:20,background:'#F8F9FA',color:'#8896A8',border:'1px solid #E8ECF0'}}>{item.tipo}</span>
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between'}}>
+        <div>
+          <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+            <span style={{fontSize:18,fontWeight:700,color:'#2563EB'}}>{item.ticker}</span>
+            <span style={{fontSize:11,fontWeight:600,padding:'2px 8px',borderRadius:20,background:'#F8F9FA',color:'#8896A8',border:'1px solid #E8ECF0'}}>{item.tipo}</span>
+            {!isAcao && item.tipo_fundo && item.tipo_fundo !== 'FII' && (
+              <span style={{fontSize:10,fontWeight:500,padding:'2px 8px',borderRadius:20,background:'#FEF3C7',color:'#92400E'}}>{item.tipo_fundo}</span>
+            )}
+          </div>
+          {item.nome_ativo && <p style={{fontSize:12,fontWeight:500,color:'#4A5568',margin:'3px 0 1px'}}>{item.nome_ativo}</p>}
+          {!isAcao && item.administradora && <p style={{fontSize:10,color:'#8896A8',margin:0}}>Adm: {item.administradora}</p>}
         </div>
-        <span className={badgeDecisao(item.decisao)}>{item.decisao}</span>
+        <div style={{display:'flex',alignItems:'center',gap:6}}>
+          <button onClick={() => onToggleFavorito(item)} style={{background:'none',border:'none',cursor:'pointer',padding:0}}
+            aria-label={item.favorito ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}>
+            {item.favorito
+              ? <span style={{color:'#FBBF24',fontSize:18}}>★</span>
+              : <span style={{color:'#D1D5DB',fontSize:18}}>☆</span>}
+          </button>
+          <span className={badgeDecisao(item.decisao)}>{item.decisao}</span>
+        </div>
       </div>
 
       {/* Score bar */}
@@ -96,6 +111,32 @@ function RadarCard({ item, onRemover, onAddCarteira }) {
           </div>
         )}
       </div>
+
+      {/* Bazin (ações) / Preço Justo (FIIs) */}
+      {isAcao && item.preco_bazin > 0 && (
+        <div style={{background:'#F0FDF4',border:'1px solid #BBF7D0',borderRadius:10,padding:'10px 14px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div>
+            <p style={{fontSize:11,color:'#276749',marginBottom:3}}>Preço Bazin</p>
+            <p style={{fontSize:15,fontWeight:700,color:'#14532D'}}>{fmt.brl(item.preco_bazin)}</p>
+          </div>
+          <span style={{fontSize:11,fontWeight:500,padding:'2px 8px',borderRadius:4,
+            background: item.status_bazin === 'DESCONTADO' ? '#D1FAE5' : item.status_bazin === 'JUSTO' ? '#FEF3C7' : '#FEE2E2',
+            color: item.status_bazin === 'DESCONTADO' ? '#065F46' : item.status_bazin === 'JUSTO' ? '#92400E' : '#991B1B'
+          }}>{item.status_bazin}</span>
+        </div>
+      )}
+      {!isAcao && item.preco_justo > 0 && (
+        <div style={{background:'#FDF4FF',border:'1px solid #E9D5FF',borderRadius:10,padding:'10px 14px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div>
+            <p style={{fontSize:11,color:'#6B21A8',marginBottom:3}}>Preço Justo (VPA)</p>
+            <p style={{fontSize:15,fontWeight:700,color:'#4C1D95'}}>{fmt.brl(item.preco_justo)}</p>
+          </div>
+          <span style={{fontSize:11,fontWeight:500,padding:'2px 8px',borderRadius:4,
+            background: item.status_justo === 'DESCONTADO' ? '#EDE9FE' : item.status_justo === 'JUSTO' ? '#FEF3C7' : '#FEE2E2',
+            color: item.status_justo === 'DESCONTADO' ? '#5B21B6' : item.status_justo === 'JUSTO' ? '#92400E' : '#991B1B'
+          }}>{item.status_justo}</span>
+        </div>
+      )}
 
       {/* Graham */}
       {isAcao && item.preco_graham != null && item.preco_graham > 0 && (
@@ -194,6 +235,8 @@ export default function WatchlistPage() {
   const [atualizando, setAtualizando] = useState(false);
   const [form, setForm]               = useState({ ticker:'',tipo:'ACAO',preco_alvo:'',observacoes:'' });
   const [erro, setErro]               = useState('');
+  const [abaRadar, setAbaRadar]       = useState('acoes');
+  const [busca, setBusca]             = useState('');
   const router = useRouter();
 
   const carregar = async () => {
@@ -221,6 +264,13 @@ export default function WatchlistPage() {
     setAtualizando(true);
     try { await api.post('/watchlist/atualizar-todos'); await carregar(); }
     finally { setAtualizando(false); }
+  };
+
+  const toggleFavorito = async (item) => {
+    try {
+      await api.put(`/watchlist/${item.id}`, { favorito: !item.favorito });
+      setItens(prev => prev.map(i => i.id === item.id ? { ...i, favorito: !i.favorito } : i));
+    } catch {}
   };
 
   const addCarteira = (item) => {
@@ -275,33 +325,58 @@ export default function WatchlistPage() {
       </div>
 
       {itens.length>0&&(
-        <div style={{display:'flex',alignItems:'center',gap:16,fontSize:11,color:'#8896A8',marginBottom:8,flexWrap:'wrap'}}>
-          <span style={{fontWeight:600,color:'#4A5568'}}>Legenda:</span>
-          {[{color:'#16A34A',label:'Aprovado'},{color:'#DC2626',label:'Reprovado'},{color:'#D97706',label:'Sem dado (não pontua)'}].map(l=>(
-            <span key={l.label} style={{display:'flex',alignItems:'center',gap:5}}>
-              <span style={{width:8,height:8,borderRadius:'50%',background:l.color,display:'inline-block'}}/>{l.label}
-            </span>
-          ))}
-        </div>
+        <>
+          <div style={{display:'flex',alignItems:'center',gap:16,fontSize:11,color:'#8896A8',marginBottom:8,flexWrap:'wrap'}}>
+            <span style={{fontWeight:600,color:'#4A5568'}}>Legenda:</span>
+            {[{color:'#16A34A',label:'Aprovado'},{color:'#DC2626',label:'Reprovado'},{color:'#D97706',label:'Sem dado (não pontua)'}].map(l=>(
+              <span key={l.label} style={{display:'flex',alignItems:'center',gap:5}}>
+                <span style={{width:8,height:8,borderRadius:'50%',background:l.color,display:'inline-block'}}/>{l.label}
+              </span>
+            ))}
+          </div>
+
+          <div style={{display:'flex',gap:0,border:'0.5px solid #E8ECF0',borderRadius:8,overflow:'hidden',marginBottom:16,width:'fit-content'}}>
+            <button onClick={()=>setAbaRadar('acoes')}
+              style={{padding:'7px 20px',fontSize:13,fontWeight:500,
+                background:abaRadar==='acoes'?'#2563EB':'#FFFFFF',
+                color:abaRadar==='acoes'?'#FFFFFF':'#8896A8',
+                border:'none',cursor:'pointer'}}>
+              Ações
+            </button>
+            <button onClick={()=>setAbaRadar('fiis')}
+              style={{padding:'7px 20px',fontSize:13,fontWeight:500,
+                background:abaRadar==='fiis'?'#2563EB':'#FFFFFF',
+                color:abaRadar==='fiis'?'#FFFFFF':'#8896A8',
+                border:'none',borderLeft:'0.5px solid #E8ECF0',cursor:'pointer'}}>
+              FIIs
+            </button>
+          </div>
+
+          <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:10,padding:'10px 14px',display:'flex',alignItems:'center',gap:8,marginBottom:16}}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8896A8" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input value={busca} onChange={e=>setBusca(e.target.value)}
+              placeholder={abaRadar==='acoes'?'Buscar ação... ex: VALE3, Petrobras':'Buscar FII... ex: CPTS11, Papel'}
+              style={{border:'none',outline:'none',fontSize:13,color:'#1A1A2E',background:'transparent',flex:1}}/>
+            {busca&&<button onClick={()=>setBusca('')} style={{background:'none',border:'none',cursor:'pointer',color:'#8896A8',fontSize:16}}>×</button>}
+          </div>
+        </>
       )}
 
       {itens.length>0?(()=>{
-        const acoes=itens.filter(i=>(i.tipo||'').toUpperCase()==='ACAO'||(i.tipo||'').toUpperCase()==='AÇÃO');
-        const fiis=itens.filter(i=>(i.tipo||'').toUpperCase()==='FII');
+        const todosAcoes=itens.filter(i=>(i.tipo||'').toUpperCase()==='ACAO'||(i.tipo||'').toUpperCase()==='AÇÃO');
+        const todosFIIs=itens.filter(i=>(i.tipo||'').toUpperCase()==='FII');
+        const filtrar = arr => {
+          const q = busca.toLowerCase();
+          return [...arr]
+            .sort((a,b)=>(b.favorito?1:0)-(a.favorito?1:0))
+            .filter(i => !q || i.ticker.toLowerCase().includes(q) || (i.nome_ativo||'').toLowerCase().includes(q) || (i.tipo_fundo||'').toLowerCase().includes(q));
+        };
+        const acoes = filtrar(todosAcoes);
+        const fiis  = filtrar(todosFIIs);
+        const lista = abaRadar==='acoes' ? acoes : fiis;
         return (
-          <div style={{display:'flex',flexDirection:'column',gap:32}}>
-            {acoes.length>0&&(
-              <div>
-                <p style={{fontSize:14,fontWeight:700,color:'#1A1A2E',marginBottom:14}}>📈 Ações no Radar</p>
-                <div className="grid-cards">{acoes.map(i=><RadarCard key={i.ticker} item={i} onRemover={remover} onAddCarteira={addCarteira}/>)}</div>
-              </div>
-            )}
-            {fiis.length>0&&(
-              <div>
-                <p style={{fontSize:14,fontWeight:700,color:'#1A1A2E',marginBottom:14}}>🏢 FIIs no Radar</p>
-                <div className="grid-cards">{fiis.map(i=><RadarCard key={i.ticker} item={i} onRemover={remover} onAddCarteira={addCarteira}/>)}</div>
-              </div>
-            )}
+          <div className="grid-cards">
+            {lista.map(i=><RadarCard key={i.ticker} item={i} onRemover={remover} onAddCarteira={addCarteira} onToggleFavorito={toggleFavorito}/>)}
           </div>
         );
       })():(

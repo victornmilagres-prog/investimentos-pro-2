@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Referência Visual – Aba Ações</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg:#f0f2f5;
+  --white:#ffffff;
+  --border:#e2e8f0;
+  --text:#1a202c;
+  --muted:#718096;
+  --green:#38a169;
+  --red:#e53e3e;
+  --orange:#dd6b20;
+  --yellow:#d4a017;
+  --blue:#3182ce;
+}
+body { font-family:-apple-system,'Inter',sans-serif; background:var(--bg); font-size:13px; color:var(--text); padding:24px; }
+
+.content-title { font-size:22px; font-weight:700; margin-bottom:2px; }
+.content-sub { color:var(--muted); font-size:13px; margin-bottom:20px; }
+
+/* DASHBOARD */
+.dash-cards { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:14px; }
+.dash-card { background:var(--white); border:1px solid var(--border); border-radius:10px; padding:16px; }
+.dash-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:6px; }
+.dash-val { font-size:19px; font-weight:800; }
+.dash-val.green { color:var(--green); }
+.dash-val.blue { color:var(--blue); }
+.dash-sub { font-size:11px; color:var(--muted); margin-top:3px; }
+
+.distrib-card { background:var(--white); border:1px solid var(--border); border-radius:10px; padding:16px; margin-bottom:14px; }
+.distrib-title { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:12px; }
+.distrib-bar { display:flex; height:26px; border-radius:6px; overflow:hidden; margin-bottom:10px; }
+.distrib-seg { display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#fff; }
+.distrib-legend { display:flex; gap:14px; flex-wrap:wrap; }
+.dleg { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--muted); }
+.dleg-dot { width:8px; height:8px; border-radius:50%; }
+
+/* DIV SUMMARY */
+.div-summary { background:linear-gradient(135deg,#fffdf0,#fefce8); border:1px solid #f6e05e; border-radius:10px; padding:16px; display:flex; margin-bottom:20px; }
+.div-sum-item { flex:1; padding:0 16px; border-right:1px solid #f6e05e; }
+.div-sum-item:first-child { padding-left:0; }
+.div-sum-item:last-child { border-right:none; }
+.div-sum-label { font-size:11px; color:#b7791f; text-transform:uppercase; letter-spacing:.5px; margin-bottom:5px; }
+.div-sum-val { font-size:17px; font-weight:800; color:#744210; }
+.div-sum-sub { font-size:11px; color:#b7791f; margin-top:2px; }
+
+/* ADD FORM */
+.add-form { background:var(--white); border:1px solid var(--border); border-radius:10px; padding:20px; margin-bottom:20px; }
+.add-form-title { font-size:14px; font-weight:600; margin-bottom:14px; }
+.add-row { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; }
+.ff { display:flex; flex-direction:column; gap:5px; }
+.ff label { font-size:11px; color:var(--muted); font-weight:500; }
+.ff input { padding:9px 12px; border:1px solid var(--border); border-radius:6px; font-size:13px; outline:none; color:var(--text); background:#fff; }
+.ff.f-ticker input { width:190px; }
+.ff.f-qtd input { width:140px; }
+.ff.f-pm input { width:170px; }
+
+.hbtns { display:flex; gap:8px; margin-left:auto; align-items:flex-end; flex-wrap:wrap; }
+.btn { padding:9px 14px; border-radius:7px; font-size:12px; font-weight:600; border:none; cursor:pointer; display:flex; align-items:center; gap:5px; white-space:nowrap; }
+.btn-buscar { background:var(--yellow); color:#fff; font-size:13px; padding:10px 18px; }
+.btn-comprar { background:#c6f6d5; color:#276749; border:1px solid #9ae6b4; }
+.btn-vender { background:#fed7d7; color:#9b2c2c; border:1px solid #fc8181; }
+.btn-dividendos { background:#fefcbf; color:#7b6213; border:1px solid #f6e05e; }
+.btn-importar { background:#ebf8ff; color:#2b6cb0; border:1px solid #90cdf4; }
+.btn-atualizar { background:#fff; color:var(--muted); border:1px solid var(--border); }
+
+/* CRITERIOS */
+.criterios { background:var(--white); border:1px solid var(--border); border-radius:10px; padding:14px 18px; margin-bottom:16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.crit-label { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; }
+.badge { padding:4px 12px; background:#edf2f7; border-radius:20px; font-size:12px; font-weight:600; color:var(--text); }
+.badge.changed { background:#fefcbf; color:#7b6213; border:1px solid #f6e05e; }
+
+.legenda { display:flex; gap:14px; align-items:center; margin-bottom:16px; }
+.leg { display:flex; align-items:center; gap:5px; font-size:12px; color:var(--muted); }
+.dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+.dg { background:var(--green); } .dr { background:var(--red); } .do { background:var(--orange); }
+
+/* CARDS */
+.cards-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+.card { background:var(--white); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+.ch { padding:14px 16px 10px; display:flex; align-items:flex-start; justify-content:space-between; }
+.ch-ticker { font-size:16px; font-weight:800; color:var(--blue); }
+.ch-status { font-size:11px; font-weight:700; padding:3px 10px; border-radius:4px; }
+.s-manter { background:#c6f6d5; color:#276749; }
+.s-acomp { background:#feebcb; color:#9c4221; }
+
+.score-wrap { padding:0 16px 10px; }
+.score-bg { height:6px; background:#e2e8f0; border-radius:3px; overflow:hidden; margin-bottom:4px; }
+.score-fill { height:100%; border-radius:3px; }
+.score-txt { font-size:11px; font-weight:700; }
+
+.section { padding:10px 16px; border-top:1px solid #f7fafc; }
+.sec-title { font-size:10px; font-weight:700; text-transform:uppercase; color:var(--muted); letter-spacing:.5px; margin-bottom:8px; }
+.grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px 4px; }
+.gi-name { font-size:10px; color:var(--muted); margin-bottom:2px; }
+.gi-val { font-size:13px; font-weight:600; display:flex; align-items:center; gap:4px; }
+.gi-val.plain { display:block; }
+
+.graham-box { margin:8px 16px; background:#ebf8ff; border-radius:8px; padding:10px 12px; display:flex; justify-content:space-between; align-items:center; }
+.g-label { font-size:11px; color:var(--blue); font-weight:600; }
+.g-val { font-size:15px; font-weight:800; color:var(--blue); }
+.g-sit { font-size:11px; font-weight:700; padding:3px 10px; border-radius:4px; }
+.g-desc { background:#c6f6d5; color:#276749; }
+.g-caro { background:#fed7d7; color:#9b2c2c; }
+
+/* NOVO: seção dividendos no card */
+.div-sec { padding:10px 16px; border-top:1px solid #f7fafc; background:#fffdf0; }
+.div-sec-title { font-size:10px; font-weight:700; text-transform:uppercase; color:#b7791f; letter-spacing:.5px; margin-bottom:8px; }
+.cdiv-name { font-size:10px; color:#b7791f; margin-bottom:2px; }
+.cdiv-val { font-size:13px; font-weight:700; color:#744210; }
+
+.cf { padding:10px 16px; border-top:1px solid #f7fafc; display:flex; align-items:center; justify-content:space-between; }
+.cot { font-size:14px; font-weight:700; }
+.cot-var { font-size:11px; font-weight:600; margin-left:4px; }
+.up { color:var(--green); } .dn { color:var(--red); }
+.cpeso { font-size:11px; color:var(--muted); }
+.cbtns { display:flex; gap:6px; }
+.cbtn { padding:4px 9px; border-radius:5px; font-size:11px; font-weight:600; border:none; cursor:pointer; }
+.cbtn-div { background:#fefcbf; color:#7b6213; }
+.cbtn-edit { background:#f7fafc; color:var(--muted); border:1px solid var(--border); font-size:13px; padding:4px 8px; }
+.cbtn-del { background:#fff5f5; color:#fc8181; border:1px solid #fed7d7; font-size:13px; padding:4px 8px; }
+
+/* MODALS */
+.overlay { position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; align-items:center; justify-content:center; z-index:200; }
+.overlay.open { display:flex; }
+.modal { background:#fff; border-radius:14px; padding:28px; width:460px; box-shadow:0 20px 60px rgba(0,0,0,.2); max-height:90vh; overflow-y:auto; }
+.m-title { font-size:17px; font-weight:700; margin-bottom:4px; }
+.m-sub { font-size:13px; color:var(--muted); margin-bottom:20px; }
+.mf { margin-bottom:14px; }
+.mf label { display:block; font-size:12px; color:var(--muted); font-weight:500; margin-bottom:5px; }
+.mf input,.mf select { width:100%; padding:9px 12px; border:1px solid var(--border); border-radius:7px; font-size:13px; outline:none; color:var(--text); }
+.mf-row { display:flex; gap:12px; }
+.mf-row .mf { flex:1; }
+.prev-box { background:#f7fafc; border-radius:8px; padding:12px 14px; display:flex; gap:16px; margin-bottom:18px; }
+.plab { font-size:11px; color:var(--muted); margin-bottom:3px; }
+.pval { font-size:15px; font-weight:700; }
+.pval.hl { color:var(--green); }
+.mfooter { display:flex; gap:10px; justify-content:flex-end; margin-top:4px; }
+.mbtn { padding:9px 20px; border-radius:7px; font-size:13px; font-weight:600; border:none; cursor:pointer; }
+.mbtn-cancel { background:#edf2f7; color:var(--muted); }
+.mbtn-buy { background:var(--green); color:#fff; }
+.mbtn-div { background:var(--yellow); color:#fff; }
+
+.import-zone { background:#ebf8ff; border:1px dashed #90cdf4; border-radius:8px; padding:14px 16px; margin-bottom:16px; display:flex; align-items:center; gap:12px; }
+.iz-icon { font-size:22px; }
+.iz-text strong { display:block; font-size:13px; color:#2b6cb0; margin-bottom:2px; }
+.iz-text span { font-size:12px; color:#4a90d9; }
+.mbtn-import { margin-left:auto; background:#ebf8ff; color:#2b6cb0; border:1px solid #90cdf4; padding:7px 14px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; }
+
+.div-sep { font-size:11px; font-weight:700; text-transform:uppercase; color:var(--muted); letter-spacing:.5px; margin-bottom:10px; display:flex; align-items:center; gap:8px; }
+.div-sep::before,.div-sep::after { content:''; flex:1; height:1px; background:var(--border); }
+
+.dcl { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
+.dci { display:flex; align-items:center; justify-content:space-between; background:#fffdf0; border:1px solid #f6e05e; border-radius:8px; padding:10px 12px; }
+.dcl-left { display:flex; align-items:center; gap:10px; }
+.dcl-left input[type=checkbox] { accent-color:var(--yellow); width:15px; height:15px; }
+.dinput { width:110px; padding:6px 10px; border-radius:6px; background:#fff; border:1px solid #f6e05e; color:var(--text); font-size:13px; text-align:right; outline:none; }
+.dtotal { background:#fffdf0; border:1px solid #f6e05e; border-radius:8px; padding:12px 16px; display:flex; gap:24px; margin-bottom:18px; }
+</style>
+</head>
+<body>
+
+<div class="content-title">Carteira Ações</div>
+<div class="content-sub">Busca dados em tempo real via Brapi e avalia por critérios fundamentalistas</div>
+
+<!-- DASHBOARD -->
+<div class="dash-cards">
+  <div class="dash-card">
+    <div class="dash-label">Patrimônio Total</div>
+    <div class="dash-val blue">R$ 48.320,00</div>
+    <div class="dash-sub">7 ativos · atualizado agora</div>
+  </div>
+  <div class="dash-card">
+    <div class="dash-label">Resultado Total</div>
+    <div class="dash-val green">+R$ 6.840,00</div>
+    <div class="dash-sub">+16,5% desde primeiro aporte</div>
+  </div>
+  <div class="dash-card">
+    <div class="dash-label">Melhor ativo</div>
+    <div class="dash-val" style="font-size:15px">WEGE3 <span style="color:var(--green);font-size:13px">+21.8%</span></div>
+    <div class="dash-sub">Pior: BBAS3 (-19.05%)</div>
+  </div>
+  <div class="dash-card">
+    <div class="dash-label">Score médio</div>
+    <div class="dash-val blue">3.8 / 6</div>
+    <div class="dash-sub">2 MANTER · 3 ACOMPANHAR</div>
+  </div>
+</div>
+
+<div class="distrib-card">
+  <div class="distrib-title">Distribuição da carteira</div>
+  <div class="distrib-bar">
+    <div class="distrib-seg" style="flex:17;background:#3182ce">PETR4</div>
+    <div class="distrib-seg" style="flex:19;background:#38a169">BBSE3</div>
+    <div class="distrib-seg" style="flex:15;background:#d4a017">BBAS3</div>
+    <div class="distrib-seg" style="flex:11;background:#805ad5">WEGE3</div>
+    <div class="distrib-seg" style="flex:17;background:#dd6b20">SAPR4</div>
+    <div class="distrib-seg" style="flex:8;background:#e53e3e">CMIG4</div>
+    <div class="distrib-seg" style="flex:13;background:#718096">TAEE4</div>
+  </div>
+  <div class="distrib-legend">
+    <div class="dleg"><div class="dleg-dot" style="background:#3182ce"></div>PETR4 17%</div>
+    <div class="dleg"><div class="dleg-dot" style="background:#38a169"></div>BBSE3 19%</div>
+    <div class="dleg"><div class="dleg-dot" style="background:#d4a017"></div>BBAS3 15%</div>
+    <div class="dleg"><div class="dleg-dot" style="background:#805ad5"></div>WEGE3 11%</div>
+    <div class="dleg"><div class="dleg-dot" style="background:#dd6b20"></div>SAPR4 17%</div>
+    <div class="dleg"><div class="dleg-dot" style="background:#e53e3e"></div>CMIG4 8%</div>
+    <div class="dleg"><div class="dleg-dot" style="background:#718096"></div>TAEE4 13%</div>
+  </div>
+</div>
+
+<!-- DIVIDENDOS RESUMO -->
+<div class="div-summary">
+  <div class="div-sum-item">
+    <div class="div-sum-label">💰 Dividendos no Ano</div>
+    <div class="div-sum-val">R$ 2.156,40</div>
+    <div class="div-sum-sub">Todos os ativos</div>
+  </div>
+  <div class="div-sum-item">
+    <div class="div-sum-label">Yield médio s/ PM</div>
+    <div class="div-sum-val">4.5% a.a.</div>
+    <div class="div-sum-sub">Sobre preço médio pago</div>
+  </div>
+  <div class="div-sum-item">
+    <div class="div-sum-label">Último lançamento</div>
+    <div class="div-sum-val" style="font-size:14px">PETR4 · R$ 1,24/ação</div>
+    <div class="div-sum-sub">28/06/2026</div>
+  </div>
+  <div class="div-sum-item">
+    <div class="div-sum-label">Maior pagador</div>
+    <div class="div-sum-val" style="font-size:14px">BBSE3</div>
+    <div class="div-sum-sub">R$ 480,00 no ano</div>
+  </div>
+</div>
+
+<!-- ADD FORM + BOTÕES -->
+<div class="add-form">
+  <div class="add-form-title">Adicionar ação</div>
+  <div class="add-row">
+    <div class="ff f-ticker"><label>Ticker *</label><input type="text" placeholder="EX: PETR4"></div>
+    <div class="ff f-qtd"><label>Qtd. que você tem</label><input type="number" value="0"></div>
+    <div class="ff f-pm"><label>Preço médio de compra</label><input type="text" value="R$ 0,00"></div>
+    <div class="hbtns">
+      <button class="btn btn-buscar">🔍 Buscar e Avaliar</button>
+      <button class="btn btn-comprar" onclick="document.getElementById('modal-buy').classList.add('open')">▲ Comprar ação</button>
+      <button class="btn btn-vender">▼ Vender ação</button>
+      <button class="btn btn-dividendos" onclick="document.getElementById('modal-div').classList.add('open')">💰 Lançar dividendos</button>
+      <button class="btn btn-importar" onclick="document.getElementById('modal-div').classList.add('open')">⬆ Importar B3</button>
+      <button class="btn btn-atualizar">🔄 Atualizar todos</button>
+    </div>
+  </div>
+</div>
+
+<!-- CRITERIOS -->
+<div class="criterios">
+  <span class="crit-label">Critérios de Avaliação (Score /6)</span>
+  <span class="badge">P/L &lt; 15</span>
+  <span class="badge">P/VP &lt; 1,5</span>
+  <span class="badge">Margem Liq. &gt; 10%</span>
+  <span class="badge">ROE &gt; 10%</span>
+  <span class="badge">Dívida/EBIT &lt; 2x</span>
+  <span class="badge changed">DY ≥ 6% ✦ alterado</span>
+</div>
+
+<div class="legenda">
+  <div class="leg"><span class="dot dg"></span> Aprovado</div>
+  <div class="leg"><span class="dot dr"></span> Reprovado</div>
+  <div class="leg"><span class="dot do"></span> Sem dado</div>
+</div>
+
+<!-- CARDS -->
+<div class="cards-grid">
+
+  <!-- PETR4 -->
+  <div class="card">
+    <div class="ch"><div class="ch-ticker">PETR4</div><div class="ch-status s-manter">MANTER</div></div>
+    <div class="score-wrap">
+      <div class="score-bg"><div class="score-fill" style="width:66.6%;background:#48bb78"></div></div>
+      <div class="score-txt">4/6 BOM</div>
+    </div>
+    <div class="section">
+      <div class="sec-title">Fundamentos</div>
+      <div class="grid3">
+        <div><div class="gi-name">P/L</div><div class="gi-val"><span class="dot dg"></span>4.56</div></div>
+        <div><div class="gi-name">P/VP</div><div class="gi-val"><span class="dot dg"></span>1.10</div></div>
+        <div><div class="gi-name">DY %</div><div class="gi-val"><span class="dot dg"></span>6.00%</div></div>
+        <div><div class="gi-name">Margem</div><div class="gi-val"><span class="dot dg"></span>21.69%</div></div>
+        <div><div class="gi-name">ROE</div><div class="gi-val"><span class="dot dg"></span>24.27%</div></div>
+        <div><div class="gi-name">Div/EBIT</div><div class="gi-val"><span class="dot dg"></span>2.93</div></div>
+      </div>
+    </div>
+    <div class="graham-box">
+      <div><div class="g-label">Preço Graham</div><div class="g-val">R$ 42,10</div></div>
+      <span class="g-sit g-desc">DESCONTADO</span>
+    </div>
+    <div class="section">
+      <div class="sec-title">Sua Posição</div>
+      <div class="grid3">
+        <div><div class="gi-name">Qtd. ações</div><div class="gi-val plain">200</div></div>
+        <div><div class="gi-name">Preço médio</div><div class="gi-val plain">R$ 36,40</div></div>
+        <div><div class="gi-name">Val. investido</div><div class="gi-val plain">R$ 7.280,00</div></div>
+        <div><div class="gi-name">Val. atual</div><div class="gi-val plain">R$ 8.420,00</div></div>
+        <div><div class="gi-name">Retorno</div><div class="gi-val plain" style="color:var(--green)">+R$ 1.140,00</div></div>
+        <div><div class="gi-name"></div><div class="gi-val plain" style="color:var(--green);font-size:11px">(+15.66%)</div></div>
+      </div>
+    </div>
+    <!-- NOVO -->
+    <div class="div-sec">
+      <div class="div-sec-title">💰 Dividendos Recebidos no Ano</div>
+      <div class="grid3">
+        <div><div class="cdiv-name">Total recebido</div><div class="cdiv-val">R$ 620,00</div></div>
+        <div><div class="cdiv-name">Yield s/ PM</div><div class="cdiv-val">8.5%</div></div>
+        <div><div class="cdiv-name">Lançamentos</div><div class="cdiv-val">3</div></div>
+      </div>
+    </div>
+    <div class="cf">
+      <div><div class="cot">R$ 42,10 <span class="cot-var up">▲ +0.24%</span></div><div class="cpeso">Peso: 17.4%</div></div>
+      <div class="cbtns">
+        <button class="cbtn cbtn-div" onclick="document.getElementById('modal-div').classList.add('open')">💰 Dividendo</button>
+        <button class="cbtn cbtn-edit">✏</button>
+        <button class="cbtn cbtn-del">🗑</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BBSE3 — Div/EBIT sem dado -->
+  <div class="card">
+    <div class="ch"><div class="ch-ticker">BBSE3</div><div class="ch-status s-manter">MANTER</div></div>
+    <div class="score-wrap">
+      <div class="score-bg"><div class="score-fill" style="width:66.6%;background:#48bb78"></div></div>
+      <div class="score-txt">4/6 BOM</div>
+    </div>
+    <div class="section">
+      <div class="sec-title">Fundamentos</div>
+      <div class="grid3">
+        <div><div class="gi-name">P/L</div><div class="gi-val"><span class="dot dg"></span>8.27</div></div>
+        <div><div class="gi-name">P/VP</div><div class="gi-val"><span class="dot dr"></span>6.02</div></div>
+        <div><div class="gi-name">DY %</div><div class="gi-val"><span class="dot dg"></span>12.00%</div></div>
+        <div><div class="gi-name">Margem</div><div class="gi-val"><span class="dot dr"></span>0.00%</div></div>
+        <div><div class="gi-name">ROE</div><div class="gi-val"><span class="dot dg"></span>72.72%</div></div>
+        <div><div class="gi-name">Div/EBIT</div><div class="gi-val"><span class="dot do"></span><span style="color:var(--orange)">S/dado</span></div></div>
+      </div>
+    </div>
+    <div class="graham-box">
+      <div><div class="g-label">Preço Graham</div><div class="g-val">R$ 26,34</div></div>
+      <span class="g-sit g-caro">CARO</span>
+    </div>
+    <div class="section">
+      <div class="sec-title">Sua Posição</div>
+      <div class="grid3">
+        <div><div class="gi-name">Qtd. ações</div><div class="gi-val plain">149</div></div>
+        <div><div class="gi-name">Preço médio</div><div class="gi-val plain">R$ 11,60</div></div>
+        <div><div class="gi-name">Val. investido</div><div class="gi-val plain">R$ 1.728,40</div></div>
+        <div><div class="gi-name">Val. atual</div><div class="gi-val plain">R$ 2.005,54</div></div>
+        <div><div class="gi-name">Retorno</div><div class="gi-val plain" style="color:var(--green)">+R$ 277,14</div></div>
+        <div><div class="gi-name"></div><div class="gi-val plain" style="color:var(--green);font-size:11px">(+16.03%)</div></div>
+      </div>
+    </div>
+    <div class="div-sec">
+      <div class="div-sec-title">💰 Dividendos Recebidos no Ano</div>
+      <div class="grid3">
+        <div><div class="cdiv-name">Total recebido</div><div class="cdiv-val">R$ 480,00</div></div>
+        <div><div class="cdiv-name">Yield s/ PM</div><div class="cdiv-val">27.6%</div></div>
+        <div><div class="cdiv-name">Lançamentos</div><div class="cdiv-val">2</div></div>
+      </div>
+    </div>
+    <div class="cf">
+      <div><div class="cot">R$ 13,46 <span class="cot-var up">▲ +1.20%</span></div><div class="cpeso">Peso: 19.1%</div></div>
+      <div class="cbtns">
+        <button class="cbtn cbtn-div" onclick="document.getElementById('modal-div').classList.add('open')">💰 Dividendo</button>
+        <button class="cbtn cbtn-edit">✏</button>
+        <button class="cbtn cbtn-del">🗑</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BBAS3 — DY 6% verde, Div/EBIT 0 verde -->
+  <div class="card">
+    <div class="ch"><div class="ch-ticker">BBAS3</div><div class="ch-status s-acomp">ACOMPANHAR</div></div>
+    <div class="score-wrap">
+      <div class="score-bg"><div class="score-fill" style="width:50%;background:var(--orange)"></div></div>
+      <div class="score-txt" style="color:var(--orange)">3/6 ATENÇÃO</div>
+    </div>
+    <div class="section">
+      <div class="sec-title">Fundamentos</div>
+      <div class="grid3">
+        <div><div class="gi-name">P/L</div><div class="gi-val"><span class="dot dg"></span>9.17</div></div>
+        <div><div class="gi-name">P/VP</div><div class="gi-val"><span class="dot dg"></span>0.61</div></div>
+        <div><div class="gi-name">DY %</div><div class="gi-val"><span class="dot dg"></span><span style="color:var(--green)">6.00% ✦</span></div></div>
+        <div><div class="gi-name">Margem</div><div class="gi-val"><span class="dot dr"></span>4.82%</div></div>
+        <div><div class="gi-name">ROE</div><div class="gi-val"><span class="dot dr"></span>8.20%</div></div>
+        <div><div class="gi-name">Div/EBIT</div><div class="gi-val"><span class="dot dg"></span>0.00</div></div>
+      </div>
+    </div>
+    <div class="graham-box">
+      <div><div class="g-label">Preço Graham</div><div class="g-val">R$ 40,85</div></div>
+      <span class="g-sit g-desc">DESCONTADO</span>
+    </div>
+    <div class="section">
+      <div class="sec-title">Sua Posição</div>
+      <div class="grid3">
+        <div><div class="gi-name">Qtd. ações</div><div class="gi-val plain">88</div></div>
+        <div><div class="gi-name">Preço médio</div><div class="gi-val plain">R$ 5,25</div></div>
+        <div><div class="gi-name">Val. investido</div><div class="gi-val plain">R$ 462,00</div></div>
+        <div><div class="gi-name">Val. atual</div><div class="gi-val plain">R$ 374,00</div></div>
+        <div><div class="gi-name">Retorno</div><div class="gi-val plain" style="color:var(--red)">-R$ 88,00</div></div>
+        <div><div class="gi-name"></div><div class="gi-val plain" style="color:var(--red);font-size:11px">(-19.05%)</div></div>
+      </div>
+    </div>
+    <div class="div-sec">
+      <div class="div-sec-title">💰 Dividendos Recebidos no Ano</div>
+      <div class="grid3">
+        <div><div class="cdiv-name">Total recebido</div><div class="cdiv-val">R$ 0,00</div></div>
+        <div><div class="cdiv-name">Yield s/ PM</div><div class="cdiv-val">—</div></div>
+        <div><div class="cdiv-name">Lançamentos</div><div class="cdiv-val">0</div></div>
+      </div>
+    </div>
+    <div class="cf">
+      <div><div class="cot">R$ 4,25 <span class="cot-var up">▲ +0.24%</span></div><div class="cpeso">Peso: 14.8%</div></div>
+      <div class="cbtns">
+        <button class="cbtn cbtn-div" onclick="document.getElementById('modal-div').classList.add('open')">💰 Dividendo</button>
+        <button class="cbtn cbtn-edit">✏</button>
+        <button class="cbtn cbtn-del">🗑</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /cards-grid -->
+
+<!-- MODAL COMPRAR -->
+<div class="overlay" id="modal-buy">
+  <div class="modal">
+    <div class="m-title">▲ Registrar Compra</div>
+    <div class="m-sub">Atualiza a quantidade e recalcula o preço médio automaticamente</div>
+    <div class="mf"><label>Ativo</label>
+      <select><option>PETR4 – Petrobras PN</option><option>BBSE3 – BB Seguridade</option><option>BBAS3 – Banco do Brasil ON</option></select>
+    </div>
+    <div class="mf-row">
+      <div class="mf"><label>Quantidade comprada</label><input type="number" value="50"></div>
+      <div class="mf"><label>Preço pago (R$)</label><input type="number" value="40.20"></div>
+    </div>
+    <div class="mf"><label>Data da compra</label><input type="date" value="2026-06-29"></div>
+    <div class="prev-box">
+      <div><div class="plab">Qtd anterior</div><div class="pval">200</div></div>
+      <div><div class="plab">PM anterior</div><div class="pval">R$ 36,40</div></div>
+      <div><div class="plab">→ Novo PM</div><div class="pval hl">R$ 37,53</div></div>
+      <div><div class="plab">→ Nova qtd</div><div class="pval hl">250</div></div>
+    </div>
+    <div class="mfooter">
+      <button class="mbtn mbtn-cancel" onclick="document.getElementById('modal-buy').classList.remove('open')">Cancelar</button>
+      <button class="mbtn mbtn-buy">Confirmar compra</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DIVIDENDOS -->
+<div class="overlay" id="modal-div">
+  <div class="modal">
+    <div class="m-title">💰 Lançar Dividendos</div>
+    <div class="m-sub">Registre os dividendos recebidos por ativo no mês</div>
+    <div class="mf"><label>Mês de referência</label>
+      <select><option>Junho / 2026</option><option>Maio / 2026</option><option>Abril / 2026</option></select>
+    </div>
+    <div class="import-zone">
+      <span class="iz-icon">📂</span>
+      <div class="iz-text">
+        <strong>Importar relatório da B3</strong>
+        <span>Sobe o arquivo e preenche todos os ativos automaticamente</span>
+      </div>
+      <button class="mbtn-import">Selecionar arquivo</button>
+    </div>
+    <div class="div-sep">ou informe manualmente</div>
+    <div class="dcl">
+      <div class="dci">
+        <div class="dcl-left"><input type="checkbox" checked id="c1"><div><div style="font-weight:700;font-size:13px">PETR4</div><div style="font-size:11px;color:var(--muted)">200 ações</div></div></div>
+        <div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:var(--muted)">R$/ação</span><input class="dinput" type="number" value="1.24" id="i1"></div>
+      </div>
+      <div class="dci">
+        <div class="dcl-left"><input type="checkbox" checked id="c2"><div><div style="font-weight:700;font-size:13px">BBSE3</div><div style="font-size:11px;color:var(--muted)">149 ações</div></div></div>
+        <div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:var(--muted)">R$/ação</span><input class="dinput" type="number" value="0.86" id="i2"></div>
+      </div>
+      <div class="dci">
+        <div class="dcl-left"><input type="checkbox" id="c3"><div><div style="font-weight:700;font-size:13px">BBAS3</div><div style="font-size:11px;color:var(--muted)">88 ações</div></div></div>
+        <div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:var(--muted)">R$/ação</span><input class="dinput" type="number" placeholder="0,00" id="i3" disabled style="opacity:.4"></div>
+      </div>
+    </div>
+    <div class="dtotal">
+      <div><div class="plab">Total a lançar</div><div class="pval" style="color:#744210" id="tdiv">R$ 376,14</div></div>
+      <div><div class="plab">Ativos selecionados</div><div class="pval" id="cdiv">2 de 3</div></div>
+    </div>
+    <div class="mfooter">
+      <button class="mbtn mbtn-cancel" onclick="document.getElementById('modal-div').classList.remove('open')">Cancelar</button>
+      <button class="mbtn mbtn-div">Lançar dividendos</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.overlay').forEach(o => o.addEventListener('click', e => { if(e.target===o) o.classList.remove('open'); }));
+  const rows = [
+    {cb:document.getElementById('c1'),inp:document.getElementById('i1'),qty:200},
+    {cb:document.getElementById('c2'),inp:document.getElementById('i2'),qty:149},
+    {cb:document.getElementById('c3'),inp:document.getElementById('i3'),qty:88},
+  ];
+  rows.forEach(({cb,inp}) => {
+    cb.addEventListener('change', () => { inp.disabled=!cb.checked; inp.style.opacity=cb.checked?'1':'.4'; calc(); });
+    inp.addEventListener('input', calc);
+  });
+  function calc() {
+    let t=0,c=0;
+    rows.forEach(({cb,inp,qty}) => { if(cb.checked&&inp.value){t+=parseFloat(inp.value)*qty;c++;} });
+    document.getElementById('tdiv').textContent='R$ '+t.toFixed(2).replace('.',',');
+    document.getElementById('cdiv').textContent=c+' de 3';
+  }
+</script>
+</body>
+</html>

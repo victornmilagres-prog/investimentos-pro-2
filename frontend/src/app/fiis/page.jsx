@@ -480,8 +480,17 @@ function FIICard({ f, onRemover, onSalvar, onAbrirDividendo, resumoAno, resumoGe
   return (
     <div style={C.card}>
       {/* Header */}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-        <span style={{fontSize:18,fontWeight:700,color:'#2563EB'}}>{f.ticker}</span>
+      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between'}}>
+        <div>
+          <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+            <span style={{fontSize:18,fontWeight:700,color:'#2563EB'}}>{f.ticker}</span>
+            {f.tipo_fundo && f.tipo_fundo !== 'FII' && (
+              <span style={{fontSize:10,fontWeight:500,padding:'2px 8px',borderRadius:20,background:'#FEF3C7',color:'#92400E'}}>{f.tipo_fundo}</span>
+            )}
+          </div>
+          {f.nome_fundo && <p style={{fontSize:12,fontWeight:500,color:'#4A5568',margin:'3px 0 1px'}}>{f.nome_fundo}</p>}
+          {f.administradora && <p style={{fontSize:10,color:'#8896A8',margin:0}}>Adm: {f.administradora}</p>}
+        </div>
         <span className={badgeDecisao(f.decisao)}>{f.decisao}</span>
       </div>
 
@@ -520,6 +529,25 @@ function FIICard({ f, onRemover, onSalvar, onAbrirDividendo, resumoAno, resumoGe
           })}
         </div>
       </div>
+
+      {/* Preço Justo */}
+      {f.preco_justo > 0 && (
+        <div style={{background:'#FDF4FF',border:'1px solid #E9D5FF',borderRadius:10,padding:'10px 14px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div>
+            <p style={{fontSize:11,color:'#6B21A8',marginBottom:3}}>Preço Justo (VPA)</p>
+            <p style={{fontSize:15,fontWeight:700,color:'#4C1D95'}}>{fmt.brl(f.preco_justo)}</p>
+            <p style={{fontSize:10,color:'#7C3AED',marginTop:2}}>VPA ÷ P/VP esperado (1,0)</p>
+          </div>
+          <div style={{textAlign:'right'}}>
+            <p style={{fontSize:11,color:'#6B21A8',marginBottom:3}}>Situação vs Justo</p>
+            <span style={{
+              fontSize:11,fontWeight:500,padding:'2px 8px',borderRadius:4,
+              background: f.status_justo === 'DESCONTADO' ? '#EDE9FE' : f.status_justo === 'JUSTO' ? '#FEF3C7' : '#FEE2E2',
+              color: f.status_justo === 'DESCONTADO' ? '#5B21B6' : f.status_justo === 'JUSTO' ? '#92400E' : '#991B1B'
+            }}>{f.status_justo}</span>
+          </div>
+        </div>
+      )}
 
       {/* Posição */}
       <div>
@@ -688,12 +716,15 @@ function FIIsForm({ onAdicionado }) {
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────
-function Dashboard({ fiis, anoFiltro, setAnoFiltro, anosDisponiveis, resumoAno }) {
+function Dashboard({ fiis, anoFiltro, setAnoFiltro, anosDisponiveis, resumoAno, resumoGeral }) {
   if (!fiis.length) return null;
   const patrimonio   = fiis.reduce((s,f)=>s+(f.preco_atual*(f.quantidade||0)),0);
   const custo        = fiis.reduce((s,f)=>{ const p=calcPerformance(f.preco_atual,f.preco_compra,f.quantidade); return s+p.custo; },0);
   const resultado    = patrimonio - custo;
   const pctTotal     = custo > 0 ? (resultado/custo)*100 : 0;
+  const totalDiv     = Object.values(resumoGeral||{}).reduce((s,v)=>s+(v.total||0),0);
+  const ganhoTotal   = resultado + totalDiv;
+  const pctGanhoTotal = custo > 0 ? (ganhoTotal/custo)*100 : 0;
   const divAno       = Object.values(resumoAno).reduce((s,v)=>s+(v.total||0),0);
   const custTotal    = fiis.reduce((s,f)=>s+((f.preco_compra||0)*(f.quantidade||0)),0);
   const yieldAno     = custTotal > 0 ? (divAno/custTotal)*100 : 0;
@@ -708,6 +739,20 @@ function Dashboard({ fiis, anoFiltro, setAnoFiltro, anosDisponiveis, resumoAno }
 
   return (
     <div style={{marginBottom:20}}>
+      {/* Resultado compra / após dividendos */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:14}}>
+        <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:10,padding:16}}>
+          <p style={{fontSize:11,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:6}}>Resultado total da compra</p>
+          <p style={{fontSize:19,fontWeight:800,color:resultado>=0?'#16A34A':'#DC2626'}}>{resultado>=0?'+':''}{fmt.brl(resultado)}</p>
+          <p style={{fontSize:11,color:'#8896A8',marginTop:3}}>{resultado>=0?'+':''}{fmt.pct(pctTotal)} desde aporte</p>
+        </div>
+        <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:10,padding:16}}>
+          <p style={{fontSize:11,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:6}}>Resultado após dividendos</p>
+          <p style={{fontSize:19,fontWeight:800,color:ganhoTotal>=0?'#16A34A':'#DC2626'}}>{ganhoTotal>=0?'+':''}{fmt.brl(ganhoTotal)}</p>
+          <p style={{fontSize:11,color:'#8896A8',marginTop:3}}>{ganhoTotal>=0?'+':''}{fmt.pct(pctGanhoTotal)} com dividendos</p>
+        </div>
+      </div>
+
       {/* 4 cards */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:14,marginBottom:14}}>
         {[
@@ -770,12 +815,26 @@ function Dashboard({ fiis, anoFiltro, setAnoFiltro, anosDisponiveis, resumoAno }
 }
 
 // ─── PÁGINA ───────────────────────────────────────────────────────────────
+const BuscaFIIs = ({ valor, onChange }) => (
+  <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:10,padding:'10px 14px',display:'flex',alignItems:'center',gap:8,marginBottom:16}}>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8896A8" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input
+      value={valor}
+      onChange={e => onChange(e.target.value)}
+      placeholder="Buscar FII... ex: CPTS11, Capitânia, Papel"
+      style={{border:'none',outline:'none',fontSize:13,color:'#1A1A2E',background:'transparent',flex:1}}
+    />
+    {valor && <button onClick={() => onChange('')} style={{background:'none',border:'none',cursor:'pointer',color:'#8896A8',fontSize:16}}>×</button>}
+  </div>
+);
+
 export default function FIIsPage() {
   const [fiis, setFiis]               = useState([]);
   const [loading, setLoading]         = useState(true);
   const [atualizando, setAtualizando] = useState(false);
   const [modalCompra, setModalCompra] = useState(null);
   const [modalDiv, setModalDiv]       = useState(false);
+  const [busca, setBusca]             = useState('');
 
   const { anosDisponiveis, anoFiltro, setAnoFiltro, resumoAno, resumoGeral, carregarDados } = useDividendosFII(fiis);
 
@@ -852,7 +911,7 @@ export default function FIIsPage() {
       </div>
 
       {/* Dashboard */}
-      {fiis.length > 0 && <Dashboard fiis={fiis} anoFiltro={anoFiltro} setAnoFiltro={setAnoFiltro} anosDisponiveis={anosDisponiveis} resumoAno={resumoAno}/>}
+      {fiis.length > 0 && <Dashboard fiis={fiis} anoFiltro={anoFiltro} setAnoFiltro={setAnoFiltro} anosDisponiveis={anosDisponiveis} resumoAno={resumoAno} resumoGeral={resumoGeral}/>}
 
       {/* Form adicionar */}
       <Suspense fallback={<div style={{background:'#FFF',border:'1px solid #E8ECF0',borderRadius:14,padding:20,marginBottom:24,height:90}}/>}>
@@ -867,10 +926,17 @@ export default function FIIsPage() {
         ))}
       </div>
 
+      {fiis.length > 0 && <BuscaFIIs valor={busca} onChange={setBusca} />}
+
       {/* Cards */}
       {fiis.length > 0 ? (
         <div className="grid-cards">
-          {fiis.map(f=>(
+          {fiis.filter(f => {
+            const q = busca.toLowerCase();
+            return !q || f.ticker.toLowerCase().includes(q)
+              || (f.nome_fundo || '').toLowerCase().includes(q)
+              || (f.tipo_fundo || '').toLowerCase().includes(q);
+          }).map(f=>(
             <FIICard key={f.ticker} f={f}
               onRemover={remover}
               onSalvar={salvarEdicao}

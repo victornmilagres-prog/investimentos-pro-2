@@ -20,6 +20,33 @@ const app = express();
 async function runMigrations() {
   try {
     await pool.query(`
+      ALTER TABLE acoes_carteira
+        ADD COLUMN IF NOT EXISTS nome_empresa VARCHAR(200),
+        ADD COLUMN IF NOT EXISTS preco_bazin NUMERIC(10,4) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS status_bazin VARCHAR(20)
+    `);
+    await pool.query(`
+      ALTER TABLE fiis_carteira
+        ADD COLUMN IF NOT EXISTS nome_fundo VARCHAR(200),
+        ADD COLUMN IF NOT EXISTS administradora VARCHAR(200),
+        ADD COLUMN IF NOT EXISTS tipo_fundo VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS vpa NUMERIC(10,4) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS preco_justo NUMERIC(10,4) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS status_justo VARCHAR(20)
+    `);
+    await pool.query(`
+      ALTER TABLE watchlist
+        ADD COLUMN IF NOT EXISTS nome_ativo VARCHAR(200),
+        ADD COLUMN IF NOT EXISTS administradora VARCHAR(200),
+        ADD COLUMN IF NOT EXISTS tipo_fundo VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS vpa NUMERIC(10,4) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS preco_bazin NUMERIC(10,4) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS status_bazin VARCHAR(20),
+        ADD COLUMN IF NOT EXISTS preco_justo NUMERIC(10,4) DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS status_justo VARCHAR(20),
+        ADD COLUMN IF NOT EXISTS favorito BOOLEAN DEFAULT FALSE
+    `);
+    await pool.query(`
       ALTER TABLE usuarios
         ADD COLUMN IF NOT EXISTS reset_token VARCHAR(255),
         ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMP,

@@ -667,7 +667,12 @@ function AcaoCard({ a, onRemover, onSalvar, onAbrirProvento, resumoAno, resumoGe
     <div style={C.card}>
       {/* Header */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-        <span style={{fontSize:18,fontWeight:700,color:'#2563EB'}}>{a.ticker}</span>
+        <div>
+          <span style={{fontSize:18,fontWeight:700,color:'#2563EB'}}>{a.ticker}</span>
+          {a.nome_empresa && (
+            <p style={{fontSize:12,fontWeight:500,color:'#4A5568',margin:'2px 0 0'}}>{a.nome_empresa}</p>
+          )}
+        </div>
         <span className={badgeDecisao(a.decisao)}>{a.decisao}</span>
       </div>
 
@@ -715,6 +720,25 @@ function AcaoCard({ a, onRemover, onSalvar, onAbrirProvento, resumoAno, resumoGe
           <div style={{textAlign:'right'}}>
             <p style={{fontSize:11,color:'#3B82F6',marginBottom:3}}>Situação vs Graham</p>
             <span className={grahamTag(a.status_graham)}>{a.status_graham}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Bazin */}
+      {a.preco_bazin > 0 && (
+        <div style={{background:'#F0FDF4',border:'1px solid #BBF7D0',borderRadius:10,padding:'10px 14px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div>
+            <p style={{fontSize:11,color:'#276749',marginBottom:3}}>Preço Bazin</p>
+            <p style={{fontSize:15,fontWeight:700,color:'#14532D'}}>{fmt.brl(a.preco_bazin)}</p>
+            <p style={{fontSize:10,color:'#276749',marginTop:2}}>DY anual ÷ 6%</p>
+          </div>
+          <div style={{textAlign:'right'}}>
+            <p style={{fontSize:11,color:'#276749',marginBottom:3}}>Situação vs Bazin</p>
+            <span style={{
+              fontSize:11,fontWeight:500,padding:'2px 8px',borderRadius:4,
+              background: a.status_bazin === 'DESCONTADO' ? '#D1FAE5' : a.status_bazin === 'JUSTO' ? '#FEF3C7' : '#FEE2E2',
+              color: a.status_bazin === 'DESCONTADO' ? '#065F46' : a.status_bazin === 'JUSTO' ? '#92400E' : '#991B1B'
+            }}>{a.status_bazin}</span>
           </div>
         </div>
       )}
@@ -877,12 +901,26 @@ function Dashboard({ acoes, anoFiltro, setAnoFiltro, anosDisponiveis, resumoAno 
 }
 
 // ─── PÁGINA ───────────────────────────────────────────────────────────────
+const BuscaAcoes = ({ valor, onChange }) => (
+  <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:10,padding:'10px 14px',display:'flex',alignItems:'center',gap:8,marginBottom:16}}>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8896A8" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input
+      value={valor}
+      onChange={e => onChange(e.target.value)}
+      placeholder="Buscar ação... ex: PETR4, Petrobras"
+      style={{border:'none',outline:'none',fontSize:13,color:'#1A1A2E',background:'transparent',flex:1}}
+    />
+    {valor && <button onClick={() => onChange('')} style={{background:'none',border:'none',cursor:'pointer',color:'#8896A8',fontSize:16}}>×</button>}
+  </div>
+);
+
 export default function AcoesPage() {
   const [acoes, setAcoes]             = useState([]);
   const [loading, setLoading]         = useState(true);
   const [atualizando, setAtualizando] = useState(false);
   const [modalCompra, setModalCompra] = useState(null);
   const [modalProv, setModalProv]     = useState(false);
+  const [busca, setBusca]             = useState('');
 
   const { anosDisponiveis, anoFiltro, setAnoFiltro, resumoAno, resumoGeral, carregarDados } = useProventosExtras(acoes);
 
@@ -976,9 +1014,14 @@ export default function AcoesPage() {
         ))}
       </div>
 
+      {acoes.length > 0 && <BuscaAcoes valor={busca} onChange={setBusca} />}
+
       {acoes.length > 0 ? (
         <div className="grid-cards">
-          {acoes.map(a=>(
+          {acoes.filter(a => {
+            const q = busca.toLowerCase();
+            return !q || a.ticker.toLowerCase().includes(q) || (a.nome_empresa || '').toLowerCase().includes(q);
+          }).map(a=>(
             <AcaoCard key={a.ticker} a={a}
               onRemover={remover}
               onSalvar={salvarEdicao}

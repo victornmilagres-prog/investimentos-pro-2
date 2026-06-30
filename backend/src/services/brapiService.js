@@ -63,11 +63,34 @@ function classificarGraham(precoAtual, precoGraham) {
   return 'CARO';
 }
 
-// DY: >= 6 (era > 6). 6% exato agora aprova.
-// Div/EBIT:
-//   - divida === 0  → SEM DADO (API não retornou) → maxScore = 5, não pontua
-//   - divida > 0 && < 2 → aprovado
-//   - divida >= 2  → reprovado, maxScore continua 6
+function calcularPrecoBazin(preco, dy) {
+  if (!(preco > 0 && dy > 0)) return 0;
+  const dividendoAnual = preco * (dy / 100);
+  return dividendoAnual / 0.06;
+}
+
+function classificarBazin(precoAtual, precoBazin) {
+  if (!(precoBazin > 0)) return 'SEM DADO';
+  if (precoAtual <= precoBazin) return 'DESCONTADO';
+  const pct = ((precoAtual - precoBazin) / precoBazin) * 100;
+  if (pct <= 10) return 'JUSTO';
+  return 'CARO';
+}
+
+function calcularPrecoJustoFII(preco, pvp) {
+  if (!(preco > 0 && pvp > 0)) return 0;
+  const vpa = preco / pvp;
+  return vpa;
+}
+
+function classificarJustoFII(precoAtual, precoJusto) {
+  if (!(precoJusto > 0)) return 'SEM DADO';
+  if (precoAtual <= precoJusto) return 'DESCONTADO';
+  const pct = ((precoAtual - precoJusto) / precoJusto) * 100;
+  if (pct <= 5) return 'JUSTO';
+  return 'CARO';
+}
+
 function scoreAcao(pl, pvp, margem, roe, divida, dy, ticker) {
   const bancos = ['BBAS3','ITUB4','ITSA4','BBDC4','SANB11','BPAC11','ITUB3','BBDC3'];
   let score = 0;
@@ -118,7 +141,7 @@ function observacaoAcao(pl, pvp, margem, roe, divida, dy) {
 
 function scoreFII(dyMensal, pvp, volume, patrimonio) {
   let score = 0;
-  if (dyMensal > 1) score++;
+  if (dyMensal >= 1) score++;
   if (pvp > 0 && pvp < 1.05) score++;
   if (volume > 1000000) score++;
   if (patrimonio > 1000000000) score++;
@@ -141,11 +164,63 @@ function decisaoFII(score) {
 
 function observacaoFII(dyMensal, pvp, volume, patrimonio) {
   const obs = [];
-  if (!(dyMensal > 1)) obs.push('DY abaixo');
+  if (!(dyMensal >= 1)) obs.push('DY abaixo');
   if (!(pvp > 0 && pvp < 1.05)) obs.push('P/VP fora ideal');
   if (!(volume > 1000000)) obs.push('Liquidez baixa');
   if (!(patrimonio > 1000000000)) obs.push('Patrimônio baixo');
   return obs.length ? obs.join('; ') : 'Todos os critérios aprovados';
+}
+
+function inferirTipoFII(nome = '', ticker = '') {
+  const n = (nome + ' ' + ticker).toUpperCase();
+  if (/AGRO|TERRA|RURAL|CAMPO|FAZENDA/.test(n)) return 'Agro';
+  if (/HOTEL|HOSP/.test(n)) return 'Hotel';
+  if (/LOGIST|LOG|GALPAO|GALPÃO|ARMAZEM|ARMAZÉM/.test(n)) return 'Logística';
+  if (/SHOPPING|MALL|VAREJO/.test(n)) return 'Shoppings';
+  if (/EDUC|ESCOLA|UNIVERSIDADE/.test(n)) return 'Educacional';
+  if (/SAUDE|SAÚDE|HOSPITAL|CLINIC/.test(n)) return 'Saúde';
+  if (/RENDA|PAPEL|CRI|CRA|RECEBIVEL|RECEBIVEIS/.test(n)) return 'Papel';
+  if (/HIBRIDO|HÍBRIDO|MULTI/.test(n)) return 'Híbrido';
+  if (/TIJOLO|OFFICE|ESCRITORIO|ESCRITÓRIO|LAJE|CORPORATIVO/.test(n)) return 'Tijolo';
+  return 'FII';
+}
+
+let fundamentusCache = { data: null, timestamp: 0 };
+
+async function buscarFundamentus() {
+  const agora = Date.now();
+  if (fundamentusCache.data && agora - fundamentusCache.timestamp < 3600000) return fundamentusCache.data;
+  const res = await axios.get('https://www.fundamentus.com.br/fii_resultado.php', {
+    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept-Language': 'pt-BR,pt;q=0.9' },
+    responseType: 'arraybuffer',
+    timeout: 15000
+  });
+  const html = Buffer.from(res.data).toString('latin1');
+  const rows = html.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || [];
+  const mapa = {};
+  for (const row of rows) {
+    const cells = (row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [])
+      .map(c => c.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, '').trim());
+    if (cells.length < 8) continue;
+    const ticker = cells[0].toUpperCase();
+    if (!/^[A-Z]{4}11B?$/.test(ticker)) continue;
+    const parseNumBR = s => { const n = parseFloat(String(s).replace(/\./g,'').replace(',','.')); return isNaN(n) ? 0 : n; };
+    const parsePct = s => parseNumBR(String(s).replace('%',''));
+    mapa[ticker] = {
+      preco: parseNumBR(cells[2]),
+      dyAnual: parsePct(cells[4]),
+      pvp: parseNumBR(cells[5]),
+      patrimonioLiquido: parseNumBR(cells[6]),
+      volumeFinanceiro: parseNumBR(cells[7]),
+    };
+  }
+  fundamentusCache = { data: mapa, timestamp: agora };
+  return mapa;
+}
+
+async function buscarFIIFundamentus(ticker) {
+  const mapa = await buscarFundamentus();
+  return mapa[ticker.toUpperCase()] || null;
 }
 
 async function buscarAcao(ticker, dividaManual = null) {
@@ -160,6 +235,8 @@ async function buscarAcao(ticker, dividaManual = null) {
 
   const item = data.results[0];
   const preco = primeiroNumero([item.regularMarketPrice, item.currentPrice]);
+
+  const nomeEmpresa = item.longName || item.shortName || item.displayName || '';
 
   const pl = primeiroNumero([
     item.priceEarnings, item.trailingPE,
@@ -181,7 +258,7 @@ async function buscarAcao(ticker, dividaManual = null) {
 
   const roe = percentual(primeiroNumero([
     item.returnOnEquity,
-    buscar(item, ['returnOnEquity','retorno sobre patrimônio líquido','retorno sobre patrimonio liquido','roe'])
+    buscar(item, ['returnOnEquity','roe'])
   ]));
 
   const dy = percentual(primeiroNumero([
@@ -196,9 +273,11 @@ async function buscarAcao(ticker, dividaManual = null) {
 
   const precoGraham = calcularPrecoGraham(preco, pl, pvp);
   const statusGraham = classificarGraham(preco, precoGraham);
-  const { score, maxScore } = scoreAcao(pl, pvp, margem, roe, divida, dy, ticker);
 
-  console.log(`[${ticker}] pl=${pl} pvp=${pvp} margem=${margem} roe=${roe} dy=${dy} divida=${divida} score=${score}/${maxScore}`);
+  const precoBazin = calcularPrecoBazin(preco, dy);
+  const statusBazin = classificarBazin(preco, precoBazin);
+
+  const { score, maxScore } = scoreAcao(pl, pvp, margem, roe, divida, dy, ticker);
 
   const variacaoDia = numero(item.regularMarketChangePercent);
   const variacaoDiaReais = numero(item.regularMarketChange);
@@ -207,9 +286,13 @@ async function buscarAcao(ticker, dividaManual = null) {
   const precoMaximo = numero(item.regularMarketDayHigh);
 
   return {
-    ticker, preco,
+    ticker,
+    nomeEmpresa,
+    preco,
     precoGraham: parseFloat(precoGraham.toFixed(2)),
     statusGraham,
+    precoBazin: parseFloat(precoBazin.toFixed(2)),
+    statusBazin,
     pl: parseFloat(pl.toFixed(4)),
     pvp: parseFloat(pvp.toFixed(4)),
     margemLiquida: parseFloat(margem.toFixed(4)),
@@ -232,46 +315,6 @@ async function buscarAcao(ticker, dividaManual = null) {
   };
 }
 
-// ─── Fundamentus fallback (cache 1h) — cobre ~560 FIIs ───────────────────
-let fundamentusCache = { data: null, timestamp: 0 };
-
-async function buscarFundamentus() {
-  const agora = Date.now();
-  if (fundamentusCache.data && agora - fundamentusCache.timestamp < 3600000) return fundamentusCache.data;
-  const res = await axios.get('https://www.fundamentus.com.br/fii_resultado.php', {
-    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept-Language': 'pt-BR,pt;q=0.9' },
-    responseType: 'arraybuffer',
-    timeout: 15000
-  });
-  // HTML em latin-1
-  const html = Buffer.from(res.data).toString('latin1');
-  const rows = html.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || [];
-  const mapa = {};
-  for (const row of rows) {
-    const cells = (row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [])
-      .map(c => c.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, '').trim());
-    if (cells.length < 8) continue;
-    const ticker = cells[0].toUpperCase();
-    if (!/^[A-Z]{4}11B?$/.test(ticker)) continue;
-    const parseNumBR = s => { const n = parseFloat(String(s).replace(/\./g,'').replace(',','.')); return isNaN(n) ? 0 : n; };
-    const parsePct  = s => parseNumBR(String(s).replace('%',''));
-    mapa[ticker] = {
-      preco:            parseNumBR(cells[2]),
-      dyAnual:          parsePct(cells[4]),
-      pvp:              parseNumBR(cells[5]),
-      patrimonioLiquido: parseNumBR(cells[6]),
-      volumeFinanceiro: parseNumBR(cells[7]),
-    };
-  }
-  fundamentusCache = { data: mapa, timestamp: agora };
-  return mapa;
-}
-
-async function buscarFIIFundamentus(ticker) {
-  const mapa = await buscarFundamentus();
-  return mapa[ticker.toUpperCase()] || null;
-}
-
 async function buscarFII(ticker, ajustes = {}) {
   ticker = ticker.trim().toUpperCase();
 
@@ -279,14 +322,16 @@ async function buscarFII(ticker, ajustes = {}) {
   const resQuote = await axios.get(urlQuote, { timeout: 15000 });
   const quote = resQuote.data?.results?.[0] || {};
 
+  const nomeFundo = quote.longName || quote.shortName || quote.displayName || '';
+  const administradora = quote.managedBy || quote.fundFamily || quote.companyOfficers?.[0]?.name || '';
+  const tipoFundo = inferirTipoFII(nomeFundo, ticker);
+
   let fiiBrapi = {};
   try {
     const urlInd = `${BRAPI_BASE}/v2/fii/indicators?symbols=${ticker}&token=${TOKEN}`;
     const resInd = await axios.get(urlInd, { timeout: 15000 });
     fiiBrapi = resInd.data?.fiis?.[0] || {};
-    console.log(`[FII ${ticker}] indicators: equity=${fiiBrapi.equity} pvp=${fiiBrapi.priceToNav} dy12m=${fiiBrapi.dividendYield12m} dy1m=${fiiBrapi.dividendYield1m}`);
   } catch(e) {
-    console.log(`[FII ${ticker}] Erro indicators:`, e.message);
     try {
       for (let page = 1; page <= 4; page++) {
         const urlFii = `${BRAPI_BASE}/v2/fii/list?limit=500&page=${page}&token=${TOKEN}`;
@@ -307,7 +352,6 @@ async function buscarFII(ticker, ajustes = {}) {
     buscar(quote, ['dividendYield','dy'])
   ]));
 
-  // monthlyReturn é retorno de preço, não DY — não usar
   let dyMensal = percentual(fiiBrapi.dividendYield1m || 0);
   if (dyMensal === 0 && dyAnual > 0) dyMensal = dyAnual / 12;
 
@@ -325,19 +369,16 @@ async function buscarFII(ticker, ajustes = {}) {
     buscar(quote, ['netAssets','equity','netWorth','totalAssets'])
   ]);
 
-  // Fundamentus: liquidez média 30 dias em R$ + fallback para pvp/dy/patrimônio
   try {
     const fund = await buscarFIIFundamentus(ticker);
     if (fund) {
-      // Volume: sempre usa Fundamentus (média 30 dias em R$), Brapi só dá volume do dia
       volume = fund.volumeFinanceiro;
       if (pvp === 0) pvp = fund.pvp;
       if (dyAnual === 0) dyAnual = fund.dyAnual;
       if (patrimonio === 0) patrimonio = fund.patrimonioLiquido;
       if (preco === 0) preco = fund.preco;
-      console.log(`[FII ${ticker}] Fundamentus: vol=${volume} dy=${dyAnual} pvp=${pvp}`);
     }
-  } catch(e) { console.log(`[FII ${ticker}] Fundamentus erro:`, e.message); }
+  } catch(e) {}
 
   if (ajustes.dyMensal) dyMensal = numero(ajustes.dyMensal);
   if (ajustes.dyAnual) dyAnual = numero(ajustes.dyAnual);
@@ -345,11 +386,13 @@ async function buscarFII(ticker, ajustes = {}) {
   if (ajustes.volumeFinanceiroDia) volume = numero(ajustes.volumeFinanceiroDia);
   if (ajustes.patrimonioLiquido) patrimonio = numero(ajustes.patrimonioLiquido);
 
-  // Recalcula dyMensal com dyAnual possivelmente atualizado pelo fallback
   if (dyMensal === 0 && dyAnual > 0) dyMensal = dyAnual / 12;
 
+  const vpa = preco > 0 && pvp > 0 ? preco / pvp : 0;
+  const precoJusto = calcularPrecoJustoFII(preco, pvp);
+  const statusJusto = classificarJustoFII(preco, precoJusto);
+
   const score = scoreFII(dyMensal, pvp, volume, patrimonio);
-  console.log(`[FII ${ticker}] dy=${dyMensal} pvp=${pvp} vol=${volume} pat=${patrimonio} score=${score}`);
 
   const variacaoDia = numero(quote.regularMarketChangePercent);
   const variacaoDiaReais = numero(quote.regularMarketChange);
@@ -358,7 +401,14 @@ async function buscarFII(ticker, ajustes = {}) {
   const precoMaximo = numero(quote.regularMarketDayHigh);
 
   return {
-    ticker, preco,
+    ticker,
+    nomeFundo,
+    administradora,
+    tipoFundo,
+    preco,
+    vpa: parseFloat(vpa.toFixed(4)),
+    precoJusto: parseFloat(precoJusto.toFixed(2)),
+    statusJusto,
     dyMensal: parseFloat(dyMensal.toFixed(4)),
     dyAnual: parseFloat(dyAnual.toFixed(4)),
     pvp: parseFloat(pvp.toFixed(4)),
@@ -392,5 +442,8 @@ function calcularPesos(ativos) {
 module.exports = {
   buscarAcao, buscarFII, calcularPesos,
   scoreAcao, classificarAcao, decisaoAcao,
-  scoreFII, classificarFII, decisaoFII
+  scoreFII, classificarFII, decisaoFII,
+  calcularPrecoBazin, classificarBazin,
+  calcularPrecoJustoFII, classificarJustoFII,
+  inferirTipoFII
 };
