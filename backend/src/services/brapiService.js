@@ -287,7 +287,7 @@ async function buscarFII(ticker, ajustes = {}) {
     } catch(e2) {}
   }
 
-  const preco = primeiroNumero([fiiBrapi.price, quote.regularMarketPrice, quote.currentPrice]);
+  let preco = primeiroNumero([fiiBrapi.price, quote.regularMarketPrice, quote.currentPrice]);
 
   let dyAnual = percentual(primeiroNumero([
     fiiBrapi.dividendYield12m,
