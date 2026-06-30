@@ -232,37 +232,44 @@ async function buscarAcao(ticker, dividaManual = null) {
   };
 }
 
-// ─── Status Invest fallback (cache 1h) ───────────────────────────────────
-// NOTA: a API retorna no máximo 100 FIIs (ABCP11–CIXR11) e ignora parâmetros
-// de paginação. FIIs fora desse corte (ex: CPSH11, TVRI11) não são acessíveis
-// por nenhuma API pública — use ajustes_manuais_fiis para esses casos.
-let siCache = { data: null, timestamp: 0 };
+// ─── Fundamentus fallback (cache 1h) — cobre ~560 FIIs ───────────────────
+let fundamentusCache = { data: null, timestamp: 0 };
 
-async function buscarStatusInvest() {
+async function buscarFundamentus() {
   const agora = Date.now();
-  if (siCache.data && agora - siCache.timestamp < 3600000) return siCache.data;
-  const url = 'https://statusinvest.com.br/category/advancedsearchresult?search=' +
-    encodeURIComponent(JSON.stringify({ Segment: '' })) + '&CategoryType=2';
-  const res = await axios.get(url, {
-    headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
+  if (fundamentusCache.data && agora - fundamentusCache.timestamp < 3600000) return fundamentusCache.data;
+  const res = await axios.get('https://www.fundamentus.com.br/fii_resultado.php', {
+    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Accept-Language': 'pt-BR,pt;q=0.9' },
+    responseType: 'arraybuffer',
     timeout: 15000
   });
-  const lista = Array.isArray(res.data) ? res.data : [];
-  siCache = { data: lista, timestamp: agora };
-  return lista;
+  // HTML em latin-1
+  const html = Buffer.from(res.data).toString('latin1');
+  const rows = html.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) || [];
+  const mapa = {};
+  for (const row of rows) {
+    const cells = (row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) || [])
+      .map(c => c.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, '').trim());
+    if (cells.length < 8) continue;
+    const ticker = cells[0].toUpperCase();
+    if (!/^[A-Z]{4}11B?$/.test(ticker)) continue;
+    const parseNumBR = s => { const n = parseFloat(String(s).replace(/\./g,'').replace(',','.')); return isNaN(n) ? 0 : n; };
+    const parsePct  = s => parseNumBR(String(s).replace('%',''));
+    mapa[ticker] = {
+      preco:            parseNumBR(cells[2]),
+      dyAnual:          parsePct(cells[4]),
+      pvp:              parseNumBR(cells[5]),
+      patrimonioLiquido: parseNumBR(cells[6]),
+      volumeFinanceiro: parseNumBR(cells[7]),
+    };
+  }
+  fundamentusCache = { data: mapa, timestamp: agora };
+  return mapa;
 }
 
-async function buscarFIIStatusInvest(ticker) {
-  const lista = await buscarStatusInvest();
-  const item = lista.find(f => f.ticker === ticker.toUpperCase());
-  if (!item) return null;
-  return {
-    preco: item.price || 0,
-    dyAnual: item.dy || 0,
-    pvp: item.p_vp || 0,
-    patrimonioLiquido: item.patrimonio || 0,
-    volumeFinanceiro: item.liquidezmediadiaria || 0,
-  };
+async function buscarFIIFundamentus(ticker) {
+  const mapa = await buscarFundamentus();
+  return mapa[ticker.toUpperCase()] || null;
 }
 
 async function buscarFII(ticker, ajustes = {}) {
@@ -322,7 +329,7 @@ async function buscarFII(ticker, ajustes = {}) {
   // Fallback Status Invest quando Brapi não tem pvp/dy
   if (pvp === 0 && dyAnual === 0) {
     try {
-      const si = await buscarFIIStatusInvest(ticker);
+      const si = await buscarFIIFundamentus(ticker);
       if (si) {
         if (pvp === 0) pvp = si.pvp;
         if (dyAnual === 0) dyAnual = si.dyAnual;
