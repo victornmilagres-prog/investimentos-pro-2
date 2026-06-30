@@ -333,8 +333,8 @@ function ModalDividendosFII({ fiis, onFechar, onSalvar }) {
                     mes: l.mes, ano: l.ano, selecionado: true });
                 }
                 const tickersImportados = new Set(novas.map(l=>l.ticker));
-                const manuais = fiis.filter(f=>!tickersImportados.has(f.ticker))
-                  .map((f,i)=>({ id:idSeq+i, ticker:f.ticker, tipo:'Rendimento', valor:'', valor_total:null, quantidade:null, mes:hoje.getMonth()+1, ano:hoje.getFullYear(), selecionado:false }));
+                const manuais = fiis.filter(fii=>!tickersImportados.has(fii.ticker))
+                  .map((fii,i)=>({ id:idSeq+i, ticker:fii.ticker, tipo:'Rendimento', valor:'', valor_total:null, quantidade:null, mes:hoje.getMonth()+1, ano:hoje.getFullYear(), selecionado:false }));
                 setLinhas([...novas, ...manuais]);
                 setAvisoFora([...new Set(fora)]);
                 setModoImport(true);
