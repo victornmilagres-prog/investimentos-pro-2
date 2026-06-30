@@ -11,25 +11,44 @@ async function parsearArquivoB3FII(file) {
   const XLSX = await import('xlsx');
   const buffer = await file.arrayBuffer();
   const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
-  const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+
+  // FIX: B3 xlsx não traz !ref confiável — recalcula varrendo células reais
+  const cellAddresses = Object.keys(sheet).filter(k => k[0] !== '!');
+  if (cellAddresses.length) {
+    const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1');
+    let minR = range.s.r, maxR = range.e.r, minC = range.s.c, maxC = range.e.c;
+    cellAddresses.forEach(addr => {
+      const cell = XLSX.utils.decode_cell(addr);
+      if (cell.r < minR) minR = cell.r;
+      if (cell.r > maxR) maxR = cell.r;
+      if (cell.c < minC) minC = cell.c;
+      if (cell.c > maxC) maxC = cell.c;
+    });
+    sheet['!ref'] = XLSX.utils.encode_range({ s: { r: minR, c: minC }, e: { r: maxR, c: maxC } });
+  }
+
+  const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true });
   if (!rows.length) return [];
 
   const norm = s => String(s).toLowerCase()
-    .replace(/[àáâãä]/g,'a').replace(/[èéêë]/g,'e').replace(/[ìíîï]/g,'i')
-    .replace(/[òóôõö]/g,'o').replace(/[ùúûü]/g,'u').replace(/[ç]/g,'c').trim();
+    .replace(/[àáâã]/g,'a').replace(/[èéê]/g,'e').replace(/[ìíîï]/g,'i')
+    .replace(/[òóôõ]/g,'o').replace(/[ùúûü]/g,'u').replace(/[ç]/g,'c').trim();
+
   const colMap = {};
   Object.keys(rows[0]).forEach(k => { colMap[norm(k)] = k; });
-  const col = (...ns) => ns.map(n => colMap[n]).find(Boolean);
+  const col = (...names) => names.map(n => colMap[n]).find(Boolean);
 
-  const colProduto  = col('produto','ativo','ticker');
-  const colTipo     = col('tipo de evento','tipo evento','tipo');
-  const colData     = col('pagamento','data pagamento','data de pagamento','data com','data');
-  const colQtd      = col('quantidade','qtd');
-  const colPreco    = col('preco unitario','preco','valor unitario','valor por cota');
-  const colValorLiq = col('valor liquido','valor bruto','valor');
+  const colProduto  = col('produto', 'ativo', 'ticker');
+  const colTipo     = col('tipo de evento', 'tipo evento', 'tipo');
+  const colData     = col('pagamento', 'data pagamento', 'data de pagamento', 'data com', 'data');
+  const colQtd      = col('quantidade', 'qtd');
+  const colPreco    = col('preco unitario', 'preco', 'valor unitario', 'valor por cota');
+  const colValorLiq = col('valor liquido', 'valor bruto', 'valor');
+
   if (!colProduto) return [];
 
-  const maparTipo = (t = '') => {
+  const mapTipo = (t = '') => {
     const v = t.toUpperCase();
     if (v.includes('REND')) return 'Rendimento';
     if (v.includes('DIV')) return 'Dividendo';
@@ -37,35 +56,63 @@ async function parsearArquivoB3FII(file) {
     if (v.includes('AMORT')) return 'Amortização';
     return 'Outros';
   };
-  const parseNum = s => { if (typeof s === 'number') return s; const n = Number(String(s).replace('R$','').replace(/\./g,'').replace(',','.').trim()); return isNaN(n) ? 0 : n; };
-  const parsarData = val => {
+
+  const parseNum = v => {
+    if (typeof v === 'number') return v;
+    if (!v) return 0;
+    const n = Number(String(v).replace('R$','').replace(/\./g,'').replace(',','.').trim());
+    return isNaN(n) ? 0 : n;
+  };
+
+  const TICKER_REGEX = /([A-Z]{4}11B?)/;
+
+  const parseDataBR = (val) => {
     if (!val) return { mes: null, ano: null };
     if (val instanceof Date) return { mes: val.getMonth()+1, ano: val.getFullYear() };
-    const m = String(val).match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+    const m = String(val).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
     if (m) return { mes: Number(m[2]), ano: Number(m[3]) };
     return { mes: null, ano: null };
   };
-  const tickerRe = /^[A-Z][A-Z0-9]{2,5}\d{2}$/; // FIIs terminam em 11
 
-  const mapa = new Map();
+  const resultado = [];
   for (const row of rows) {
-    const produtoRaw = String(row[colProduto] || '').trim();
-    const ticker = produtoRaw.split(/[\s\-–]/)[0].toUpperCase().replace(/[^A-Z0-9]/g,'');
-    if (!tickerRe.test(ticker)) continue;
-    const tipo = maparTipo(String(row[colTipo] || ''));
-    const { mes, ano } = parsarData(row[colData]);
-    const qtd = colQtd ? parseNum(row[colQtd]) : 0;
-    const preco = colPreco ? parseNum(row[colPreco]) : 0;
-    const liq = colValorLiq ? parseNum(row[colValorLiq]) : 0;
-    if (preco <= 0 && liq <= 0) continue;
-    const chave = `${ticker}|${tipo}|${mes}|${ano}|${preco}`;
-    if (mapa.has(chave)) { const e = mapa.get(chave); e.qtd += qtd; e.liq += liq; }
-    else mapa.set(chave, { ticker, tipo, mes, ano, qtd, preco, liq });
+    const produtoRaw = row[colProduto];
+    if (!produtoRaw || String(produtoRaw).trim() === '') continue;
+    if (String(produtoRaw).toUpperCase().includes('TOTAL')) continue;
+
+    const match = String(produtoRaw).toUpperCase().match(TICKER_REGEX);
+    if (!match) continue;
+    const ticker = match[1];
+
+    const { mes, ano } = parseDataBR(row[colData]);
+    if (!mes || !ano) continue;
+
+    const tipo = mapTipo(String(row[colTipo] || ''));
+    const valorLiquido = parseNum(row[colValorLiq]);
+    const precoUnitario = parseNum(row[colPreco]);
+    const quantidade = parseNum(row[colQtd]);
+
+    if (valorLiquido <= 0) continue;
+
+    resultado.push({
+      ticker,
+      tipo_dividendo: tipo,
+      valor_por_cota: precoUnitario || (quantidade > 0 ? valorLiquido / quantidade : 0),
+      valor_total: valorLiquido,
+      quantidade,
+      mes,
+      ano,
+    });
   }
-  return Array.from(mapa.values()).map(r => ({
-    ticker: r.ticker, tipo_dividendo: r.tipo, mes: r.mes, ano: r.ano,
-    quantidade: r.qtd, valor_por_cota: r.preco, valor_total: r.liq,
-  }));
+
+  const agrupados = {};
+  for (const l of resultado) {
+    const chave = `${l.ticker}|${l.tipo_dividendo}|${l.mes}|${l.ano}`;
+    if (!agrupados[chave]) agrupados[chave] = { ...l };
+    else agrupados[chave].valor_total += l.valor_total;
+  }
+
+  return Object.values(agrupados);
 }
 
 function badgeDecisao(d = '') {
