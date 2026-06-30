@@ -233,19 +233,23 @@ async function buscarAcao(ticker, dividaManual = null) {
 }
 
 // ─── Status Invest fallback (cache 1h) ───────────────────────────────────
+// NOTA: a API retorna no máximo 100 FIIs (ABCP11–CIXR11) e ignora parâmetros
+// de paginação. FIIs fora desse corte (ex: CPSH11, TVRI11) não são acessíveis
+// por nenhuma API pública — use ajustes_manuais_fiis para esses casos.
 let siCache = { data: null, timestamp: 0 };
 
 async function buscarStatusInvest() {
   const agora = Date.now();
   if (siCache.data && agora - siCache.timestamp < 3600000) return siCache.data;
   const url = 'https://statusinvest.com.br/category/advancedsearchresult?search=' +
-    encodeURIComponent(JSON.stringify({ Segment: '' })) + '&categoryType=2';
+    encodeURIComponent(JSON.stringify({ Segment: '' })) + '&CategoryType=2';
   const res = await axios.get(url, {
     headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json' },
     timeout: 15000
   });
-  siCache = { data: res.data, timestamp: agora };
-  return res.data;
+  const lista = Array.isArray(res.data) ? res.data : [];
+  siCache = { data: lista, timestamp: agora };
+  return lista;
 }
 
 async function buscarFIIStatusInvest(ticker) {
