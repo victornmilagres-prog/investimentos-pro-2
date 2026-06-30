@@ -317,8 +317,7 @@ async function buscarFII(ticker, ajustes = {}) {
     buscar(quote, ['priceToBook','pvp','p/vp'])
   ]);
 
-  const volumeCotas = primeiroNumero([quote.regularMarketVolume, quote.volume]);
-  let volume = (preco > 0 && volumeCotas > 0) ? preco * volumeCotas : 0;
+  let volume = 0;
 
   let patrimonio = primeiroNumero([
     fiiBrapi.equity,
@@ -326,20 +325,19 @@ async function buscarFII(ticker, ajustes = {}) {
     buscar(quote, ['netAssets','equity','netWorth','totalAssets'])
   ]);
 
-  // Fallback Status Invest quando Brapi não tem pvp/dy
-  if (pvp === 0 && dyAnual === 0) {
-    try {
-      const si = await buscarFIIFundamentus(ticker);
-      if (si) {
-        if (pvp === 0) pvp = si.pvp;
-        if (dyAnual === 0) dyAnual = si.dyAnual;
-        if (patrimonio === 0) patrimonio = si.patrimonioLiquido;
-        if (volume === 0) volume = si.volumeFinanceiro;
-        if (preco === 0) preco = si.preco;
-        console.log(`[FII ${ticker}] fallback SI: dy=${dyAnual} pvp=${pvp}`);
-      }
-    } catch(e) { console.log(`[FII ${ticker}] SI fallback erro:`, e.message); }
-  }
+  // Fundamentus: liquidez média 30 dias em R$ + fallback para pvp/dy/patrimônio
+  try {
+    const fund = await buscarFIIFundamentus(ticker);
+    if (fund) {
+      // Volume: sempre usa Fundamentus (média 30 dias em R$), Brapi só dá volume do dia
+      volume = fund.volumeFinanceiro;
+      if (pvp === 0) pvp = fund.pvp;
+      if (dyAnual === 0) dyAnual = fund.dyAnual;
+      if (patrimonio === 0) patrimonio = fund.patrimonioLiquido;
+      if (preco === 0) preco = fund.preco;
+      console.log(`[FII ${ticker}] Fundamentus: vol=${volume} dy=${dyAnual} pvp=${pvp}`);
+    }
+  } catch(e) { console.log(`[FII ${ticker}] Fundamentus erro:`, e.message); }
 
   if (ajustes.dyMensal) dyMensal = numero(ajustes.dyMensal);
   if (ajustes.dyAnual) dyAnual = numero(ajustes.dyAnual);
