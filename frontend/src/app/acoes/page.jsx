@@ -872,19 +872,43 @@ function Dashboard({ acoes, anoFiltro, setAnoFiltro, anosDisponiveis, resumoAno 
 
   return (
     <div style={{marginBottom:20}}>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:14,marginBottom:14}}>
-        {[
-          { label:'Patrimônio Total',    val:fmt.brl(patrimonio),  sub:`${acoes.length} ativos`, cor:'#2563EB' },
-          { label:'Resultado Total',     val:`${resultado>=0?'+':''}${fmt.brl(resultado)}`, sub:`${resultado>=0?'+':''}${fmt.pct(pctTotal)} desde aporte`, cor:resultado>=0?'#16A34A':'#DC2626' },
-          { label:'Melhor / Pior ativo', val:melhor?`${melhor.ticker} ${melhor.pct>=0?'+':''}${fmt.pct(melhor.pct)}`:'—', sub:pior&&pior.ticker!==melhor?.ticker?`Pior: ${pior.ticker} ${fmt.pct(pior.pct)}`:'', cor:'#1A1A2E' },
-          { label:'Score médio',         val:`${scoreMedio} / ${acoes[0]?.max_score||6}`, sub:`${acoes.filter(a=>(typeof a.score==='string'?parseInt(a.score):a.score)>=4).length} MANTER · ${acoes.filter(a=>(typeof a.score==='string'?parseInt(a.score):a.score)===3).length} ATENÇÃO`, cor:'#2563EB' },
-        ].map((c,i)=>(
-          <div key={i} style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:10,padding:16}}>
-            <p style={{fontSize:11,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:6}}>{c.label}</p>
-            <p style={{fontSize:19,fontWeight:800,color:c.cor}}>{c.val}</p>
-            {c.sub&&<p style={{fontSize:11,color:'#8896A8',marginTop:3}}>{c.sub}</p>}
+      <div style={{display:'flex',flexDirection:'column',gap:12,marginBottom:14}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+          <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:12,padding:'18px 20px'}}>
+            <p style={{fontSize:11,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:8}}>Patrimônio total</p>
+            <p style={{fontSize:26,fontWeight:800,color:'#2563EB',margin:0}}>{fmt.brl(patrimonio)}</p>
+            <p style={{fontSize:12,color:'#8896A8',marginTop:4}}>{acoes.length} ativos na carteira</p>
           </div>
-        ))}
+          <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:12,padding:'18px 20px'}}>
+            <p style={{fontSize:11,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:8}}>Resultado após a compra</p>
+            <p style={{fontSize:26,fontWeight:800,color:resultado>=0?'#16A34A':'#DC2626',margin:0}}>{resultado>=0?'+':''}{fmt.brl(resultado)}</p>
+            <p style={{fontSize:12,color:'#8896A8',marginTop:4}}>{resultado>=0?'+':''}{fmt.pct(pctTotal)} desde aporte</p>
+          </div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}}>
+          <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:12,padding:'16px 18px'}}>
+            <p style={{fontSize:11,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:6}}>Resultado após proventos</p>
+            {(()=>{
+              const totalProv = Object.values(resumoAno||{}).reduce((s,v)=>s+(v.total||0),0);
+              const resApos = resultado + totalProv;
+              const pctApos = custo > 0 ? (resApos/custo)*100 : 0;
+              return (<>
+                <p style={{fontSize:20,fontWeight:800,color:resApos>=0?'#16A34A':'#DC2626',margin:0}}>{resApos>=0?'+':''}{fmt.brl(resApos)}</p>
+                <p style={{fontSize:11,color:'#8896A8',marginTop:3}}>{resApos>=0?'+':''}{fmt.pct(pctApos)} com proventos</p>
+              </>);
+            })()}
+          </div>
+          <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:12,padding:'16px 18px'}}>
+            <p style={{fontSize:11,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:6}}>Melhor / Pior ativo</p>
+            <p style={{fontSize:16,fontWeight:800,color:'#1A1A2E',margin:0}}>{melhor?`${melhor.ticker} ${melhor.pct>=0?'+':''}${fmt.pct(melhor.pct)}`:'—'}</p>
+            <p style={{fontSize:11,color:'#8896A8',marginTop:3}}>{pior&&pior.ticker!==melhor?.ticker?`Pior: ${pior.ticker} ${fmt.pct(pior.pct)}`:''}</p>
+          </div>
+          <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:12,padding:'16px 18px'}}>
+            <p style={{fontSize:11,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:6}}>Score médio</p>
+            <p style={{fontSize:20,fontWeight:800,color:'#2563EB',margin:0}}>{scoreMedio} / {acoes[0]?.max_score||6}</p>
+            <p style={{fontSize:11,color:'#8896A8',marginTop:3}}>{acoes.filter(a=>(typeof a.score==='string'?parseInt(a.score):a.score)>=4).length} MANTER · {acoes.filter(a=>(typeof a.score==='string'?parseInt(a.score):a.score)===3).length} ATENÇÃO</p>
+          </div>
+        </div>
       </div>
       <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:10,padding:16,marginBottom:14}}>
         <p style={{fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:12}}>Distribuição da carteira</p>

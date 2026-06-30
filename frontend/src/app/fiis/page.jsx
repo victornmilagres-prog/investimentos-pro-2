@@ -722,6 +722,8 @@ function Dashboard({ fiis, anoFiltro, setAnoFiltro, anosDisponiveis, resumoAno, 
   const custo        = fiis.reduce((s,f)=>{ const p=calcPerformance(f.preco_atual,f.preco_compra,f.quantidade); return s+p.custo; },0);
   const resultado    = patrimonio - custo;
   const pctTotal     = custo > 0 ? (resultado/custo)*100 : 0;
+  const ganhoCompra  = resultado;
+  const pctCompra    = pctTotal;
   const totalDiv     = Object.values(resumoGeral||{}).reduce((s,v)=>s+(v.total||0),0);
   const ganhoTotal   = resultado + totalDiv;
   const pctGanhoTotal = custo > 0 ? (ganhoTotal/custo)*100 : 0;
@@ -739,33 +741,36 @@ function Dashboard({ fiis, anoFiltro, setAnoFiltro, anosDisponiveis, resumoAno, 
 
   return (
     <div style={{marginBottom:20}}>
-      {/* Resultado compra / após dividendos */}
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:14}}>
-        <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:10,padding:16}}>
-          <p style={{fontSize:11,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:6}}>Resultado total da compra</p>
-          <p style={{fontSize:19,fontWeight:800,color:resultado>=0?'#16A34A':'#DC2626'}}>{resultado>=0?'+':''}{fmt.brl(resultado)}</p>
-          <p style={{fontSize:11,color:'#8896A8',marginTop:3}}>{resultado>=0?'+':''}{fmt.pct(pctTotal)} desde aporte</p>
-        </div>
-        <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:10,padding:16}}>
-          <p style={{fontSize:11,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:6}}>Resultado após dividendos</p>
-          <p style={{fontSize:19,fontWeight:800,color:ganhoTotal>=0?'#16A34A':'#DC2626'}}>{ganhoTotal>=0?'+':''}{fmt.brl(ganhoTotal)}</p>
-          <p style={{fontSize:11,color:'#8896A8',marginTop:3}}>{ganhoTotal>=0?'+':''}{fmt.pct(pctGanhoTotal)} com dividendos</p>
-        </div>
-      </div>
-
-      {/* 3 cards */}
-      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14,marginBottom:14}}>
-        {[
-          { label:'Patrimônio FIIs',    val:fmt.brl(patrimonio), sub:`${fiis.length} FIIs`, cor:'#2563EB' },
-          { label:'Melhor / Pior FII',  val:melhor?`${melhor.ticker} ${melhor.pct>=0?'+':''}${fmt.pct(melhor.pct)}`:'—', sub:pior&&pior.ticker!==melhor?.ticker?`Pior: ${pior.ticker} ${fmt.pct(pior.pct)}`:'', cor:'#1A1A2E' },
-          { label:'Score médio',        val:`${scoreMedio} / 4`, sub:`${fiis.filter(f=>(typeof f.score==='string'?parseInt(f.score):f.score)>=3).length} MANTER · ${fiis.filter(f=>(typeof f.score==='string'?parseInt(f.score):f.score)===2).length} ATENÇÃO`, cor:'#2563EB' },
-        ].map((c,i)=>(
-          <div key={i} style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:10,padding:16}}>
-            <p style={{fontSize:11,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:6}}>{c.label}</p>
-            <p style={{fontSize:19,fontWeight:800,color:c.cor}}>{c.val}</p>
-            {c.sub&&<p style={{fontSize:11,color:'#8896A8',marginTop:3}}>{c.sub}</p>}
+      <div style={{display:'flex',flexDirection:'column',gap:12,marginBottom:14}}>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+          <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:12,padding:'18px 20px'}}>
+            <p style={{fontSize:11,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:8}}>Patrimônio FIIs</p>
+            <p style={{fontSize:26,fontWeight:800,color:'#2563EB',margin:0}}>{fmt.brl(patrimonio)}</p>
+            <p style={{fontSize:12,color:'#8896A8',marginTop:4}}>{fiis.length} FIIs na carteira</p>
           </div>
-        ))}
+          <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:12,padding:'18px 20px'}}>
+            <p style={{fontSize:11,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:8}}>Resultado após a compra</p>
+            <p style={{fontSize:26,fontWeight:800,color:ganhoCompra>=0?'#16A34A':'#DC2626',margin:0}}>{ganhoCompra>=0?'+':''}{fmt.brl(ganhoCompra)}</p>
+            <p style={{fontSize:12,color:'#8896A8',marginTop:4}}>{ganhoCompra>=0?'+':''}{fmt.pct(pctCompra)} desde aporte</p>
+          </div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}}>
+          <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:12,padding:'16px 18px'}}>
+            <p style={{fontSize:11,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:6}}>Resultado após dividendos</p>
+            <p style={{fontSize:20,fontWeight:800,color:ganhoTotal>=0?'#16A34A':'#DC2626',margin:0}}>{ganhoTotal>=0?'+':''}{fmt.brl(ganhoTotal)}</p>
+            <p style={{fontSize:11,color:'#8896A8',marginTop:3}}>{ganhoTotal>=0?'+':''}{fmt.pct(pctGanhoTotal)} com dividendos</p>
+          </div>
+          <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:12,padding:'16px 18px'}}>
+            <p style={{fontSize:11,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:6}}>Melhor / Pior FII</p>
+            <p style={{fontSize:16,fontWeight:800,color:'#1A1A2E',margin:0}}>{melhor?`${melhor.ticker} ${melhor.pct>=0?'+':''}${fmt.pct(melhor.pct)}`:'—'}</p>
+            <p style={{fontSize:11,color:'#8896A8',marginTop:3}}>{pior&&pior.ticker!==melhor?.ticker?`Pior: ${pior.ticker} ${fmt.pct(pior.pct)}`:''}</p>
+          </div>
+          <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:12,padding:'16px 18px'}}>
+            <p style={{fontSize:11,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:6}}>Score médio</p>
+            <p style={{fontSize:20,fontWeight:800,color:'#2563EB',margin:0}}>{scoreMedio} / 4</p>
+            <p style={{fontSize:11,color:'#8896A8',marginTop:3}}>{fiis.filter(f=>(typeof f.score==='string'?parseInt(f.score):f.score)>=3).length} MANTER · {fiis.filter(f=>(typeof f.score==='string'?parseInt(f.score):f.score)===2).length} ATENÇÃO</p>
+          </div>
+        </div>
       </div>
 
       {/* Distribuição */}
