@@ -7,7 +7,7 @@ const pool = require('../config/database');
 const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 // POST /api/auth/register
 router.post('/register', [
@@ -105,12 +105,14 @@ router.post('/esqueci-senha', [
       'UPDATE usuarios SET reset_token = $1, reset_token_expires = $2 WHERE id = $3',
       [resetCode, expiresAt, userId]
     );
-    await resend.emails.send({
-      from: 'Investimentos Pro <onboarding@resend.dev>',
-      to: email,
-      subject: 'Redefinicao de Senha - Investimentos Pro',
-      html: '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px"><h1 style="color:#0f172a">Investimentos Pro</h1><p>Ola, <strong>' + nome + '</strong>!</p><p>Use o codigo abaixo para redefinir sua senha:</p><div style="text-align:center;margin:32px 0"><span style="font-size:40px;font-weight:bold;letter-spacing:10px;color:#3b82f6;background:#eff6ff;padding:16px 24px;border-radius:8px;display:inline-block">' + resetCode + '</span></div><p style="color:#64748b;font-size:14px">Expira em <strong>1 hora</strong>. Se nao foi voce, ignore este email.</p></div>'
-    });
+    if (resend) {
+      await resend.emails.send({
+        from: 'Investimentos Pro <onboarding@resend.dev>',
+        to: email,
+        subject: 'Redefinicao de Senha - Investimentos Pro',
+        html: '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px"><h1 style="color:#0f172a">Investimentos Pro</h1><p>Ola, <strong>' + nome + '</strong>!</p><p>Use o codigo abaixo para redefinir sua senha:</p><div style="text-align:center;margin:32px 0"><span style="font-size:40px;font-weight:bold;letter-spacing:10px;color:#3b82f6;background:#eff6ff;padding:16px 24px;border-radius:8px;display:inline-block">' + resetCode + '</span></div><p style="color:#64748b;font-size:14px">Expira em <strong>1 hora</strong>. Se nao foi voce, ignore este email.</p></div>'
+      });
+    }
     res.json({ message: 'Codigo enviado! Verifique seu email.' });
   } catch (err) {
     console.error(err);
