@@ -753,11 +753,10 @@ function Dashboard({ fiis, anoFiltro, setAnoFiltro, anosDisponiveis, resumoAno, 
         </div>
       </div>
 
-      {/* 4 cards */}
-      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:14,marginBottom:14}}>
+      {/* 3 cards */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14,marginBottom:14}}>
         {[
           { label:'Patrimônio FIIs',    val:fmt.brl(patrimonio), sub:`${fiis.length} FIIs`, cor:'#2563EB' },
-          { label:'Resultado Total',    val:`${resultado>=0?'+':''}${fmt.brl(resultado)}`, sub:`${resultado>=0?'+':''}${fmt.pct(pctTotal)} desde aporte`, cor:resultado>=0?'#16A34A':'#DC2626' },
           { label:'Melhor / Pior FII',  val:melhor?`${melhor.ticker} ${melhor.pct>=0?'+':''}${fmt.pct(melhor.pct)}`:'—', sub:pior&&pior.ticker!==melhor?.ticker?`Pior: ${pior.ticker} ${fmt.pct(pior.pct)}`:'', cor:'#1A1A2E' },
           { label:'Score médio',        val:`${scoreMedio} / 4`, sub:`${fiis.filter(f=>(typeof f.score==='string'?parseInt(f.score):f.score)>=3).length} MANTER · ${fiis.filter(f=>(typeof f.score==='string'?parseInt(f.score):f.score)===2).length} ATENÇÃO`, cor:'#2563EB' },
         ].map((c,i)=>(
