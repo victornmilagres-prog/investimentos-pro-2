@@ -71,7 +71,7 @@ router.post('/', async (req, res) => {
       dyMensal, dados.dyAnual, dados.pvp, dados.volumeFinanceiro, dados.patrimonioLiquido,
       dados.variacaoDia, dados.variacaoDiaReais, dados.precoAbertura, dados.precoMinimo, dados.precoMaximo,
       dados.observacoes, dados.ultimaAtualizacao,
-      dados.nomeFundo, dados.administradora, dados.tipoFundo, dados.vpa, dados.precoJusto, dados.statusJusto, dados.setor
+      dados.nomeFundo, dados.administradora, dados.segmento || dados.tipoFundo, dados.vpa, dados.precoJusto, dados.statusJusto, dados.setor
     ]);
 
     await recalcularPesosFII(req.userId);
@@ -146,7 +146,7 @@ router.post('/atualizar-todos', async (req, res) => {
           dyMensal, dados.dyAnual, dados.pvp, dados.volumeFinanceiro, dados.patrimonioLiquido,
           dados.variacaoDia, dados.variacaoDiaReais, dados.precoAbertura, dados.precoMinimo, dados.precoMaximo,
           dados.observacoes, dados.ultimaAtualizacao,
-          dados.nomeFundo, dados.administradora, dados.tipoFundo, dados.vpa, dados.precoJusto, dados.statusJusto,
+          dados.nomeFundo, dados.administradora, dados.segmento || dados.tipoFundo, dados.vpa, dados.precoJusto, dados.statusJusto,
           dados.setor,
           req.userId, fii.ticker
         ]);
