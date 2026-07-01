@@ -484,8 +484,18 @@ function FIICard({ f, onRemover, onSalvar, onAbrirDividendo, resumoAno, resumoGe
         <div>
           <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
             <span style={{fontSize:18,fontWeight:700,color:'#2563EB'}}>{f.ticker}</span>
+            {f.setor_fundo && (() => {
+              const COR_SETOR = {
+                'Fundo de Tijolo': { bg:'#FEF3C7', color:'#92400E' },
+                'Fundo de Papel':  { bg:'#F3E8FF', color:'#7E22CE' },
+                'Fundo de Agro':   { bg:'#DCFCE7', color:'#166534' },
+                'Fundo Misto':     { bg:'#E0F9FF', color:'#0369A1' },
+              };
+              const c = COR_SETOR[f.setor_fundo] || { bg:'#F1F5F9', color:'#475569' };
+              return <span style={{fontSize:10,fontWeight:500,padding:'2px 8px',borderRadius:20,background:c.bg,color:c.color}}>{f.setor_fundo}</span>;
+            })()}
             {f.tipo_fundo && f.tipo_fundo !== 'FII' && (
-              <span style={{fontSize:10,fontWeight:500,padding:'2px 8px',borderRadius:20,background:'#FEF3C7',color:'#92400E'}}>{f.tipo_fundo}</span>
+              <span style={{fontSize:10,fontWeight:500,padding:'2px 8px',borderRadius:20,background:'#E0F2FE',color:'#0369A1'}}>{f.tipo_fundo}</span>
             )}
           </div>
           {f.nome_fundo && <p style={{fontSize:12,fontWeight:500,color:'#4A5568',margin:'3px 0 1px'}}>{f.nome_fundo}</p>}

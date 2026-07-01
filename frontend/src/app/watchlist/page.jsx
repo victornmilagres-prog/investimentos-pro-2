@@ -57,8 +57,18 @@ function RadarCard({ item, onRemover, onAddCarteira, onToggleFavorito }) {
           <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
             <span style={{fontSize:18,fontWeight:700,color:'#2563EB'}}>{item.ticker}</span>
             <span style={{fontSize:11,fontWeight:600,padding:'2px 8px',borderRadius:20,background:'#F8F9FA',color:'#8896A8',border:'1px solid #E8ECF0'}}>{item.tipo}</span>
+            {!isAcao && item.setor_fundo && (() => {
+              const COR_SETOR = {
+                'Fundo de Tijolo': { bg:'#FEF3C7', color:'#92400E' },
+                'Fundo de Papel':  { bg:'#F3E8FF', color:'#7E22CE' },
+                'Fundo de Agro':   { bg:'#DCFCE7', color:'#166534' },
+                'Fundo Misto':     { bg:'#E0F9FF', color:'#0369A1' },
+              };
+              const c = COR_SETOR[item.setor_fundo] || { bg:'#F1F5F9', color:'#475569' };
+              return <span style={{fontSize:10,fontWeight:500,padding:'2px 8px',borderRadius:20,background:c.bg,color:c.color}}>{item.setor_fundo}</span>;
+            })()}
             {!isAcao && item.tipo_fundo && item.tipo_fundo !== 'FII' && (
-              <span style={{fontSize:10,fontWeight:500,padding:'2px 8px',borderRadius:20,background:'#FEF3C7',color:'#92400E'}}>{item.tipo_fundo}</span>
+              <span style={{fontSize:10,fontWeight:500,padding:'2px 8px',borderRadius:20,background:'#E0F2FE',color:'#0369A1'}}>{item.tipo_fundo}</span>
             )}
           </div>
           {item.nome_ativo && <p style={{fontSize:12,fontWeight:500,color:'#4A5568',margin:'3px 0 1px'}}>{item.nome_ativo}</p>}

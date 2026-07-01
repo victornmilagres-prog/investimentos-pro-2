@@ -185,7 +185,42 @@ function inferirTipoFII(nome = '', ticker = '') {
   return 'FII';
 }
 
+const TIPO_PARA_SETOR = {
+  'Agro':      { setor: 'Fundo de Agro',   segmento: 'Agronegócio' },
+  'Logística': { setor: 'Fundo de Tijolo', segmento: 'Logística' },
+  'Shoppings': { setor: 'Fundo de Tijolo', segmento: 'Shoppings' },
+  'Tijolo':    { setor: 'Fundo de Tijolo', segmento: 'Lajes Corporativas' },
+  'Papel':     { setor: 'Fundo de Papel',  segmento: 'Papéis' },
+  'Híbrido':   { setor: 'Fundo Misto',     segmento: 'Misto' },
+  'Hotel':     { setor: 'Fundo de Tijolo', segmento: 'Hotéis' },
+  'Saúde':     { setor: 'Fundo de Tijolo', segmento: 'Saúde' },
+  'Educacional':{ setor: 'Fundo de Tijolo',segmento: 'Educacional' },
+  'FII':       { setor: 'Fundo Misto',     segmento: 'Misto' },
+};
+
 let fundamentusCache = { data: null, timestamp: 0 };
+let statusInvestCache = { data: null, timestamp: 0 };
+
+async function buscarStatusInvestFIIs() {
+  const agora = Date.now();
+  if (statusInvestCache.data && agora - statusInvestCache.timestamp < 86400000) return statusInvestCache.data;
+  try {
+    const res = await axios.get(
+      'https://statusinvest.com.br/category/advancedsearchresult?search=%7B%7D&orderColumn=&isASC=&page=0&take=600&CategoryType=2',
+      { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json', 'Referer': 'https://statusinvest.com.br/fundos-imobiliarios' }, timeout: 20000 }
+    );
+    const lista = res.data?.list || res.data || [];
+    const mapa = {};
+    for (const item of lista) {
+      const t = (item.ticker || item.code || '').toUpperCase();
+      if (t) mapa[t] = { setor: item.sectorname || '', segmento: item.segment || item.subsectorname || '' };
+    }
+    statusInvestCache = { data: mapa, timestamp: agora };
+    return mapa;
+  } catch(e) {
+    return {};
+  }
+}
 
 async function buscarFundamentus() {
   const agora = Date.now();
@@ -326,6 +361,24 @@ async function buscarFII(ticker, ajustes = {}) {
   const administradora = quote.managedBy || quote.fundFamily || quote.companyOfficers?.[0]?.name || '';
   const tipoFundo = inferirTipoFII(nomeFundo, ticker);
 
+  // Setor/segmento: Status Invest → Brapi → inferência
+  let setor = '';
+  let segmento = '';
+  try {
+    const siMapa = await buscarStatusInvestFIIs();
+    const siDados = siMapa[ticker];
+    if (siDados && siDados.setor) { setor = siDados.setor; segmento = siDados.segmento || tipoFundo; }
+  } catch(e) {}
+  if (!setor) {
+    const brapiSetor = quote.sector || quote.industry || '';
+    if (brapiSetor) { setor = brapiSetor; segmento = segmento || tipoFundo; }
+  }
+  if (!setor) {
+    const inf = TIPO_PARA_SETOR[tipoFundo] || TIPO_PARA_SETOR['FII'];
+    setor = inf.setor;
+    segmento = inf.segmento;
+  }
+
   let fiiBrapi = {};
   try {
     const urlInd = `${BRAPI_BASE}/v2/fii/indicators?symbols=${ticker}&token=${TOKEN}`;
@@ -405,6 +458,8 @@ async function buscarFII(ticker, ajustes = {}) {
     nomeFundo,
     administradora,
     tipoFundo,
+    setor: setor || 'Fundo Imobiliário',
+    segmento: segmento || tipoFundo,
     preco,
     vpa: parseFloat(vpa.toFixed(4)),
     precoJusto: parseFloat(precoJusto.toFixed(2)),

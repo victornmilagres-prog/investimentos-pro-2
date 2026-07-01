@@ -32,7 +32,12 @@ async function runMigrations() {
         ADD COLUMN IF NOT EXISTS tipo_fundo VARCHAR(50),
         ADD COLUMN IF NOT EXISTS vpa NUMERIC(10,4) DEFAULT 0,
         ADD COLUMN IF NOT EXISTS preco_justo NUMERIC(10,4) DEFAULT 0,
-        ADD COLUMN IF NOT EXISTS status_justo VARCHAR(20)
+        ADD COLUMN IF NOT EXISTS status_justo VARCHAR(20),
+        ADD COLUMN IF NOT EXISTS setor_fundo VARCHAR(100)
+    `);
+    await pool.query(`
+      ALTER TABLE watchlist
+        ADD COLUMN IF NOT EXISTS setor_fundo VARCHAR(100)
     `);
     await pool.query(`
       ALTER TABLE watchlist

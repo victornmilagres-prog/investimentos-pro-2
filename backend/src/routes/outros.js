@@ -77,8 +77,8 @@ watchlistRouter.post('/', async (req, res) => {
          preco_graham,status_graham,
          variacao_dia,variacao_dia_reais,preco_abertura,preco_minimo,preco_maximo,
          ultima_atualizacao,
-         nome_ativo,administradora,tipo_fundo,vpa,preco_bazin,status_bazin,preco_justo,status_justo
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36)
+         nome_ativo,administradora,tipo_fundo,vpa,preco_bazin,status_bazin,preco_justo,status_justo,setor_fundo
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37)
        ON CONFLICT (usuario_id,ticker) DO UPDATE SET
          preco_alvo=EXCLUDED.preco_alvo, observacoes=EXCLUDED.observacoes,
          preco_atual=EXCLUDED.preco_atual, score=EXCLUDED.score, max_score=EXCLUDED.max_score,
@@ -95,6 +95,7 @@ watchlistRouter.post('/', async (req, res) => {
          tipo_fundo=EXCLUDED.tipo_fundo, vpa=EXCLUDED.vpa,
          preco_bazin=EXCLUDED.preco_bazin, status_bazin=EXCLUDED.status_bazin,
          preco_justo=EXCLUDED.preco_justo, status_justo=EXCLUDED.status_justo,
+         setor_fundo=EXCLUDED.setor_fundo,
          updated_at=NOW()
        RETURNING *`,
       [
@@ -123,7 +124,8 @@ watchlistRouter.post('/', async (req, res) => {
         isAcao ? (d.precoBazin || 0) : 0,
         isAcao ? (d.statusBazin || null) : null,
         !isAcao ? (d.precoJusto || 0) : 0,
-        !isAcao ? (d.statusJusto || null) : null
+        !isAcao ? (d.statusJusto || null) : null,
+        !isAcao ? (d.setor || null) : null
       ]
     );
     res.status(201).json(r.rows[0]);
@@ -167,8 +169,9 @@ watchlistRouter.post('/atualizar-todos', async (req, res) => {
            preco_abertura=$20, preco_minimo=$21, preco_maximo=$22,
            ultima_atualizacao=$23,
            nome_ativo=$24, administradora=$25, tipo_fundo=$26, vpa=$27,
-           preco_bazin=$28, status_bazin=$29, preco_justo=$30, status_justo=$31
-         WHERE usuario_id=$32 AND ticker=$33`,
+           preco_bazin=$28, status_bazin=$29, preco_justo=$30, status_justo=$31,
+           setor_fundo=$32
+         WHERE usuario_id=$33 AND ticker=$34`,
         [
           d.preco, d.score, isAcao ? (d.maxScore || 6) : 4, d.classificacao, d.decisao,
           isAcao ? (d.pl || 0) : 0,
@@ -194,6 +197,7 @@ watchlistRouter.post('/atualizar-todos', async (req, res) => {
           isAcao ? (d.statusBazin || null) : null,
           !isAcao ? (d.precoJusto || 0) : 0,
           !isAcao ? (d.statusJusto || null) : null,
+          !isAcao ? (d.setor || null) : null,
           req.userId, item.ticker
         ]
       );
