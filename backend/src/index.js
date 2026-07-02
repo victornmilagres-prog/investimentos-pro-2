@@ -14,6 +14,7 @@ const watchlistRoutes = require('./routes/watchlist');
 const planejamentoRoutes = require('./routes/planejamento');
 const dashboardRoutes = require('./routes/dashboard');
 const notificacoesRoutes = require('./routes/notificacoes');
+const outrosAtivosRoutes = require('./routes/outros-ativos');
 
 const app = express();
 
@@ -69,6 +70,44 @@ async function runMigrations() {
         ADD COLUMN IF NOT EXISTS termo_ip VARCHAR(45),
         ADD COLUMN IF NOT EXISTS termo_versao VARCHAR(10) DEFAULT '1.0'
     `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS renda_fixa (
+        id              SERIAL PRIMARY KEY,
+        usuario_id      INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+        nome            VARCHAR(200) NOT NULL,
+        tipo            VARCHAR(50) NOT NULL,
+        indexador       VARCHAR(50) NOT NULL,
+        taxa            NUMERIC(10,4) NOT NULL,
+        valor_investido NUMERIC(14,2) NOT NULL,
+        data_inicio     DATE NOT NULL,
+        data_vencimento DATE NOT NULL,
+        emissor         VARCHAR(200),
+        liquidez        VARCHAR(20) DEFAULT 'Vencimento',
+        isento_ir       BOOLEAN DEFAULT FALSE,
+        observacoes     TEXT,
+        created_at      TIMESTAMP DEFAULT NOW(),
+        updated_at      TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_renda_fixa_usuario ON renda_fixa(usuario_id)`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS outros_ativos (
+        id              SERIAL PRIMARY KEY,
+        usuario_id      INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+        ticker          VARCHAR(20) NOT NULL,
+        nome            VARCHAR(200),
+        tipo            VARCHAR(50) NOT NULL,
+        quantidade      NUMERIC(20,8) NOT NULL DEFAULT 0,
+        preco_compra    NUMERIC(14,4) NOT NULL DEFAULT 0,
+        preco_atual     NUMERIC(14,4) DEFAULT 0,
+        variacao_dia    NUMERIC(10,4) DEFAULT 0,
+        observacoes     TEXT,
+        created_at      TIMESTAMP DEFAULT NOW(),
+        updated_at      TIMESTAMP DEFAULT NOW(),
+        UNIQUE(usuario_id, ticker)
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_outros_ativos_usuario ON outros_ativos(usuario_id)`);
     console.log('Migrations OK');
   } catch (err) {
     console.error('Migration error:', err.message);
@@ -103,6 +142,7 @@ app.use('/api/watchlist', watchlistRoutes);
 app.use('/api/planejamento', planejamentoRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notificacoes', notificacoesRoutes);
+app.use('/api/outros-ativos', outrosAtivosRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);

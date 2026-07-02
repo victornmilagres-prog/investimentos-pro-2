@@ -4,7 +4,7 @@ import { useState, useEffect, createContext, useContext } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   LayoutDashboard, TrendingUp, Building2, Landmark,
-  Eye, Target, Bell, LogOut, Menu, X, User
+  Eye, Target, Bell, LogOut, Menu, X, User, Globe
 } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -16,7 +16,8 @@ const NAV = [
   { href: '/dashboard',    label: 'Dashboard',                icon: LayoutDashboard },
   { href: '/acoes',        label: 'Carteira Ações',           icon: TrendingUp },
   { href: '/fiis',         label: 'Carteira FII',             icon: Building2 },
-  { href: '/renda-fixa',   label: 'Carteira Renda Fixa',      icon: Landmark },
+  { href: '/renda-fixa',    label: 'Carteira Renda Fixa',      icon: Landmark },
+  { href: '/outros-ativos', label: 'Outros Ativos',           icon: Globe },
   { href: '/watchlist',    label: 'No Radar',                 icon: Eye },
 ];
 
