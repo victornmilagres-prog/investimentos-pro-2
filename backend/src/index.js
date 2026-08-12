@@ -17,6 +17,7 @@ const notificacoesRoutes = require('./routes/notificacoes');
 const outrosAtivosRoutes = require('./routes/outros-ativos');
 
 const app = express();
+app.set('trust proxy', 1);
 
 async function runMigrations() {
   try {
