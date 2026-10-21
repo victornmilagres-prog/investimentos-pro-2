@@ -106,10 +106,12 @@ export default function RootLayout({ children }) {
           @media (max-width: 767px) {
             .sidebar-desktop { display: none !important; }
             .bottom-nav { display: flex !important; }
-            .main-content { padding-bottom: 64px !important; }
+            .main-content { padding-bottom: 72px !important; }
+            .topbar { display: flex !important; }
           }
           @media (min-width: 768px) {
             .bottom-nav { display: none !important; }
+            .mobile-menu-btn { display: none !important; }
           }
         `}</style>
       </head>
@@ -235,25 +237,37 @@ export default function RootLayout({ children }) {
               {/* Bottom nav — mobile only */}
               <nav className="bottom-nav" style={{
                 position: 'fixed', bottom: 0, left: 0, right: 0,
-                background: '#FFFFFF', borderTop: '1px solid #E8ECF0',
-                height: 60, zIndex: 50,
+                background: '#FFFFFF', borderTop: '2px solid #E8ECF0',
+                height: 64, zIndex: 50,
                 display: 'none',
                 alignItems: 'stretch',
+                boxShadow: '0 -2px 12px rgba(0,0,0,0.08)',
               }}>
                 {BOTTOM_NAV.map(({ href, label, icon: Icon }) => {
                   const active = pathname === href || pathname.startsWith(href + '/');
                   return (
                     <a key={href} href={href} style={{
                       flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                      gap: 3, textDecoration: 'none',
+                      gap: 4, textDecoration: 'none',
                       color: active ? '#C9A84C' : '#8896A8',
-                      borderTop: `2px solid ${active ? '#C9A84C' : 'transparent'}`,
+                      borderTop: `3px solid ${active ? '#C9A84C' : 'transparent'}`,
+                      background: active ? 'rgba(201,168,76,0.05)' : 'transparent',
                     }}>
-                      <Icon size={20}/>
-                      <span style={{ fontSize: 10, fontWeight: 500 }}>{label}</span>
+                      <Icon size={22}/>
+                      <span style={{ fontSize: 10, fontWeight: active ? 700 : 500 }}>{label}</span>
                     </a>
                   );
                 })}
+                <a href="/outros-ativos" style={{
+                  flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                  gap: 4, textDecoration: 'none',
+                  color: pathname.startsWith('/outros-ativos') ? '#C9A84C' : '#8896A8',
+                  borderTop: `3px solid ${pathname.startsWith('/outros-ativos') ? '#C9A84C' : 'transparent'}`,
+                  background: pathname.startsWith('/outros-ativos') ? 'rgba(201,168,76,0.05)' : 'transparent',
+                }}>
+                  <Globe size={22}/>
+                  <span style={{ fontSize: 10, fontWeight: pathname.startsWith('/outros-ativos') ? 700 : 500 }}>Outros</span>
+                </a>
               </nav>
             </div>
           )}
