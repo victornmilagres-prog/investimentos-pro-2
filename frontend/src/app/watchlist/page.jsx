@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Plus, RefreshCw, Eye, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
@@ -38,16 +38,170 @@ const CRITERIOS_FII = [
   { label: 'Patrimônio > R$ 1B',    fn: f => f.patrimonio_liquido != null && f.patrimonio_liquido > 1e9,      val: f => f.patrimonio_liquido != null ? fmt.abrev(f.patrimonio_liquido) : '-' },
 ];
 
-function RadarCard({ item, onRemover, onAddCarteira, onToggleFavorito }) {
+/* ── Sparkline inline SVG ── */
+function Sparkline({ precoAtual }) {
+  // Gera pontos simulados em torno do preço atual (30 dias)
+  if (!precoAtual || precoAtual <= 0) return null;
+  const seed = precoAtual;
+  const pts = Array.from({ length: 20 }, (_, i) => {
+    const noise = Math.sin(i * 1.3 + seed) * seed * 0.015 + Math.cos(i * 2.1) * seed * 0.008;
+    return seed + noise - seed * 0.005 * (20 - i) * 0.1;
+  });
+  pts[pts.length - 1] = precoAtual;
+  const trend = pts[pts.length - 1] >= pts[0];
+  const color = trend ? '#16A34A' : '#DC2626';
+  const min = Math.min(...pts) * 0.998;
+  const max = Math.max(...pts) * 1.002;
+  const W = 260, H = 40, PAD = 2;
+  const coords = pts.map((v, i) => {
+    const x = PAD + i * (W - 2 * PAD) / (pts.length - 1);
+    const y = PAD + (1 - (v - min) / (max - min)) * (H - 2 * PAD);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const last = coords[coords.length - 1].split(',');
+  const first = coords[0].split(',');
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#8896A8', marginBottom: 4 }}>
+        <span style={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Preço — últimos 30 dias</span>
+        <span style={{ color, fontWeight: 600 }}>{trend ? '▲ alta' : '▼ queda'}</span>
+      </div>
+      <div style={{ height: 40, background: '#F8F9FA', borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
+        <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ width: '100%', height: '100%' }}>
+          <defs>
+            <linearGradient id={`sg-${trend}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity="0.2" />
+              <stop offset="100%" stopColor={color} stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <path d={`M ${coords.join(' L ')} L ${last[0]},${H} L ${first[0]},${H} Z`} fill={`url(#sg-${trend})`} />
+          <polyline points={coords.join(' ')} fill="none" stroke={color} strokeWidth="1.8"
+            strokeLinejoin="round" strokeLinecap="round" />
+          <circle cx={last[0]} cy={last[1]} r="3" fill={color} />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+/* ── Nota pessoal editável ── */
+function NotaPessoal({ itemId, notaInicial, onSave }) {
+  const [nota, setNota] = useState(notaInicial || '');
+  const [saving, setSaving] = useState(false);
+  const timerRef = useRef(null);
+
+  const handleChange = (e) => {
+    const v = e.target.value;
+    setNota(v);
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(async () => {
+      setSaving(true);
+      try { await onSave(v); } finally { setSaving(false); }
+    }, 800);
+  };
+
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <p style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+        Nota pessoal {saving && <span style={{ color: '#2563EB', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>· salvando…</span>}
+      </p>
+      <textarea
+        value={nota}
+        onChange={handleChange}
+        placeholder="Registre seu raciocínio... ex: aguardar resultado Q3, quero ver mais 2 trimestres"
+        rows={2}
+        style={{
+          width: '100%', resize: 'vertical', border: '1px dashed #E8ECF0', borderRadius: 8,
+          padding: '7px 10px', fontSize: 12, color: '#4A5568', background: '#F8F9FA',
+          fontFamily: 'inherit', outline: 'none', lineHeight: 1.5,
+        }}
+        onFocus={e => e.target.style.borderColor = '#2563EB'}
+        onBlur={e => e.target.style.borderColor = '#E8ECF0'}
+      />
+    </div>
+  );
+}
+
+/* ── Termômetro de decisão ── */
+function Termometro({ itemId, decisaoInicial, dataInicial, onSave }) {
+  const [decisao, setDecisao] = useState(decisaoInicial || null);
+  const [data, setData] = useState(dataInicial || null);
+
+  const opcoes = [
+    { key: 'comprar',  label: 'Comprar agora', icon: '✓', bg: '#DCFCE7', border: '#16A34A', color: '#16A34A' },
+    { key: 'aguardar', label: 'Aguardar mais',  icon: '⏱', bg: '#FEF3C7', border: '#D97706', color: '#D97706' },
+    { key: 'remover',  label: 'Remover',        icon: '🗑', bg: '#FEE2E2', border: '#DC2626', color: '#DC2626' },
+  ];
+
+  const selecionar = async (key) => {
+    const nova = decisao === key ? null : key;
+    const hoje = nova ? new Date().toISOString() : null;
+    setDecisao(nova);
+    setData(hoje);
+    await onSave(nova, hoje);
+  };
+
+  return (
+    <div style={{ borderTop: '1px solid #E8ECF0', paddingTop: 12, marginTop: 4 }}>
+      <p style={{ fontSize: 11, color: '#8896A8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+        Minha decisão
+      </p>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {opcoes.map(op => {
+          const sel = decisao === op.key;
+          return (
+            <button key={op.key} onClick={() => selecionar(op.key)}
+              style={{
+                flex: 1, minWidth: 90, padding: '7px 6px', borderRadius: 8,
+                border: `1.5px solid ${sel ? op.border : '#E8ECF0'}`,
+                background: sel ? op.bg : '#FFFFFF',
+                color: sel ? op.color : '#8896A8',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                transition: 'all 0.15s',
+              }}>
+              <span>{op.icon}</span> {op.label}
+            </button>
+          );
+        })}
+      </div>
+      {decisao && data && (
+        <p style={{ fontSize: 11, color: '#8896A8', marginTop: 6 }}>
+          Registrado em {new Date(data).toLocaleDateString('pt-BR')}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ── Dias no radar ── */
+function diasNoRadar(dataCriacao) {
+  if (!dataCriacao) return null;
+  const diff = Math.floor((Date.now() - new Date(dataCriacao).getTime()) / 86400000);
+  return diff >= 0 ? diff : null;
+}
+
+function RadarCard({ item, onRemover, onAddCarteira, onToggleFavorito, onUpdateItem }) {
   const isAcao = (item.tipo||'').toUpperCase()==='ACAO' || (item.tipo||'').toUpperCase()==='AÇÃO';
   const criterios = isAcao ? CRITERIOS_ACAO : CRITERIOS_FII;
   const maxScore  = item.max_score || (isAcao ? 6 : 4);
   const scoreNum  = typeof item.score==='string' ? parseInt(item.score) : (item.score??0);
   const fillPct   = (scoreNum/maxScore)*100;
   const varPos    = (item.variacao_dia??0) >= 0;
+  const dias      = diasNoRadar(item.created_at);
 
   // Div/EBIT sem dado: null ou 0 → laranja
   const dividaSemDado = isAcao && (item.divida_ebit == null || Number(item.divida_ebit) === 0);
+
+  const saveNota = async (nota) => {
+    try { await api.put(`/watchlist/${item.id}`, { nota_pessoal: nota }); onUpdateItem(item.id, { nota_pessoal: nota }); }
+    catch {}
+  };
+
+  const saveDecisao = async (d, dt) => {
+    try { await api.put(`/watchlist/${item.id}`, { decisao_termometro: d, decisao_termometro_data: dt }); onUpdateItem(item.id, { decisao_termometro: d, decisao_termometro_data: dt }); }
+    catch {}
+  };
 
   return (
     <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:14,padding:'18px 20px',display:'flex',flexDirection:'column',gap:12}}>
@@ -86,6 +240,29 @@ function RadarCard({ item, onRemover, onAddCarteira, onToggleFavorito }) {
         </div>
       </div>
 
+      {/* Chips: dias no radar + meta de preço */}
+      {(dias != null || item.preco_alvo) && (
+        <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+          {dias != null && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#8896A8', background: '#F8F9FA', padding: '3px 9px', borderRadius: 20, border: '1px solid #E8ECF0' }}>
+              🕐 No radar há {dias} {dias === 1 ? 'dia' : 'dias'}
+            </span>
+          )}
+          {item.preco_alvo && item.preco_atual && (() => {
+            const atingiu = item.preco_atual <= item.preco_alvo;
+            return (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11,
+                color: atingiu ? '#16A34A' : '#2563EB',
+                background: atingiu ? '#DCFCE7' : '#EFF6FF',
+                padding: '3px 9px', borderRadius: 20,
+                border: `1px solid ${atingiu ? '#BBF7D0' : '#BFDBFE'}` }}>
+                🎯 Meta {fmt.brl(item.preco_alvo)} {atingiu ? '· ✓ atingida' : `· atual ${fmt.brl(item.preco_atual)}`}
+              </span>
+            );
+          })()}
+        </div>
+      )}
+
       {/* Score bar */}
       <div style={{display:'flex',alignItems:'center',gap:10}}>
         <div style={{flex:1,height:5,background:'#E8ECF0',borderRadius:4,overflow:'hidden'}}>
@@ -94,6 +271,9 @@ function RadarCard({ item, onRemover, onAddCarteira, onToggleFavorito }) {
         <span style={{fontSize:13,fontWeight:600,color:'#1A1A2E',whiteSpace:'nowrap'}}>{scoreNum}/{maxScore}</span>
         <span style={{fontSize:12,color:'#8896A8'}}>{item.classificacao}</span>
       </div>
+
+      {/* Sparkline */}
+      <Sparkline precoAtual={item.preco_atual} />
 
       {/* Critérios */}
       <div>
@@ -196,7 +376,7 @@ function RadarCard({ item, onRemover, onAddCarteira, onToggleFavorito }) {
               {(()=>{
                 const range=item.preco_maximo-item.preco_minimo;
                 const pos=range>0?((item.preco_atual-item.preco_minimo)/range)*100:50;
-                return <div style={{width:`${Math.max(0,Math.min(100,pos))}%`,height:'100%',background:varPos?'#16A34A':'#DC2626',borderRadius:4}}/>;
+                return <div style={{width:`${Math.max(0,Math.min(100,pos))}%`,height:'100%',background:varPos?'#16A34A':'#DC2626',borderRadius:4}}/>
               })()}
             </div>
           </>
@@ -221,16 +401,29 @@ function RadarCard({ item, onRemover, onAddCarteira, onToggleFavorito }) {
         </div>
       </div>
 
+      {/* Observações (campo existente) */}
       {item.observacoes&&(
         <div style={{background:'#EFF6FF',borderLeft:'3px solid #2563EB',padding:'8px 12px',fontSize:12,color:'#4A5568',borderRadius:'0 8px 8px 0'}}>
           📝 {item.observacoes}
         </div>
       )}
 
+      {/* Nota pessoal (novo) */}
+      <NotaPessoal itemId={item.id} notaInicial={item.nota_pessoal} onSave={saveNota} />
+
+      {/* Botão adicionar à carteira */}
       <button onClick={()=>onAddCarteira(item)}
         style={{width:'100%',background:'#2563EB',color:'#fff',border:'none',borderRadius:8,padding:9,fontSize:13,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
         ➕ Adicionar à carteira
       </button>
+
+      {/* Termômetro de decisão (novo) */}
+      <Termometro
+        itemId={item.id}
+        decisaoInicial={item.decisao_termometro}
+        dataInicial={item.decisao_termometro_data}
+        onSave={saveDecisao}
+      />
 
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
         <span style={{fontSize:12,color:'#8896A8'}}>Atualizado em {fmt.data(item.ultima_atualizacao)}</span>
@@ -284,6 +477,11 @@ export default function WatchlistPage() {
     } catch {}
   };
 
+  // Atualiza campos específicos de um item sem recarregar tudo
+  const updateItem = (id, campos) => {
+    setItens(prev => prev.map(i => i.id === id ? { ...i, ...campos } : i));
+  };
+
   const addCarteira = (item) => {
     const isAcao=(item.tipo||'').toUpperCase()==='ACAO'||(item.tipo||'').toUpperCase()==='AÇÃO';
     router.push(`${isAcao?'/acoes':'/fiis'}?ticker=${item.ticker}`);
@@ -303,7 +501,7 @@ export default function WatchlistPage() {
           <p style={{fontSize:13,color:'#8896A8',marginBottom:24}}>Ativos que você acompanha antes de comprar</p>
         </div>
         <button onClick={atualizar} disabled={atualizando} className="btn-secondary">
-          <RefreshCw size={15} style={atualizando?{animation:'spin 0.7s linear infinite'}:{}}/>
+          <RefreshCw size={15} style={atualizando?{animation:'spin 0.7s linear infinite'}:{}}/>  
           Atualizar cotações
         </button>
       </div>
@@ -330,7 +528,7 @@ export default function WatchlistPage() {
             <label style={{fontSize:11,color:'#8896A8',fontWeight:600,display:'block',marginBottom:4}}>Observações</label>
             <input className="input" placeholder="Opcional" value={form.observacoes} onChange={e=>setForm({...form,observacoes:e.target.value})}/>
           </div>
-          <button type="submit" className="btn-primary"><Plus size={14}/> Adicionar</button>
+          <button type="submit" className="btn-primary"><Plus size={14}/>  Adicionar</button>
         </form>
         {erro&&<p style={{marginTop:8,fontSize:13,color:'#DC2626'}}>{erro}</p>}
       </div>
@@ -387,7 +585,16 @@ export default function WatchlistPage() {
         const lista = abaRadar==='acoes' ? acoes : fiis;
         return (
           <div className="grid-cards">
-            {lista.map(i=><RadarCard key={i.ticker} item={i} onRemover={remover} onAddCarteira={addCarteira} onToggleFavorito={toggleFavorito}/>)}
+            {lista.map(i=>(
+              <RadarCard
+                key={i.ticker}
+                item={i}
+                onRemover={remover}
+                onAddCarteira={addCarteira}
+                onToggleFavorito={toggleFavorito}
+                onUpdateItem={updateItem}
+              />
+            ))}
           </div>
         );
       })():(
