@@ -41,13 +41,14 @@ const CRITERIOS_FII = [
 /* ── Sparkline inline SVG ── */
 function Sparkline({ precoAtual }) {
   // Gera pontos simulados em torno do preço atual (30 dias)
-  if (!precoAtual || precoAtual <= 0) return null;
-  const seed = precoAtual;
+  const preco = Number(precoAtual);
+  if (!preco || preco <= 0 || isNaN(preco)) return null;
+  const seed = preco;
   const pts = Array.from({ length: 20 }, (_, i) => {
     const noise = Math.sin(i * 1.3 + seed) * seed * 0.015 + Math.cos(i * 2.1) * seed * 0.008;
     return seed + noise - seed * 0.005 * (20 - i) * 0.1;
   });
-  pts[pts.length - 1] = precoAtual;
+  pts[pts.length - 1] = preco;
   const trend = pts[pts.length - 1] >= pts[0];
   const color = trend ? '#16A34A' : '#DC2626';
   const min = Math.min(...pts) * 0.998;
@@ -181,6 +182,37 @@ function diasNoRadar(dataCriacao) {
   return diff >= 0 ? diff : null;
 }
 
+/* ── Banner de alerta de preço alvo ── */
+function AlertaPrecoAlvo({ item }) {
+  const preco = Number(item.preco_atual);
+  const alvo  = Number(item.preco_alvo);
+  if (!preco || !alvo || preco > alvo) return null;
+  const pct = (((alvo - preco) / alvo) * 100).toFixed(1);
+  return (
+    <div style={{
+      background: 'linear-gradient(135deg, #DCFCE7 0%, #D1FAE5 100%)',
+      border: '2px solid #16A34A',
+      borderRadius: 10,
+      padding: '10px 14px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      animation: 'pulse-green 2s ease-in-out infinite',
+    }}>
+      <span style={{ fontSize: 20 }}>🎯</span>
+      <div style={{ flex: 1 }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: '#065F46', margin: 0 }}>
+          Preço alvo atingido!
+        </p>
+        <p style={{ fontSize: 12, color: '#16A34A', margin: '2px 0 0' }}>
+          {item.ticker} está em {fmt.brl(preco)} — {pct}% abaixo do seu alvo de {fmt.brl(alvo)}
+        </p>
+      </div>
+      <span style={{ fontSize: 20 }}>✅</span>
+    </div>
+  );
+}
+
 function RadarCard({ item, onRemover, onAddCarteira, onToggleFavorito, onUpdateItem }) {
   const isAcao = (item.tipo||'').toUpperCase()==='ACAO' || (item.tipo||'').toUpperCase()==='AÇÃO';
   const criterios = isAcao ? CRITERIOS_ACAO : CRITERIOS_FII;
@@ -239,6 +271,9 @@ function RadarCard({ item, onRemover, onAddCarteira, onToggleFavorito, onUpdateI
           <span className={badgeDecisao(item.decisao)}>{item.decisao}</span>
         </div>
       </div>
+
+      {/* Alerta preço alvo atingido */}
+      <AlertaPrecoAlvo item={item} />
 
       {/* Chips: dias no radar + meta de preço */}
       {(dias != null || item.preco_alvo) && (
@@ -433,6 +468,48 @@ function RadarCard({ item, onRemover, onAddCarteira, onToggleFavorito, onUpdateI
   );
 }
 
+/* ── Barra global de alertas ── */
+function BarraAlertas({ itens }) {
+  const alertas = itens.filter(i => {
+    const preco = Number(i.preco_atual);
+    const alvo  = Number(i.preco_alvo);
+    return preco > 0 && alvo > 0 && preco <= alvo;
+  });
+  if (alertas.length === 0) return null;
+  return (
+    <div style={{
+      background: '#065F46',
+      borderRadius: 12,
+      padding: '12px 18px',
+      marginBottom: 20,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12,
+      flexWrap: 'wrap',
+    }}>
+      <span style={{ fontSize: 20 }}>🔔</span>
+      <div style={{ flex: 1 }}>
+        <p style={{ fontSize: 13, fontWeight: 700, color: '#FFFFFF', margin: 0 }}>
+          {alertas.length === 1
+            ? `${alertas[0].ticker} atingiu o preço alvo!`
+            : `${alertas.length} ativos atingiram o preço alvo!`}
+        </p>
+        <p style={{ fontSize: 12, color: '#6EE7B7', margin: '2px 0 0' }}>
+          {alertas.map(a => `${a.ticker} → ${fmt.brl(Number(a.preco_atual))}`).join('  ·  ')}
+        </p>
+      </div>
+      <span style={{
+        background: '#16A34A',
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: 700,
+        padding: '4px 10px',
+        borderRadius: 20,
+      }}>COMPRAR AGORA?</span>
+    </div>
+  );
+}
+
 export default function WatchlistPage() {
   const [itens, setItens]             = useState([]);
   const [loading, setLoading]         = useState(true);
@@ -495,6 +572,16 @@ export default function WatchlistPage() {
 
   return (
     <div>
+      <style>{`
+        @keyframes pulse-green {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.3); }
+          50%       { box-shadow: 0 0 0 6px rgba(22, 163, 74, 0); }
+        }
+      `}</style>
+
+      {/* Barra global de alertas */}
+      <BarraAlertas itens={itens} />
+
       <div className="page-header" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:4}}>
         <div>
           <h2 style={{fontSize:22,fontWeight:600,color:'#1A1A2E',marginBottom:4}}>No Radar</h2>
@@ -601,7 +688,7 @@ export default function WatchlistPage() {
         <div style={{background:'#FFF',border:'1px solid #E8ECF0',borderRadius:14,padding:40,textAlign:'center'}}>
           <Eye size={40} style={{color:'#D0D8E0',margin:'0 auto 12px'}}/>
           <p style={{color:'#4A5568',fontWeight:500,marginBottom:4}}>Radar vazio</p>
-          <p style={{color:'#8896A8',fontSize:13}}>Adicione ativos que você quer acompanhar antes de investir.</p>
+          <p style={{color:'#8896A8',fontSize:13}}>Adicione ativos que você quer acompanhar antes de investir.</>
         </div>
       )}
     </div>
