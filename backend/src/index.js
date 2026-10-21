@@ -54,6 +54,12 @@ async function runMigrations() {
         ADD COLUMN IF NOT EXISTS favorito BOOLEAN DEFAULT FALSE
     `);
     await pool.query(`
+      ALTER TABLE watchlist
+        ADD COLUMN IF NOT EXISTS nota_pessoal TEXT,
+        ADD COLUMN IF NOT EXISTS decisao_termometro VARCHAR(20),
+        ADD COLUMN IF NOT EXISTS decisao_termometro_data TIMESTAMP
+    `);
+    await pool.query(`
       ALTER TABLE usuarios
         ADD COLUMN IF NOT EXISTS reset_token VARCHAR(255),
         ADD COLUMN IF NOT EXISTS reset_token_expires TIMESTAMP,
