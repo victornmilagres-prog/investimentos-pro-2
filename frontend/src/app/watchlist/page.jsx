@@ -688,7 +688,7 @@ export default function WatchlistPage() {
         <div style={{background:'#FFF',border:'1px solid #E8ECF0',borderRadius:14,padding:40,textAlign:'center'}}>
           <Eye size={40} style={{color:'#D0D8E0',margin:'0 auto 12px'}}/>
           <p style={{color:'#4A5568',fontWeight:500,marginBottom:4}}>Radar vazio</p>
-          <p style={{color:'#8896A8',fontSize:13}}>Adicione ativos que você quer acompanhar antes de investir.</>
+          <p style={{color:'#8896A8',fontSize:13}}>Adicione ativos que você quer acompanhar antes de investir.</p>
         </div>
       )}
     </div>
