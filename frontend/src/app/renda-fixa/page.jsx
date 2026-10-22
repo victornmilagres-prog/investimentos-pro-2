@@ -42,8 +42,8 @@ export default function RendaFixa() {
     if (!token) { router.push('/login'); return; }
 
     Promise.all([
-      fetch('/api/renda-fixa', { headers: { Authorization: `Bearer ${token}` } }),
-      fetch('/api/renda-fixa/taxas', { headers: { Authorization: `Bearer ${token}` } }),
+      fetch('/_/backend/api/renda-fixa', { headers: { Authorization: `Bearer ${token}` } }),
+      fetch('/_/backend/api/renda-fixa/taxas', { headers: { Authorization: `Bearer ${token}` } }),
     ])
       .then(([r1, r2]) => Promise.all([r1.json(), r2.json()]))
       .then(([dados, tx]) => {
@@ -120,7 +120,7 @@ export default function RendaFixa() {
     setSalvando(true);
     const token = localStorage.getItem('token');
     try {
-      const res = await fetch('/api/renda-fixa', {
+      const res = await fetch('/_/backend/api/renda-fixa', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -180,6 +180,11 @@ export default function RendaFixa() {
         :root {
           --bg:#f0f2f5; --surface:#fff; --surface2:#f8f9fb; --border:#e2e6ed;
           --fg:#0f1923; --fg2:#5a6474; --fg3:#8e98a8;
+          --accent:#1a56db; --accent-light:#e8effe;
+          --green:#0c9e6a; --green-light:#e3f6ee;
+          --yellow:#d97706; --yellow-light:#fef3c7;
+          --red:#dc2626; --red-light:#fee2e2;
+          --purple:#7c3aed;   --fg:#0f1923; --fg2:#5a6474; --fg3:#8e98a8;
           --accent:#1a56db; --accent-light:#e8effe;
           --green:#0c9e6a; --green-light:#e3f6ee;
           --yellow:#d97706; --yellow-light:#fef3c7;
