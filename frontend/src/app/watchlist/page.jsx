@@ -615,7 +615,7 @@ id: `${item.ticker}-score-baixo`,
 cat: 'evitar',
 ticker: item.ticker,
 motivo: 'Score fraco',
-c: `Score ${score}/${maxScore} — ativo não atende aos critérios mínimos`,
+desc: `Score ${score}/${maxScore} — ativo não atende aos critérios mínimos`,
 lido: false,
 });
 } else {
@@ -1105,7 +1105,7 @@ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8896A8" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
 <input value={busca} onChange={e=>setBusca(e.target.value)}
 placeholder={abaRadar==='acoes'?'Buscar ação... ex: VALE3, Petrobras':'Buscar FII... ex: CPTS11, Papel'}
-style={{border:'none',outline:'none',fontSize:ze:13,color:'#1A1A2E',background:'transparent',flex:1}}/>
+style={{border:'none',outline:'none',fontSize:13,color:'#1A1A2E',background:'transparent',flex:1}}/>
 {busca&&<button onClick={()=>setBusca('')} style={{background:'none',border:'none',cursor:'pointer',color:'#8896A8',fontSize:16}}>×</button>}
 </div>
 
