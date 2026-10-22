@@ -1,365 +1,692 @@
 'use client';
+
 import { useState, useEffect } from 'react';
-import { RefreshCw, X, Plus } from 'lucide-react';
-import api from '@/lib/api';
-import { fmt } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
-const TIPOS = ['CDB', 'LCI', 'LCA', 'Tesouro Direto', 'Debenture', 'CRI', 'CRA', 'Poupança', 'Outro'];
-const INDEXADORES = ['Prefixado', 'CDI', 'Selic', 'IPCA'];
-const LIQUIDEZ = ['D+0', 'D+1', 'D+30', 'D+60', 'Vencimento'];
+// ── Utilitários ──────────────────────────────────────────────────────────────
+const fmt = (v, dec = 2) =>
+  Number(v).toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+const fmtR = (v) => `R$ ${fmt(v)}`;
+const fmtP = (v) => `${v >= 0 ? '+' : ''}${fmt(v)}%`;
 
-function corAlerta(a) {
-  if (a === 'critico') return { bg: '#FEE2E2', cor: '#991B1B', texto: '🔴 Vence em breve!' };
-  if (a === 'atencao') return { bg: '#FEF3C7', cor: '#92400E', texto: '⚠ Vence em 3 meses' };
-  if (a === 'info')    return { bg: '#DBEAFE', cor: '#1E40AF', texto: 'ℹ Vence em 6 meses' };
-  return null;
-}
+// ── Componente principal ─────────────────────────────────────────────────────
+export default function RendaFixa() {
+  const router = useRouter();
 
-function corProgresso(pct) {
-  if (pct >= 80) return '#DC2626';
-  if (pct >= 50) return '#D97706';
-  return '#2563EB';
-}
-
-function labelIndexador(indexador, taxa, taxas) {
-  const t = parseFloat(taxa);
-  switch (indexador) {
-    case 'CDI':   return `${t}% do CDI (≈ ${((t/100)*taxas.cdi).toFixed(2)}% a.a.)`;
-    case 'Selic': return `${t}% da Selic (≈ ${((t/100)*taxas.selic).toFixed(2)}% a.a.)`;
-    case 'IPCA':  return `IPCA + ${t}% a.a. (≈ ${(taxas.ipca + t).toFixed(2)}% a.a.)`;
-    default:      return `${t}% a.a.`;
-  }
-}
-
-// ─── MODAL ADICIONAR / EDITAR ─────────────────────────────────────────────
-function ModalForm({ item, onFechar, onSalvar }) {
-  const [form, setForm] = useState({
-    nome: '', tipo: 'CDB', indexador: 'CDI', taxa: '', valor_investido: '',
-    data_inicio: new Date().toISOString().split('T')[0],
-    data_vencimento: '', emissor: '', liquidez: 'Vencimento',
-    isento_ir: false, observacoes: '',
-    ...item
-  });
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState('');
-
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
-  useEffect(() => {
-    if (['LCI', 'LCA'].includes(form.tipo)) set('isento_ir', true);
-  }, [form.tipo]);
-
-  const salvar = async () => {
-    if (!form.nome || !form.taxa || !form.valor_investido || !form.data_vencimento)
-      return setErro('Preencha todos os campos obrigatórios.');
-    setSalvando(true); setErro('');
-    try { await onSalvar(form); onFechar(); }
-    catch (e) { setErro(e.response?.data?.error || 'Erro ao salvar.'); }
-    finally { setSalvando(false); }
-  };
-
-  const st = {
-    overlay: { position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200 },
-    modal:   { background:'#fff',borderRadius:14,padding:28,width:520,boxShadow:'0 20px 60px rgba(0,0,0,0.2)',maxHeight:'92vh',overflowY:'auto' },
-    lbl:     { fontSize:12,color:'#8896A8',fontWeight:500,display:'block',marginBottom:5 },
-    inp:     { width:'100%',padding:'9px 12px',border:'1px solid #E8ECF0',borderRadius:7,fontSize:13,outline:'none',color:'#1A1A2E' },
-    g2:      { display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:14 },
-  };
-
-  return (
-    <div style={st.overlay} onClick={e=>e.target===e.currentTarget&&onFechar()}>
-      <div style={st.modal}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:20}}>
-          <h3 style={{fontSize:17,fontWeight:700}}>{item ? 'Editar investimento' : '+ Novo investimento'}</h3>
-          <button onClick={onFechar} style={{background:'none',border:'none',cursor:'pointer',color:'#8896A8'}}><X size={18}/></button>
-        </div>
-
-        <div style={{marginBottom:14}}>
-          <label style={st.lbl}>Nome *</label>
-          <input style={st.inp} placeholder="Ex: CDB Banco Inter 14,5%" value={form.nome} onChange={e=>set('nome',e.target.value)}/>
-        </div>
-
-        <div style={st.g2}>
-          <div>
-            <label style={st.lbl}>Tipo *</label>
-            <select style={st.inp} value={form.tipo} onChange={e=>set('tipo',e.target.value)}>
-              {TIPOS.map(t=><option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={st.lbl}>Indexador *</label>
-            <select style={st.inp} value={form.indexador} onChange={e=>set('indexador',e.target.value)}>
-              {INDEXADORES.map(i=><option key={i} value={i}>{i}</option>)}
-            </select>
-          </div>
-        </div>
-
-        <div style={st.g2}>
-          <div>
-            <label style={st.lbl}>
-              Taxa * {form.indexador==='Prefixado'?'(% a.a.)':form.indexador==='IPCA'?'(IPCA + % a.a.)':'(% do índice)'}
-            </label>
-            <input style={st.inp} type="number" step="0.01" placeholder={form.indexador==='CDI'?'110':form.indexador==='IPCA'?'6.12':'14.5'} value={form.taxa} onChange={e=>set('taxa',e.target.value)}/>
-          </div>
-          <div>
-            <label style={st.lbl}>Valor investido (R$) *</label>
-            <input style={st.inp} type="number" step="0.01" placeholder="10000.00" value={form.valor_investido} onChange={e=>set('valor_investido',e.target.value)}/>
-          </div>
-        </div>
-
-        <div style={st.g2}>
-          <div>
-            <label style={st.lbl}>Data de início *</label>
-            <input style={st.inp} type="date" value={form.data_inicio} onChange={e=>set('data_inicio',e.target.value)}/>
-          </div>
-          <div>
-            <label style={st.lbl}>Data de vencimento *</label>
-            <input style={st.inp} type="date" value={form.data_vencimento} onChange={e=>set('data_vencimento',e.target.value)}/>
-          </div>
-        </div>
-
-        <div style={st.g2}>
-          <div>
-            <label style={st.lbl}>Emissor / Banco</label>
-            <input style={st.inp} placeholder="Ex: Banco Inter" value={form.emissor} onChange={e=>set('emissor',e.target.value)}/>
-          </div>
-          <div>
-            <label style={st.lbl}>Liquidez</label>
-            <select style={st.inp} value={form.liquidez} onChange={e=>set('liquidez',e.target.value)}>
-              {LIQUIDEZ.map(l=><option key={l} value={l}>{l}</option>)}
-            </select>
-          </div>
-        </div>
-
-        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14,background:'#F8F9FA',padding:'10px 14px',borderRadius:8}}>
-          <input type="checkbox" id="isento_ir" checked={form.isento_ir} onChange={e=>set('isento_ir',e.target.checked)} style={{accentColor:'#2563EB',width:15,height:15}}/>
-          <label htmlFor="isento_ir" style={{fontSize:13,color:'#1A1A2E',cursor:'pointer'}}>
-            Isento de IR <span style={{fontSize:11,color:'#8896A8'}}>(LCI, LCA são automaticamente isentos)</span>
-          </label>
-        </div>
-
-        <div style={{marginBottom:18}}>
-          <label style={st.lbl}>Observações</label>
-          <textarea style={{...st.inp,height:70,resize:'vertical'}} value={form.observacoes} onChange={e=>set('observacoes',e.target.value)}/>
-        </div>
-
-        {erro && <p style={{fontSize:13,color:'#DC2626',marginBottom:12}}>{erro}</p>}
-
-        <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
-          <button onClick={onFechar} style={{padding:'9px 20px',borderRadius:7,fontSize:13,fontWeight:600,border:'none',cursor:'pointer',background:'#EDF2F7',color:'#8896A8'}}>Cancelar</button>
-          <button onClick={salvar} disabled={salvando} style={{padding:'9px 20px',borderRadius:7,fontSize:13,fontWeight:600,border:'none',cursor:'pointer',background:'#2563EB',color:'#fff'}}>
-            {salvando ? 'Salvando...' : item ? 'Salvar alterações' : 'Adicionar'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── CARD DO TÍTULO ────────────────────────────────────────────────────────
-function RendaFixaCard({ item, taxas, onEditar, onRemover }) {
-  const alerta = corAlerta(item.alertaVencimento);
-  const C = {
-    lbl: { fontSize:10,color:'#8896A8',margin:0,textTransform:'uppercase',letterSpacing:'.04em' },
-    val: { fontSize:14,fontWeight:600,color:'#1A1A2E',margin:0 },
-  };
-
-  return (
-    <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:14,overflow:'hidden'}}>
-      <div style={{padding:'14px 16px 10px',display:'flex',alignItems:'flex-start',justifyContent:'space-between'}}>
-        <div>
-          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
-            <span style={{fontSize:16,fontWeight:700,color:'#2563EB'}}>{item.nome}</span>
-            <span style={{fontSize:10,fontWeight:600,padding:'2px 8px',borderRadius:20,background:'#DBEAFE',color:'#1E40AF'}}>{item.tipo}</span>
-            <span style={{fontSize:10,fontWeight:600,padding:'2px 8px',borderRadius:20,background:'#EDE9FE',color:'#5B21B6'}}>{item.indexador}</span>
-            {item.liquidez && item.liquidez !== 'Vencimento' && (
-              <span style={{fontSize:10,fontWeight:600,padding:'2px 8px',borderRadius:20,background:'#FEE2E2',color:'#991B1B'}}>{item.liquidez}</span>
-            )}
-            {item.isento_ir && (
-              <span style={{fontSize:10,fontWeight:600,padding:'2px 8px',borderRadius:20,background:'#D1FAE5',color:'#065F46'}}>Isento IR</span>
-            )}
-          </div>
-          <p style={{fontSize:12,color:'#8896A8',margin:0}}>
-            {item.emissor && `${item.emissor} · `}Vence em {new Date(item.data_vencimento).toLocaleDateString('pt-BR')}
-          </p>
-        </div>
-        {alerta && (
-          <span style={{fontSize:11,fontWeight:600,padding:'3px 9px',borderRadius:4,background:alerta.bg,color:alerta.cor,whiteSpace:'nowrap'}}>{alerta.texto}</span>
-        )}
-      </div>
-
-      <div style={{padding:'10px 16px',borderTop:'1px solid #E8ECF0'}}>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}}>
-          <div><p style={C.lbl}>Valor investido</p><p style={C.val}>{fmt.brl(item.valor_investido)}</p></div>
-          <div><p style={C.lbl}>Taxa contratada</p><p style={C.val}>{labelIndexador(item.indexador, item.taxa, taxas)}</p></div>
-          <div>
-            <p style={C.lbl}>vs CDI atual</p>
-            <p style={{...C.val, color: item.taxaAnual >= taxas.cdi ? '#16A34A' : '#DC2626'}}>
-              {((item.taxaAnual / taxas.cdi) * 100).toFixed(1)}% do CDI
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div style={{padding:'10px 16px',borderTop:'1px solid #E8ECF0'}}>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}}>
-          <div>
-            <p style={C.lbl}>Valor atual (bruto)</p>
-            <p style={{fontSize:16,fontWeight:700,color:'#2563EB',margin:0}}>{fmt.brl(item.valorBruto)}</p>
-            <p style={{fontSize:11,color:'#16A34A',margin:'3px 0 0'}}>+{fmt.brl(item.rendBruto)} (+{fmt.pct(item.rendBrutoPct)})</p>
-          </div>
-          <div>
-            <p style={C.lbl}>IR estimado ({item.aliquotaIR}%)</p>
-            {item.isento_ir
-              ? <><p style={{fontSize:16,fontWeight:700,color:'#16A34A',margin:0}}>R$ 0,00</p><p style={{fontSize:11,color:'#16A34A',margin:'3px 0 0'}}>✓ Isento</p></>
-              : <><p style={{fontSize:16,fontWeight:700,color:'#DC2626',margin:0}}>-{fmt.brl(item.ir)}</p><p style={{fontSize:11,color:'#8896A8',margin:'3px 0 0'}}>Alíquota regressiva</p></>
-            }
-          </div>
-          <div>
-            <p style={C.lbl}>Valor líquido (após IR)</p>
-            <p style={{fontSize:16,fontWeight:700,color:'#16A34A',margin:0}}>{fmt.brl(item.valorLiquido)}</p>
-            <p style={{fontSize:11,color:'#16A34A',margin:'3px 0 0'}}>+{fmt.brl(item.rendLiquido)} (+{fmt.pct(item.rendLiquidoPct)})</p>
-          </div>
-        </div>
-      </div>
-
-      <div style={{padding:'10px 16px',borderTop:'1px solid #E8ECF0'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-          <p style={{fontSize:11,color:'#8896A8',margin:0}}>Progresso até o vencimento</p>
-          <p style={{fontSize:11,color:'#8896A8',margin:0}}>
-            {new Date(item.data_inicio).toLocaleDateString('pt-BR')} → {new Date(item.data_vencimento).toLocaleDateString('pt-BR')} · <strong>{item.progressoPct}% concluído</strong>
-            {item.diasParaVencer > 0 && ` · faltam ${item.diasParaVencer} dias`}
-          </p>
-        </div>
-        <div style={{height:6,background:'#E8ECF0',borderRadius:3,overflow:'hidden'}}>
-          <div style={{width:`${item.progressoPct}%`,height:'100%',background:corProgresso(item.progressoPct),borderRadius:3}}/>
-        </div>
-      </div>
-
-      <div style={{padding:'10px 16px',borderTop:'1px solid #E8ECF0',display:'flex',justifyContent:'flex-end',gap:8}}>
-        <button onClick={()=>onEditar(item)} className="btn-icon">✏️</button>
-        <button onClick={()=>onRemover(item.id)} className="btn-icon">🗑️</button>
-      </div>
-    </div>
-  );
-}
-
-// ─── PÁGINA ────────────────────────────────────────────────────────────────
-export default function RendaFixaPage() {
-  const [itens, setItens]     = useState([]);
-  const [taxas, setTaxas]     = useState({ cdi: 0, selic: 0, ipca: 0 });
+  const [investimentos, setInvestimentos] = useState([]);
+  const [taxas, setTaxas] = useState({ cdi: 0, selic: 0, ipca: 0 });
   const [loading, setLoading] = useState(true);
-  const [modal, setModal]     = useState(null);
+  const [erro, setErro] = useState(null);
+  const [showTimeline, setShowTimeline] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
-  const carregar = async () => {
+  // Filtros
+  const [filtroObjetivo, setFiltroObjetivo] = useState('Todos');
+  const [filtroTipo, setFiltroTipo] = useState('Todos');
+  const [filtroIdx, setFiltroIdx] = useState('Todos');
+  const [filtroVenc, setFiltroVenc] = useState('Todos');
+  const [sortBy, setSortBy] = useState('vencimento');
+
+  // Form
+  const [form, setForm] = useState({
+    nome: '', tipo: 'LCA', indexador: 'CDI', taxa: '', valor_investido: '',
+    isento_ir: true, data_inicio: '', data_vencimento: '', emissor: '',
+    objetivo: '', meta_valor: '', meta_descricao: '', observacoes: ''
+  });
+  const [sugestoesFiltradas, setSugestoesFiltradas] = useState([]);
+  const [salvando, setSalvando] = useState(false);
+
+  // ── Buscar dados ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) { router.push('/login'); return; }
+
+    Promise.all([
+      fetch('/api/renda-fixa', { headers: { Authorization: `Bearer ${token}` } }),
+      fetch('/api/renda-fixa/taxas', { headers: { Authorization: `Bearer ${token}` } }),
+    ])
+      .then(([r1, r2]) => Promise.all([r1.json(), r2.json()]))
+      .then(([dados, tx]) => {
+        setInvestimentos(dados.itens || dados);
+        setTaxas(tx);
+        setLoading(false);
+      })
+      .catch(() => { setErro('Erro ao carregar dados.'); setLoading(false); });
+  }, []);
+
+  // ── Derivados ───────────────────────────────────────────────────────────────
+  const objetivosUnicos = ['Todos', ...new Set(investimentos.map(i => i.objetivo || 'Sem objetivo'))];
+  const tiposUnicos = ['Todos', ...new Set(investimentos.map(i => i.tipo))];
+
+  const hoje = new Date();
+  const filtrados = investimentos
+    .filter(i => {
+      const obj = i.objetivo || 'Sem objetivo';
+      if (filtroObjetivo !== 'Todos' && obj !== filtroObjetivo) return false;
+      if (filtroTipo !== 'Todos' && i.tipo !== filtroTipo) return false;
+      if (filtroIdx !== 'Todos' && i.indexador !== filtroIdx) return false;
+      if (filtroVenc !== 'Todos') {
+        const venc = new Date(i.data_vencimento);
+        const dias = Math.ceil((venc - hoje) / 86400000);
+        if (filtroVenc === 'Este mês' && dias > 30) return false;
+        if (filtroVenc === '90 dias' && dias > 90) return false;
+        if (filtroVenc === 'Este ano' && venc.getFullYear() !== hoje.getFullYear()) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (sortBy === 'vencimento') return new Date(a.data_vencimento) - new Date(b.data_vencimento);
+      if (sortBy === 'rendimento') return (b.rendBrutoPct || 0) - (a.rendBrutoPct || 0);
+      if (sortBy === 'valor') return (b.valorBruto || 0) - (a.valorBruto || 0);
+      if (sortBy === 'nome') return a.nome.localeCompare(b.nome);
+      if (sortBy === 'cdi') return (b.taxaAnual || 0) - (a.taxaAnual || 0);
+      return 0;
+    });
+
+  // Grupos por objetivo
+  const grupos = {};
+  filtrados.forEach(i => {
+    const k = i.objetivo || 'Sem objetivo';
+    if (!grupos[k]) grupos[k] = [];
+    grupos[k].push(i);
+  });
+
+  // Totais
+  const totalInvestido = investimentos.reduce((s, i) => s + Number(i.valor_investido || 0), 0);
+  const totalBruto = investimentos.reduce((s, i) => s + Number(i.valorBruto || i.valor_investido || 0), 0);
+  const totalLiquido = investimentos.reduce((s, i) => s + Number(i.valorLiquido || i.valor_investido || 0), 0);
+  const rendTotalR = totalBruto - totalInvestido;
+  const rendTotalPct = totalInvestido > 0 ? (rendTotalR / totalInvestido) * 100 : 0;
+  const rendMedioPct = investimentos.length > 0
+    ? investimentos.reduce((s, i) => s + Number(i.rendBrutoPct || 0), 0) / investimentos.length : 0;
+
+  // Próximo vencimento
+  const proxVenc = [...investimentos].sort((a, b) =>
+    new Date(a.data_vencimento) - new Date(b.data_vencimento)
+  ).find(i => new Date(i.data_vencimento) > hoje);
+  const diasProx = proxVenc
+    ? Math.ceil((new Date(proxVenc.data_vencimento) - hoje) / 86400000) : null;
+
+  // Sugestões de objetivo
+  const objetivosExistentes = [...new Set(investimentos.map(i => i.objetivo).filter(Boolean))];
+  const mostrarSugestoes = (val) => {
+    setSugestoesFiltradas(objetivosExistentes.filter(o =>
+      !val || o.toLowerCase().includes(val.toLowerCase())
+    ));
+  };
+
+  // ── Salvar novo investimento ────────────────────────────────────────────────
+  const salvar = async () => {
+    setSalvando(true);
+    const token = localStorage.getItem('token');
     try {
-      const r = await api.get('/renda-fixa');
-      setItens(r.data.itens || []);
-      setTaxas(r.data.taxas || { cdi: 0, selic: 0, ipca: 0 });
-    } finally { setLoading(false); }
+      const res = await fetch('/api/renda-fixa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          ...form,
+          taxa: parseFloat(form.taxa),
+          valor_investido: parseFloat(form.valor_investido),
+          isento_ir: form.isento_ir === true || form.isento_ir === 'true',
+        }),
+      });
+      const novo = await res.json();
+      if (!res.ok) throw new Error(novo.error || 'Erro');
+      setInvestimentos(prev => [...prev, novo]);
+      setShowModal(false);
+      setForm({
+        nome: '', tipo: 'LCA', indexador: 'CDI', taxa: '', valor_investido: '',
+        isento_ir: true, data_inicio: '', data_vencimento: '', emissor: '',
+        objetivo: '', meta_valor: '', meta_descricao: '', observacoes: ''
+      });
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setSalvando(false);
+    }
   };
 
-  useEffect(() => { carregar(); }, []);
-
-  const salvar = async (form) => {
-    if (form.id) await api.put(`/renda-fixa/${form.id}`, form);
-    else         await api.post('/renda-fixa', form);
-    await carregar();
+  // ── Cor por indexador ───────────────────────────────────────────────────────
+  const corIdx = { CDI: '#1a56db', Selic: '#0c9e6a', IPCA: '#7c3aed', Prefixado: '#d97706' };
+  const corBadge = {
+    LCA: 'badge-lca', LCI: 'badge-lci', CDB: 'badge-cdb',
+    'Tesouro Direto': 'badge-teso', Debênture: 'badge-deb', Outro: 'badge-outro'
   };
 
-  const remover = async (id) => {
-    if (!confirm('Remover este investimento?')) return;
-    await api.delete(`/renda-fixa/${id}`);
-    await carregar();
+  // ── Alerta vencimento ───────────────────────────────────────────────────────
+  const alertaVenc = (inv) => {
+    const dias = inv.diasParaVencer ?? Math.ceil((new Date(inv.data_vencimento) - hoje) / 86400000);
+    if (dias <= 0) return { cls: 'alerta-vencido', txt: 'Vencido' };
+    if (dias <= 30) return { cls: 'alerta-critico', txt: `🚨 Vence em ${dias} dias` };
+    if (dias <= 90) return { cls: 'alerta-atencao', txt: `⚠️ Vence em ${dias} dias — planeje o reinvestimento` };
+    if (dias <= 180) return { cls: 'alerta-info', txt: `📅 Vence em ${dias} dias` };
+    return null;
   };
 
-  const patrimonio   = itens.reduce((s,i) => s + (i.valorLiquido || 0), 0);
-  const totalInvest  = itens.reduce((s,i) => s + parseFloat(i.valor_investido || 0), 0);
-  const rendBruto    = itens.reduce((s,i) => s + (i.rendBruto || 0), 0);
-  const rendLiquido  = itens.reduce((s,i) => s + (i.rendLiquido || 0), 0);
-  const rendBrutoPct = totalInvest > 0 ? (rendBruto / totalInvest) * 100 : 0;
-  const rendLiqPct   = totalInvest > 0 ? (rendLiquido / totalInvest) * 100 : 0;
-
+  // ── Render ──────────────────────────────────────────────────────────────────
   if (loading) return (
-    <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:256}}>
-      <div style={{width:32,height:32,border:'2px solid #2563EB',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.7s linear infinite'}}/>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--fg2)' }}>
+      Carregando...
     </div>
+  );
+  if (erro) return (
+    <div style={{ padding: '32px', color: 'var(--red)' }}>{erro}</div>
   );
 
   return (
-    <div>
-      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:20,flexWrap:'wrap',gap:8}}>
-        <div>
-          <h2 style={{fontSize:22,fontWeight:600,color:'#1A1A2E',marginBottom:4}}>Carteira Renda Fixa</h2>
-          <p style={{fontSize:13,color:'#8896A8'}}>Rendimento calculado automaticamente com juros compostos diários</p>
-        </div>
-        <button onClick={()=>setModal('novo')} style={{display:'flex',alignItems:'center',gap:6,padding:'8px 16px',borderRadius:7,fontSize:13,fontWeight:600,border:'none',cursor:'pointer',background:'#2563EB',color:'#fff'}}>
-          <Plus size={15}/> Novo investimento
-        </button>
-      </div>
+    <>
+      <style>{`
+        /* ── Tokens ── */
+        :root {
+          --bg:#f0f2f5; --surface:#fff; --surface2:#f8f9fb; --border:#e2e6ed;
+          --fg:#0f1923; --fg2:#5a6474; --fg3:#8e98a8;
+          --accent:#1a56db; --accent-light:#e8effe;
+          --green:#0c9e6a; --green-light:#e3f6ee;
+          --yellow:#d97706; --yellow-light:#fef3c7;
+          --red:#dc2626; --red-light:#fee2e2;
+          --purple:#7c3aed; --purple-light:#ede9fe;
+          --teal:#0891b2; --teal-light:#e0f9ff;
+          --radius:12px; --radius-sm:8px;
+          --shadow:0 1px 3px rgba(0,0,0,.08);
+          --shadow-md:0 4px 12px rgba(0,0,0,.10);
+        }
+        @media(prefers-color-scheme:dark){
+          :root:not([data-theme=light]){
+            --bg:#0d1117; --surface:#161b22; --surface2:#1c2230; --border:#2a3140;
+            --fg:#e6edf3; --fg2:#8b949e; --fg3:#484f58;
+            --accent:#4f8ef7; --accent-light:#1a2744;
+            --green:#3fb884; --green-light:#0d2b1e;
+            --yellow:#f59e0b; --yellow-light:#2a1f07;
+            --red:#f87171; --red-light:#2a0f0f;
+            --purple:#a78bfa; --purple-light:#1e1434;
+            --teal:#22d3ee; --teal-light:#061e24;
+          }
+        }
+        :root[data-theme=dark]{
+          --bg:#0d1117; --surface:#161b22; --surface2:#1c2230; --border:#2a3140;
+          --fg:#e6edf3; --fg2:#8b949e; --fg3:#484f58;
+          --accent:#4f8ef7; --accent-light:#1a2744;
+          --green:#3fb884; --green-light:#0d2b1e;
+          --yellow:#f59e0b; --yellow-light:#2a1f07;
+          --red:#f87171; --red-light:#2a0f0f;
+          --purple:#a78bfa; --purple-light:#1e1434;
+          --teal:#22d3ee; --teal-light:#061e24;
+        }
 
-      <div style={{background:'linear-gradient(135deg,#1E3A5F,#2563EB)',borderRadius:12,padding:'16px 20px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12,marginBottom:16}}>
-        <div>
-          <p style={{fontSize:11,color:'rgba(255,255,255,.7)',textTransform:'uppercase',letterSpacing:'.05em',margin:'0 0 2px'}}>Taxas de referência — atualizadas automaticamente</p>
-          <p style={{fontSize:10,color:'rgba(255,255,255,.5)',margin:0}}>Fonte: Banco Central do Brasil</p>
+        .rf-wrap{padding:24px 16px;max-width:1200px;margin:0 auto;}
+        /* Header */
+        .rf-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;}
+        .rf-header h1{font-size:20px;font-weight:700;letter-spacing:-.3px;}
+        .rf-header h1 span{color:var(--accent);}
+        .rf-header-right{display:flex;gap:8px;}
+        .btn-outline{display:flex;align-items:center;gap:5px;background:var(--surface);color:var(--fg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 14px;font-size:13px;font-weight:500;cursor:pointer;}
+        .btn-outline:hover{border-color:var(--accent);color:var(--accent);}
+        .btn-primary{display:flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;}
+        /* Taxas */
+        .taxas-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+        .taxa-pill{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:5px 12px;font-size:12px;}
+        .t-nome{color:var(--fg3);font-weight:600;text-transform:uppercase;letter-spacing:.4px;}
+        .t-val{font-weight:700;font-variant-numeric:tabular-nums;}
+        /* Resumo */
+        .resumo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:20px;}
+        .resumo-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);}
+        .r-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--fg3);margin-bottom:6px;}
+        .r-valor{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1;}
+        .r-sub{font-size:12px;color:var(--fg2);margin-top:3px;}
+        .r-delta{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:600;margin-top:4px;padding:2px 7px;border-radius:4px;}
+        .delta-pos{background:var(--green-light);color:var(--green);}
+        .venc-card{border-left:3px solid var(--yellow);}
+        .venc-card .r-valor{color:var(--yellow);font-size:16px;}
+        /* Timeline */
+        .timeline-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-bottom:20px;box-shadow:var(--shadow);}
+        .tl-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+        .tl-nome{font-size:12px;color:var(--fg2);width:140px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        .tl-track{flex:1;height:8px;background:var(--border);border-radius:4px;}
+        .tl-fill{height:100%;border-radius:4px;}
+        .tl-data{font-size:11px;color:var(--fg3);width:60px;flex-shrink:0;text-align:right;}
+        /* Filtros */
+        .filtros-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:20px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;box-shadow:var(--shadow);}
+        .filtro-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--fg3);}
+        .chip-group{display:flex;flex-wrap:wrap;gap:6px;}
+        .chip{padding:4px 11px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--fg2);font-size:12px;font-weight:500;cursor:pointer;transition:all .15s;}
+        .chip:hover{border-color:var(--accent);color:var(--accent);}
+        .chip.active{background:var(--accent-light);border-color:var(--accent);color:var(--accent);font-weight:600;}
+        .filtro-divider{width:1px;height:28px;background:var(--border);}
+        .sort-sel{margin-left:auto;padding:5px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface2);color:var(--fg2);font-size:12px;cursor:pointer;}
+        /* Objetivo section */
+        .obj-section{margin-bottom:28px;}
+        .obj-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap;}
+        .obj-title{display:flex;align-items:center;gap:8px;}
+        .obj-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;background:var(--accent-light);}
+        .obj-title h2{font-size:15px;font-weight:700;}
+        .obj-title .qtd{font-size:12px;color:var(--fg3);}
+        .obj-total{text-align:right;}
+        .obj-total .t-label{font-size:11px;color:var(--fg3);}
+        .obj-total .t-valor{font-size:16px;font-weight:700;color:var(--green);font-variant-numeric:tabular-nums;}
+        .obj-total .t-rend{font-size:12px;color:var(--fg2);}
+        /* Meta barra */
+        .meta-barra{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:12px;}
+        .meta-info .meta-label{font-size:11px;color:var(--fg3);margin-bottom:4px;}
+        .meta-track{height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
+        .meta-fill{height:100%;border-radius:3px;background:var(--accent);}
+        .meta-pct{font-size:13px;font-weight:700;color:var(--accent);white-space:nowrap;}
+        /* Cards */
+        .inv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;}
+        .inv-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);position:relative;overflow:hidden;transition:box-shadow .2s,transform .15s;cursor:pointer;}
+        .inv-card:hover{box-shadow:var(--shadow-md);transform:translateY(-1px);}
+        .inv-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;}
+        .inv-card.idx-CDI::before{background:var(--accent);}
+        .inv-card.idx-Selic::before{background:var(--green);}
+        .inv-card.idx-IPCA::before{background:var(--purple);}
+        .inv-card.idx-Prefixado::before{background:var(--yellow);}
+        .card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px;}
+        .card-nome{font-size:14px;font-weight:700;line-height:1.3;}
+        .card-badges{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;}
+        .badge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:2px 7px;border-radius:4px;}
+        .badge-lca{background:var(--green-light);color:var(--green);}
+        .badge-lci{background:var(--teal-light);color:var(--teal);}
+        .badge-cdb{background:var(--accent-light);color:var(--accent);}
+        .badge-teso{background:var(--purple-light);color:var(--purple);}
+        .badge-isento{background:var(--green-light);color:var(--green);}
+        .card-taxa{font-size:12px;color:var(--fg2);margin-bottom:10px;}
+        .card-row{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:4px;}
+        .ck{font-size:11px;color:var(--fg3);}
+        .cv{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;}
+        .cv-green{color:var(--green);}
+        .cdi-comp{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--fg3);margin-top:4px;}
+        .cdi-badge{font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;}
+        .cdi-acima{background:var(--green-light);color:var(--green);}
+        .cdi-abaixo{background:var(--red-light);color:var(--red);}
+        .divider{height:1px;background:var(--border);margin:10px 0;}
+        .prog-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:4px;}
+        .prog-fill{height:100%;border-radius:2px;background:var(--accent);}
+        .prog-label{display:flex;justify-content:space-between;font-size:10px;color:var(--fg3);}
+        .projecao{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;margin-top:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+        .pj-label{font-size:11px;color:var(--fg3);}
+        .pj-val{font-size:13px;font-weight:700;color:var(--accent);font-variant-numeric:tabular-nums;}
+        .alertas{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+        .alerta{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 8px;border-radius:4px;}
+        .alerta-critico{background:var(--red-light);color:var(--red);}
+        .alerta-atencao{background:var(--yellow-light);color:var(--yellow);}
+        .alerta-info{background:var(--accent-light);color:var(--accent);}
+        .alerta-vencido{background:var(--border);color:var(--fg2);}
+        /* Modal */
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:16px;z-index:100;}
+        .modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);width:100%;max-width:500px;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+        .modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:1;}
+        .modal-head h3{font-size:15px;font-weight:700;}
+        .btn-close{background:none;border:none;color:var(--fg3);font-size:18px;cursor:pointer;padding:2px 6px;border-radius:4px;}
+        .modal-body{padding:20px;display:flex;flex-direction:column;gap:14px;}
+        .form-sec{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--fg3);border-top:1px solid var(--border);padding-top:12px;margin-top:2px;}
+        .form-sec:first-child{border-top:none;padding-top:0;margin-top:0;}
+        .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+        .form-grp{display:flex;flex-direction:column;gap:5px;}
+        .form-grp label{font-size:12px;font-weight:600;color:var(--fg2);}
+        .form-grp input,.form-grp select,.form-grp textarea{padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface2);color:var(--fg);font-family:inherit;font-size:13px;}
+        .form-grp input:focus,.form-grp select:focus{outline:none;border-color:var(--accent);}
+        .form-hint{font-size:11px;color:var(--fg3);}
+        .obj-chip{padding:5px 11px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--fg2);font-size:12px;cursor:pointer;}
+        .obj-chip:hover{border-color:var(--accent);color:var(--accent);}
+        .modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;position:sticky;bottom:0;background:var(--surface);}
+        .btn-cancel{padding:8px 16px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);color:var(--fg2);font-size:13px;font-weight:600;cursor:pointer;}
+        .btn-salvar{padding:8px 20px;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-size:13px;font-weight:600;cursor:pointer;}
+        @media(max-width:500px){.form-row{grid-template-columns:1fr;}}
+      `}</style>
+
+      <div className="rf-wrap">
+        {/* Header */}
+        <div className="rf-header">
+          <h1>Renda <span>Fixa</span></h1>
+          <div className="rf-header-right">
+            <button className="btn-outline" onClick={() => setShowTimeline(v => !v)}>
+              📅 Vencimentos
+            </button>
+            <button className="btn-primary" onClick={() => setShowModal(true)}>
+              + Novo Lançamento
+            </button>
+          </div>
         </div>
-        <div style={{display:'flex',gap:28}}>
-          {[
-            { label: 'CDI',   val: `${taxas.cdi?.toFixed(2) || '—'}%` },
-            { label: 'Selic', val: `${taxas.selic?.toFixed(2) || '—'}%` },
-            { label: 'IPCA',  val: `${taxas.ipca?.toFixed(2) || '—'}%` },
-          ].map((t,i) => (
-            <div key={t.label} style={{textAlign:'center',paddingLeft:i>0?28:0,borderLeft:i>0?'1px solid rgba(255,255,255,.2)':undefined}}>
-              <p style={{fontSize:11,color:'rgba(255,255,255,.7)',margin:'0 0 2px'}}>{t.label}</p>
-              <p style={{fontSize:24,fontWeight:700,color:'#fff',margin:0}}>{t.val}</p>
-              <p style={{fontSize:10,color:'rgba(255,255,255,.5)',margin:0}}>a.a.</p>
+
+        {/* Taxas do dia */}
+        <div className="taxas-bar">
+          <div className="taxa-pill">
+            <span className="t-nome">CDI</span>
+            <span className="t-val" style={{ color: 'var(--accent)' }}>{fmt(taxas.cdi, 2)}% a.a.</span>
+          </div>
+          <div className="taxa-pill">
+            <span className="t-nome">Selic</span>
+            <span className="t-val" style={{ color: 'var(--green)' }}>{fmt(taxas.selic, 2)}% a.a.</span>
+          </div>
+          <div className="taxa-pill">
+            <span className="t-nome">IPCA</span>
+            <span className="t-val" style={{ color: 'var(--purple)' }}>{fmt(taxas.ipca, 2)}% a.a.</span>
+          </div>
+          <span style={{ fontSize: 11, color: 'var(--fg3)', alignSelf: 'center' }}>Atualizado via BCB</span>
+        </div>
+
+        {/* Resumo */}
+        <div className="resumo-grid">
+          <div className="resumo-card">
+            <div className="r-label">Total Investido</div>
+            <div className="r-valor">{fmtR(totalInvestido)}</div>
+            <div className="r-sub">{investimentos.length} aplicações</div>
+          </div>
+          <div className="resumo-card">
+            <div className="r-label">Valor Bruto Atual</div>
+            <div className="r-valor" style={{ color: 'var(--green)' }}>{fmtR(totalBruto)}</div>
+            <div className="r-delta delta-pos">▲ {fmtR(rendTotalR)} ({fmt(rendTotalPct)}%)</div>
+          </div>
+          <div className="resumo-card">
+            <div className="r-label">Valor Líquido (IR)</div>
+            <div className="r-valor" style={{ color: 'var(--green)' }}>{fmtR(totalLiquido)}</div>
+            <div className="r-sub">IR descontado: {fmtR(totalBruto - totalLiquido)}</div>
+          </div>
+          <div className="resumo-card">
+            <div className="r-label">Rendimento Médio</div>
+            <div className="r-valor" style={{ color: 'var(--accent)' }}>{fmt(rendMedioPct)}%</div>
+            <div className="r-sub">≈ {taxas.cdi > 0 ? fmt((rendMedioPct / taxas.cdi) * 100) : '–'}% do CDI atual</div>
+          </div>
+          {proxVenc && (
+            <div className="resumo-card venc-card">
+              <div className="r-label">Próximo Vencimento</div>
+              <div className="r-valor">{proxVenc.nome}</div>
+              <div className="r-sub">
+                {diasProx <= 90 ? '⚠️' : '📅'} {diasProx} dias · {new Date(proxVenc.data_vencimento).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}
+              </div>
             </div>
-          ))}
+          )}
         </div>
+
+        {/* Timeline */}
+        {showTimeline && (
+          <div className="timeline-section">
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>📅 Linha do Tempo — Vencimentos</div>
+            {[...investimentos]
+              .sort((a, b) => new Date(a.data_vencimento) - new Date(b.data_vencimento))
+              .map(inv => {
+                const inicio = new Date(inv.data_inicio);
+                const venc = new Date(inv.data_vencimento);
+                const total = Math.max(1, venc - inicio);
+                const corrido = Math.min(hoje - inicio, total);
+                const pct = Math.max(2, Math.min(98, (corrido / total) * 100));
+                const cor = corIdx[inv.indexador] || '#8e98a8';
+                return (
+                  <div className="tl-row" key={inv.id}>
+                    <div className="tl-nome">{inv.nome}</div>
+                    <div className="tl-track">
+                      <div className="tl-fill" style={{ width: `${pct}%`, background: cor }} />
+                    </div>
+                    <div className="tl-data">
+                      {new Date(inv.data_vencimento).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}
+                      {(inv.diasParaVencer ?? 999) <= 90 ? ' ⚠️' : ''}
+                    </div>
+                  </div>
+                );
+              })}
+            <div style={{ fontSize: 11, color: 'var(--fg3)', marginTop: 8 }}>
+              A barra indica quanto do prazo total já transcorreu.
+            </div>
+          </div>
+        )}
+
+        {/* Filtros */}
+        <div className="filtros-bar">
+          <span className="filtro-label">Objetivo</span>
+          <div className="chip-group">
+            {objetivosUnicos.map(o => (
+              <div key={o} className={`chip${filtroObjetivo === o ? ' active' : ''}`}
+                onClick={() => setFiltroObjetivo(o)}>{o}</div>
+            ))}
+          </div>
+          <div className="filtro-divider" />
+          <span className="filtro-label">Tipo</span>
+          <div className="chip-group">
+            {tiposUnicos.map(t => (
+              <div key={t} className={`chip${filtroTipo === t ? ' active' : ''}`}
+                onClick={() => setFiltroTipo(t)}>{t}</div>
+            ))}
+          </div>
+          <div className="filtro-divider" />
+          <span className="filtro-label">Indexador</span>
+          <div className="chip-group">
+            {['Todos', 'CDI', 'Selic', 'IPCA', 'Prefixado'].map(i => (
+              <div key={i} className={`chip${filtroIdx === i ? ' active' : ''}`}
+                onClick={() => setFiltroIdx(i)}>{i}</div>
+            ))}
+          </div>
+          <div className="filtro-divider" />
+          <span className="filtro-label">Vencimento</span>
+          <div className="chip-group">
+            {['Todos', 'Este mês', '90 dias', 'Este ano'].map(v => (
+              <div key={v} className={`chip${filtroVenc === v ? ' active' : ''}`}
+                onClick={() => setFiltroVenc(v)}>{v}</div>
+            ))}
+          </div>
+          <select className="sort-sel" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+            <option value="vencimento">Ordenar: Vencimento ↑</option>
+            <option value="rendimento">Ordenar: Maior rendimento</option>
+            <option value="valor">Ordenar: Maior valor</option>
+            <option value="nome">Ordenar: Nome A–Z</option>
+            <option value="cdi">Ordenar: % CDI</option>
+          </select>
+        </div>
+
+        {/* Grupos por objetivo */}
+        {Object.entries(grupos).length === 0 && (
+          <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--fg3)' }}>
+            Nenhum investimento encontrado com esses filtros.
+          </div>
+        )}
+
+        {Object.entries(grupos).map(([objetivo, itens]) => {
+          const totObj = itens.reduce((s, i) => s + Number(i.valorBruto || i.valor_investido || 0), 0);
+          const invObj = itens.reduce((s, i) => s + Number(i.valor_investido || 0), 0);
+          const liqObj = itens.reduce((s, i) => s + Number(i.valorLiquido || i.valor_investido || 0), 0);
+          return (
+            <div className="obj-section" key={objetivo}>
+              <div className="obj-header">
+                <div className="obj-title">
+                  <div className="obj-icon">🎯</div>
+                  <div>
+                    <h2>{objetivo}</h2>
+                    <span className="qtd">{itens.length} aplicaç{itens.length === 1 ? 'ão' : 'ões'}</span>
+                  </div>
+                </div>
+                <div className="obj-total">
+                  <div className="t-label">Total atual</div>
+                  <div className="t-valor">{fmtR(totObj)}</div>
+                  <div className="t-rend">+{fmtR(totObj - invObj)} · Líq: {fmtR(liqObj)}</div>
+                </div>
+              </div>
+
+              <div className="inv-grid">
+                {itens.map(inv => {
+                  const vencDate = new Date(inv.data_vencimento);
+                  const inicDate = new Date(inv.data_inicio);
+                  const totalDias = Math.max(1, Math.floor((vencDate - inicDate) / 86400000));
+                  const corridoDias = Math.max(0, Math.floor((hoje - inicDate) / 86400000));
+                  const progPct = inv.progressoPct ?? Math.min(100, (corridoDias / totalDias) * 100);
+                  const alerta = alertaVenc(inv);
+
+                  // Comparativo CDI
+                  let cdiComp = null;
+                  if (inv.indexador === 'CDI' && taxas.cdi > 0) {
+                    const taxaEfetiva = (inv.taxa / 100) * taxas.cdi;
+                    const diff = taxaEfetiva - taxas.cdi;
+                    cdiComp = diff >= 0
+                      ? <span className="cdi-badge cdi-acima">▲ {fmt(diff, 1)}% acima do CDI</span>
+                      : <span className="cdi-badge cdi-abaixo">▼ {fmt(Math.abs(diff), 1)}% abaixo do CDI</span>;
+                  }
+
+                  return (
+                    <div className={`inv-card idx-${inv.indexador}${inv.vencido ? ' vencido' : ''}`} key={inv.id}>
+                      <div className="card-top">
+                        <div className="card-nome">{inv.nome}</div>
+                        <div className="card-badges">
+                          <span className={`badge ${corBadge[inv.tipo] || 'badge-outro'}`}>{inv.tipo}</span>
+                          {inv.isento_ir && <span className="badge badge-isento">Isento IR</span>}
+                          {inv.vencido && <span className="badge" style={{ background: 'var(--border)', color: 'var(--fg3)' }}>Vencido</span>}
+                        </div>
+                      </div>
+                      <div className="card-taxa">
+                        {inv.emissor} · {fmt(inv.taxa)}% {inv.indexador !== 'Prefixado' ? `do ${inv.indexador}` : 'a.a.'}
+                        {inv.taxaAnual > 0 && <strong> · ≈{fmt(inv.taxaAnual)}% a.a.</strong>}
+                      </div>
+                      <div className="card-row">
+                        <span className="ck">Investido</span>
+                        <span className="cv">{fmtR(inv.valor_investido)}</span>
+                      </div>
+                      <div className="card-row">
+                        <span className="ck">Valor bruto</span>
+                        <span className="cv cv-green">{fmtR(inv.valorBruto || inv.valor_investido)}</span>
+                      </div>
+                      {!inv.isento_ir && (
+                        <div className="card-row">
+                          <span className="ck">Valor líquido (IR {inv.aliquotaIR}%)</span>
+                          <span className="cv cv-green">{fmtR(inv.valorLiquido || inv.valor_investido)}</span>
+                        </div>
+                      )}
+                      {cdiComp && (
+                        <div className="cdi-comp">{cdiComp}</div>
+                      )}
+                      <div className="divider" />
+                      <div className="prog-bar">
+                        <div className="prog-fill" style={{ width: `${progPct}%`, background: corIdx[inv.indexador] || 'var(--accent)' }} />
+                      </div>
+                      <div className="prog-label">
+                        <span>{inicDate.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}</span>
+                        <span>{fmt(progPct, 0)}% do prazo</span>
+                        <span>{vencDate.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}</span>
+                      </div>
+                      {alerta && (
+                        <div className="alertas">
+                          <span className={`alerta ${alerta.cls}`}>{alerta.txt}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {itens.length > 0 && (
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:16}}>
-          <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:12,padding:'18px 20px'}}>
-            <p style={{fontSize:11,color:'#8896A8',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:8}}>Patrimônio renda fixa</p>
-            <p style={{fontSize:26,fontWeight:800,color:'#2563EB',margin:0}}>{fmt.brl(patrimonio)}</p>
-            <p style={{fontSize:12,color:'#8896A8',marginTop:4}}>{itens.length} investimento{itens.length>1?'s':''} ativo{itens.length>1?'s':''}</p>
-          </div>
-          <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:12,padding:'18px 20px'}}>
-            <p style={{fontSize:11,color:'#8896A8',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:8}}>Rendimento acumulado</p>
-            <p style={{fontSize:26,fontWeight:800,color:'#16A34A',margin:0}}>+{fmt.brl(rendLiquido)}</p>
-            <p style={{fontSize:12,color:'#8896A8',marginTop:4}}>
-              +{fmt.pct(rendLiqPct)} líquido · +{fmt.pct(rendBrutoPct)} bruto
-            </p>
-          </div>
-        </div>
-      )}
+      {/* Modal */}
+      {showModal && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
+          <div className="modal">
+            <div className="modal-head">
+              <h3>Novo Lançamento de Renda Fixa</h3>
+              <button className="btn-close" onClick={() => setShowModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-sec" style={{ borderTop: 'none', paddingTop: 0 }}>
+                🎯 Objetivo <span style={{ fontWeight: 400, color: 'var(--fg3)', textTransform: 'none', letterSpacing: 0 }}>(opcional)</span>
+              </div>
+              <div className="form-grp">
+                <label>Para que é esse investimento? <span style={{ color: 'var(--fg3)', fontWeight: 400 }}>— deixe em branco se não houver</span></label>
+                <input
+                  type="text"
+                  value={form.objetivo}
+                  placeholder="Ex: Reserva de emergência, Futuro do filho..."
+                  onChange={e => { setForm(f => ({ ...f, objetivo: e.target.value })); mostrarSugestoes(e.target.value); }}
+                  onFocus={() => mostrarSugestoes(form.objetivo)}
+                />
+                {sugestoesFiltradas.length > 0 && (
+                  <div style={{ marginTop: 6 }}>
+                    <span className="form-hint" style={{ display: 'block', marginBottom: 5 }}>Objetivos já cadastrados:</span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {sugestoesFiltradas.map(o => (
+                        <div key={o} className="obj-chip"
+                          onClick={() => { setForm(f => ({ ...f, objetivo: o })); setSugestoesFiltradas([]); }}>
+                          {o}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <span className="form-hint">💡 Sem objetivo, aparece em &quot;Sem objetivo&quot; na listagem.</span>
+              </div>
 
-      {itens.length > 0 ? (
-        <div style={{display:'flex',flexDirection:'column',gap:12}}>
-          {itens.map(item => (
-            <RendaFixaCard key={item.id} item={item} taxas={taxas}
-              onEditar={setModal} onRemover={remover}/>
-          ))}
-        </div>
-      ) : (
-        <div style={{background:'#FFF',border:'1px solid #E8ECF0',borderRadius:14,padding:48,textAlign:'center'}}>
-          <p style={{fontSize:40,marginBottom:12}}>💰</p>
-          <p style={{color:'#4A5568',fontWeight:500,marginBottom:8}}>Nenhum investimento cadastrado</p>
-          <p style={{color:'#8896A8',fontSize:13,marginBottom:20}}>Adicione seus CDBs, LCIs, Tesouro Direto e outros títulos de renda fixa.</p>
-          <button onClick={()=>setModal('novo')} style={{padding:'10px 20px',borderRadius:8,fontSize:13,fontWeight:600,border:'none',cursor:'pointer',background:'#2563EB',color:'#fff'}}>
-            + Adicionar primeiro investimento
-          </button>
-        </div>
-      )}
+              <div className="form-sec">📋 Dados do Investimento</div>
+              <div className="form-grp">
+                <label>Nome / Apelido</label>
+                <input type="text" value={form.nome} placeholder="Ex: LCA Reserva Nov/28"
+                  onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} />
+              </div>
+              <div className="form-row">
+                <div className="form-grp">
+                  <label>Tipo</label>
+                  <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))}>
+                    <option>LCA</option><option>LCI</option><option>CDB</option>
+                    <option>Tesouro Direto</option><option>Debênture</option><option>Outro</option>
+                  </select>
+                </div>
+                <div className="form-grp">
+                  <label>Instituição</label>
+                  <input type="text" value={form.emissor} placeholder="Ex: XP, Nubank, Itaú..."
+                    onChange={e => setForm(f => ({ ...f, emissor: e.target.value }))} />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-grp">
+                  <label>Indexador</label>
+                  <select value={form.indexador} onChange={e => setForm(f => ({ ...f, indexador: e.target.value }))}>
+                    <option>CDI</option><option>Selic</option>
+                    <option>IPCA</option><option>Prefixado</option>
+                  </select>
+                </div>
+                <div className="form-grp">
+                  <label>Taxa (%)</label>
+                  <input type="number" value={form.taxa} placeholder="Ex: 96.5"
+                    onChange={e => setForm(f => ({ ...f, taxa: e.target.value }))} />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-grp">
+                  <label>Valor Investido (R$)</label>
+                  <input type="number" value={form.valor_investido} placeholder="Ex: 9000"
+                    onChange={e => setForm(f => ({ ...f, valor_investido: e.target.value }))} />
+                </div>
+                <div className="form-grp">
+                  <label>Isento de IR?</label>
+                  <select value={form.isento_ir ? 'true' : 'false'}
+                    onChange={e => setForm(f => ({ ...f, isento_ir: e.target.value === 'true' }))}>
+                    <option value="true">Sim (LCA/LCI)</option>
+                    <option value="false">Não (CDB/outros)</option>
+                  </select>
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-grp">
+                  <label>Data de Aplicação</label>
+                  <input type="date" value={form.data_inicio}
+                    onChange={e => setForm(f => ({ ...f, data_inicio: e.target.value }))} />
+                </div>
+                <div className="form-grp">
+                  <label>Data de Vencimento</label>
+                  <input type="date" value={form.data_vencimento}
+                    onChange={e => setForm(f => ({ ...f, data_vencimento: e.target.value }))} />
+                </div>
+              </div>
 
-      {modal && (
-        <ModalForm
-          item={modal === 'novo' ? null : modal}
-          onFechar={() => setModal(null)}
-          onSalvar={salvar}
-        />
+              <div className="form-sec">📝 Observações <span style={{ fontWeight: 400, color: 'var(--fg3)', textTransform: 'none', letterSpacing: 0 }}>(opcional)</span></div>
+              <div className="form-grp">
+                <textarea placeholder="Condições especiais, motivo da escolha..."
+                  value={form.observacoes}
+                  onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))} />
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn-cancel" onClick={() => setShowModal(false)}>Cancelar</button>
+              <button className="btn-salvar" onClick={salvar} disabled={salvando}>
+                {salvando ? 'Salvando...' : 'Salvar Lançamento'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-    </div>
+    </>
   );
 }
