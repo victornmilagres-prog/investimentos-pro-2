@@ -14,14 +14,22 @@ async function buscarTaxasBancoCentral() {
   if (taxasCache.cdi > 0 && agora - taxasCache.timestamp < 3600000) return taxasCache;
   try {
     const [resCdi, resSelic, resIpca] = await Promise.allSettled([
-      axios.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.4391/dados/ultimos/1?formato=json', { timeout: 8000 }),
-      axios.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json', { timeout: 8000 }),
+      // Série 4392 = CDI anual (% a.a.) — substitui 4391 que era diária
+      axios.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.4392/dados/ultimos/1?formato=json', { timeout: 8000 }),
+      // Série 1178 = Selic anual (% a.a.) — substitui 432 que era diária
+      axios.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.1178/dados/ultimos/1?formato=json', { timeout: 8000 }),
+      // Série 13522 = IPCA mensal (% a.m.) — converte para anual
       axios.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.13522/dados/ultimos/1?formato=json', { timeout: 8000 }),
     ]);
-    const cdi   = resCdi.status   === 'fulfilled' ? parseFloat(resCdi.value.data[0]?.valor   || 0) : taxasCache.cdi;
-    const selic = resSelic.status === 'fulfilled' ? parseFloat(resSelic.value.data[0]?.valor || 0) : taxasCache.selic;
-    const ipca  = resIpca.status  === 'fulfilled' ? parseFloat(resIpca.value.data[0]?.valor  || 0) : taxasCache.ipca;
-    taxasCache  = { cdi, selic, ipca, timestamp: agora };
+    // CDI e Selic já vêm em % a.a. — usar diretamente
+    const cdiAnual   = resCdi.status   === 'fulfilled' ? parseFloat(resCdi.value.data[0]?.valor   || 0) : taxasCache.cdi;
+    const selicAnual = resSelic.status === 'fulfilled' ? parseFloat(resSelic.value.data[0]?.valor || 0) : taxasCache.selic;
+    // IPCA mensal → anualizar: ((1 + pm/100)^12 - 1) * 100
+    const ipcaMensal = resIpca.status  === 'fulfilled' ? parseFloat(resIpca.value.data[0]?.valor  || 0) : null;
+    const ipcaAnual  = ipcaMensal !== null
+      ? parseFloat(((Math.pow(1 + ipcaMensal / 100, 12) - 1) * 100).toFixed(4))
+      : taxasCache.ipca;
+    taxasCache = { cdi: cdiAnual, selic: selicAnual, ipca: ipcaAnual, timestamp: agora };
   } catch(e) { console.error('[taxas BCB]', e.message); }
   return taxasCache;
 }
@@ -29,9 +37,19 @@ async function buscarTaxasBancoCentral() {
 // ─── Cálculo de rendimento ─────────────────────────────────────────────────
 function calcularRendimento(item, taxas) {
   const { valor_investido, taxa, indexador, data_inicio, data_vencimento, isento_ir } = item;
-  const inicio     = new Date(data_inicio);
-  const hoje       = new Date();
-  const vencimento = new Date(data_vencimento);
+
+  // Normalizar datas para meia-noite local (evita bug de fuso UTC vs local)
+  const parseData = (d) => {
+    if (!d) return new Date();
+    const s = typeof d === 'string' ? d : d.toISOString();
+    const [ano, mes, dia] = s.substring(0, 10).split('-').map(Number);
+    return new Date(ano, mes - 1, dia);
+  };
+
+  const inicio     = parseData(data_inicio);
+  const hoje       = parseData(new Date().toISOString());
+  const vencimento = parseData(data_vencimento);
+
   const diasCorridos  = Math.max(0, Math.floor((hoje - inicio) / 86400000));
   const diasTotais    = Math.max(1, Math.floor((vencimento - inicio) / 86400000));
   const progressoPct  = Math.min(100, (diasCorridos / diasTotais) * 100);
