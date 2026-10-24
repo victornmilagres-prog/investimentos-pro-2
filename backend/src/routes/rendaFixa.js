@@ -7,7 +7,7 @@ const router = express.Router();
 router.use(auth);
 
 // ─── Cache das taxas do Banco Central ─────────────────────────────────────
-let taxasCache = { cdi: 0, cdiAnual: 0, selic: 0, ipca: 0, ipcaAnual: 0, timestamp: 0 };
+let taxasCache = { cdi: 0, selic: 0, ipca: 0, timestamp: 0 };
 
 async function buscarTaxasBancoCentral() {
   const agora = Date.now();
@@ -19,11 +19,11 @@ async function buscarTaxasBancoCentral() {
       axios.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.13522/dados/ultimos/1?formato=json', { timeout: 8000 }),
     ]);
     const cdiMensal  = resCdi.status   === 'fulfilled' ? parseFloat(resCdi.value.data[0]?.valor   || 0) : taxasCache.cdi;
-    const cdiAnual   = parseFloat(((Math.pow(1 + cdiMensal / 100, 12) - 1) * 100).toFixed(4));
+    const cdi        = parseFloat(((Math.pow(1 + cdiMensal  / 100, 12) - 1) * 100).toFixed(4));
     const selic      = resSelic.status === 'fulfilled' ? parseFloat(resSelic.value.data[0]?.valor || 0) : taxasCache.selic;
     const ipcaMensal = resIpca.status  === 'fulfilled' ? parseFloat(resIpca.value.data[0]?.valor  || 0) : taxasCache.ipca;
-    const ipcaAnual  = parseFloat(((Math.pow(1 + ipcaMensal / 100, 12) - 1) * 100).toFixed(4));
-    taxasCache = { cdi: cdiMensal, cdiAnual, selic, ipca: ipcaMensal, ipcaAnual, timestamp: agora };
+    const ipca       = parseFloat(((Math.pow(1 + ipcaMensal / 100, 12) - 1) * 100).toFixed(4));
+    taxasCache  = { cdi, selic, ipca, timestamp: agora };
   } catch(e) { console.error('[taxas BCB]', e.message); }
   return taxasCache;
 }
@@ -43,9 +43,9 @@ function calcularRendimento(item, taxas) {
   const t = parseFloat(taxa);
   switch (indexador) {
     case 'Prefixado': taxaAnual = t; break;
-    case 'CDI':       taxaAnual = (t / 100) * taxas.cdiAnual;  break;
+    case 'CDI':       taxaAnual = (t / 100) * taxas.cdi;  break;
     case 'Selic':     taxaAnual = (t / 100) * taxas.selic; break;
-    case 'IPCA':      taxaAnual = taxas.ipcaAnual + t; break;
+    case 'IPCA':      taxaAnual = taxas.ipca + t; break;
     default:          taxaAnual = t;
   }
 
