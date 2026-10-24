@@ -6,103 +6,53 @@ const axios   = require('axios');
 const router = express.Router();
 router.use(auth);
 
-// ─── Normalizar data para meia-noite local ─────────────────────────────────
-function parseData(d) {
-  if (!d) return new Date();
-  const s = typeof d === 'string' ? d : d.toISOString();
-  const [ano, mes, dia] = s.substring(0, 10).split('-').map(Number);
-  return new Date(ano, mes - 1, dia);
-}
+// ─── Cache das taxas do Banco Central ─────────────────────────────────────
+let taxasCache = { cdi: 0, selic: 0, ipca: 0, timestamp: 0 };
 
-function formatDataBCB(dt) {
-  const d = String(dt.getDate()).padStart(2, '0');
-  const m = String(dt.getMonth() + 1).padStart(2, '0');
-  const y = dt.getFullYear();
-  return `${d}/${m}/${y}`;
-}
-
-// ─── Cache de taxas
-const cdiDiarioCache = {};
-let taxasAnuaisCache = { selic: 0, ipca: 0, timestamp: 0 };
-
-async function buscarCdiDiario(dataInicio, dataFim) {
-  const chave = `${formatDataBCB(dataInicio)}_${formatDataBCB(dataFim)}`;
-  if (cdiDiarioCache[chave]) return cdiDiarioCache[chave];
-  try {
-    const url = `https://api.bcb.gov.br/dados/serie/bcdata.sgs.12/dados?formato=json&dataInicial=${formatDataBCB(dataInicio)}&dataFinal=${formatDataBCB(dataFim)}`;
-    const res = await axios.get(url, { timeout: 10000 });
-    cdiDiarioCache[chave] = res.data || [];
-    return cdiDiarioCache[chave];
-  } catch (e) {
-    console.error('[CDI diário BCB]', e.message);
-    return [];
-  }
-}
-
-async function buscarTaxasAnuais() {
+async function buscarTaxasBancoCentral() {
   const agora = Date.now();
-  if (taxasAnuaisCache.selic > 0 && agora - taxasAnuaisCache.timestamp < 3600000) return taxasAnuaisCache;
+  if (taxasCache.cdi > 0 && agora - taxasCache.timestamp < 3600000) return taxasCache;
   try {
-    const [resSelic, resIpca] = await Promise.allSettled([
-      axios.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.1178/dados/ultimos/1?formato=json', { timeout: 8000 }),
+    const [resCdi, resSelic, resIpca] = await Promise.allSettled([
+      axios.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.4391/dados/ultimos/1?formato=json', { timeout: 8000 }),
+      axios.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json', { timeout: 8000 }),
       axios.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.13522/dados/ultimos/1?formato=json', { timeout: 8000 }),
     ]);
-    const selicAnual = resSelic.status === 'fulfilled' ? parseFloat(resSelic.value.data[0]?.valor || 0) : taxasAnuaisCache.selic;
-    const ipcaMensal = resIpca.status  === 'fulfilled' ? parseFloat(resIpca.value.data[0]?.valor  || 0) : null;
-    const ipcaAnual  = ipcaMensal !== null
-      ? parseFloat(((Math.pow(1 + ipcaMensal / 100, 12) - 1) * 100).toFixed(4))
-      : taxasAnuaisCache.ipca;
-    taxasAnuaisCache = { selic: selicAnual, ipca: ipcaAnual, timestamp: agora };
-  } catch(e) { console.error('[taxas anuais BCB]', e.message); }
-  return taxasAnuaisCache;
-}
-
-async function buscarCdiAtual() {
-  try {
-    const res = await axios.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.4392/dados/ultimos/1?formato=json', { timeout: 8000 });
-    return parseFloat(res.data[0]?.valor || 0);
-  } catch(e) { return 0; }
+    const cdi   = resCdi.status   === 'fulfilled' ? parseFloat(resCdi.value.data[0]?.valor   || 0) : taxasCache.cdi;
+    const selic = resSelic.status === 'fulfilled' ? parseFloat(resSelic.value.data[0]?.valor || 0) : taxasCache.selic;
+    const ipca  = resIpca.status  === 'fulfilled' ? parseFloat(resIpca.value.data[0]?.valor  || 0) : taxasCache.ipca;
+    taxasCache  = { cdi, selic, ipca, timestamp: agora };
+  } catch(e) { console.error('[taxas BCB]', e.message); }
+  return taxasCache;
 }
 
 // ─── Cálculo de rendimento ─────────────────────────────────────────────────
-async function calcularRendimento(item) {
+function calcularRendimento(item, taxas) {
   const { valor_investido, taxa, indexador, data_inicio, data_vencimento, isento_ir } = item;
+  const inicio     = new Date(data_inicio);
+  const hoje       = new Date();
+  const vencimento = new Date(data_vencimento);
+  const diasCorridos  = Math.max(0, Math.floor((hoje - inicio) / 86400000));
+  const diasTotais    = Math.max(1, Math.floor((vencimento - inicio) / 86400000));
+  const progressoPct  = Math.min(100, (diasCorridos / diasTotais) * 100);
 
-  const inicio     = parseData(data_inicio);
-  const hoje       = parseData(new Date().toISOString());
-  const vencimento = parseData(data_vencimento);
-
-  const diasCorridos = Math.max(0, Math.floor((hoje - inicio) / 86400000));
-  const diasTotais   = Math.max(1, Math.floor((vencimento - inicio) / 86400000));
-  const progressoPct = Math.min(100, (diasCorridos / diasTotais) * 100);
-
+  // Taxa anual efetiva
+  let taxaAnual = 0;
   const t = parseFloat(taxa);
-  let fator = 1;
-  let taxaAnualRef = 0;
-
-  if (indexador === 'CDI') {
-    // Acumular CDI diário (série 12) — mesma metodologia dos bancos/corretoras
-    const dadosCdi = await buscarCdiDiario(inicio, hoje);
-    const percentual = t / 100;
-    for (const d of dadosCdi) {
-      fator *= (1 + parseFloat(d.valor) / 100 * percentual);
-    }
-    taxaAnualRef = await buscarCdiAtual();
-  } else {
-    const taxasAnuais = await buscarTaxasAnuais();
-    let taxaAnual = 0;
-    switch (indexador) {
-      case 'Prefixado': taxaAnual = t; taxaAnualRef = t; break;
-      case 'Selic':     taxaAnual = (t / 100) * taxasAnuais.selic; taxaAnualRef = taxasAnuais.selic; break;
-      case 'IPCA':      taxaAnual = taxasAnuais.ipca + t; taxaAnualRef = taxasAnuais.ipca; break;
-      default:          taxaAnual = t; taxaAnualRef = t;
-    }
-    fator = Math.pow(1 + taxaAnual / 100, diasCorridos / 252);
+  switch (indexador) {
+    case 'Prefixado': taxaAnual = t; break;
+    case 'CDI':       taxaAnual = (t / 100) * taxas.cdi;  break;
+    case 'Selic':     taxaAnual = (t / 100) * taxas.selic; break;
+    case 'IPCA':      taxaAnual = taxas.ipca + t; break;
+    default:          taxaAnual = t;
   }
 
-  const valorBruto = parseFloat(valor_investido) * fator;
-  const rendBruto  = valorBruto - parseFloat(valor_investido);
+  // Valor atual bruto via juros compostos diários (base 252 dias úteis)
+  const fator       = Math.pow(1 + taxaAnual / 100, diasCorridos / 252);
+  const valorBruto  = parseFloat(valor_investido) * fator;
+  const rendBruto   = valorBruto - parseFloat(valor_investido);
 
+  // IR regressivo (apenas se não isento)
   let aliquotaIR = 0;
   if (!isento_ir) {
     if      (diasCorridos <= 180) aliquotaIR = 22.5;
@@ -114,14 +64,15 @@ async function calcularRendimento(item) {
   const valorLiquido = valorBruto - ir;
   const rendLiquido  = valorLiquido - parseFloat(valor_investido);
 
+  // Dias para vencer
   const diasParaVencer = Math.max(0, Math.floor((vencimento - hoje) / 86400000));
   let alertaVencimento = null;
-  if      (diasParaVencer <= 30)  alertaVencimento = 'critico';
+  if (diasParaVencer <= 30)       alertaVencimento = 'critico';
   else if (diasParaVencer <= 90)  alertaVencimento = 'atencao';
   else if (diasParaVencer <= 180) alertaVencimento = 'info';
 
   return {
-    taxaAnual:      parseFloat(taxaAnualRef.toFixed(4)),
+    taxaAnual:      parseFloat(taxaAnual.toFixed(4)),
     valorBruto:     parseFloat(valorBruto.toFixed(2)),
     valorLiquido:   parseFloat(valorLiquido.toFixed(2)),
     rendBruto:      parseFloat(rendBruto.toFixed(2)),
@@ -142,8 +93,8 @@ async function calcularRendimento(item) {
 // ─── GET /api/renda-fixa/taxas ────────────────────────────────────────────
 router.get('/taxas', async (req, res) => {
   try {
-    const [taxasAnuais, cdiAtual] = await Promise.all([buscarTaxasAnuais(), buscarCdiAtual()]);
-    res.json({ cdi: cdiAtual, selic: taxasAnuais.selic, ipca: taxasAnuais.ipca });
+    const taxas = await buscarTaxasBancoCentral();
+    res.json(taxas);
   } catch (err) {
     res.status(500).json({ error: 'Erro ao buscar taxas.' });
   }
@@ -152,13 +103,15 @@ router.get('/taxas', async (req, res) => {
 // ─── GET /api/renda-fixa ──────────────────────────────────────────────────
 router.get('/', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM renda_fixa WHERE usuario_id=$1 ORDER BY data_vencimento ASC', [req.userId]);
-    const itens = await Promise.all(result.rows.map(async item => ({
+    const [result, taxas] = await Promise.all([
+      pool.query('SELECT * FROM renda_fixa WHERE usuario_id=$1 ORDER BY data_vencimento ASC', [req.userId]),
+      buscarTaxasBancoCentral(),
+    ]);
+    const itens = result.rows.map(item => ({
       ...item,
-      ...await calcularRendimento(item),
-    })));
-    const [taxasAnuais, cdiAtual] = await Promise.all([buscarTaxasAnuais(), buscarCdiAtual()]);
-    res.json({ itens, taxas: { cdi: cdiAtual, selic: taxasAnuais.selic, ipca: taxasAnuais.ipca } });
+      ...calcularRendimento(item, taxas),
+    }));
+    res.json({ itens, taxas });
   } catch (err) {
     console.error('[renda-fixa GET]', err);
     res.status(500).json({ error: 'Erro ao buscar renda fixa.' });
@@ -176,8 +129,8 @@ router.post('/', async (req, res) => {
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *
     `, [req.userId, nome, tipo, indexador, parseFloat(taxa), parseFloat(valor_investido), data_inicio, data_vencimento,
         emissor || null, liquidez || 'Vencimento', isento_ir || false, observacoes || null]);
-    const rendimento = await calcularRendimento(result.rows[0]);
-    res.status(201).json({ ...result.rows[0], ...rendimento });
+    const taxas = await buscarTaxasBancoCentral();
+    res.status(201).json({ ...result.rows[0], ...calcularRendimento(result.rows[0], taxas) });
   } catch (err) {
     console.error('[renda-fixa POST]', err);
     res.status(500).json({ error: 'Erro ao cadastrar investimento.' });
@@ -196,8 +149,8 @@ router.put('/:id', async (req, res) => {
     `, [nome, tipo, indexador, parseFloat(taxa), parseFloat(valor_investido), data_inicio, data_vencimento,
         emissor, liquidez, isento_ir, observacoes, req.params.id, req.userId]);
     if (!result.rows.length) return res.status(404).json({ error: 'Investimento não encontrado.' });
-    const rendimento = await calcularRendimento(result.rows[0]);
-    res.json({ ...result.rows[0], ...rendimento });
+    const taxas = await buscarTaxasBancoCentral();
+    res.json({ ...result.rows[0], ...calcularRendimento(result.rows[0], taxas) });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao atualizar investimento.' });
   }
@@ -210,6 +163,38 @@ router.delete('/:id', async (req, res) => {
     res.json({ message: 'Investimento removido.' });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao remover investimento.' });
+  }
+});
+
+// ─── POST /api/renda-fixa/:id/vender ─────────────────────────────────────
+// Registra venda parcial ou total. Se total, remove o registro.
+// Body: { valor_venda, data_venda }
+router.post('/:id/vender', async (req, res) => {
+  const { valor_venda, data_venda } = req.body;
+  if (!valor_venda) return res.status(400).json({ error: 'valor_venda obrigatório.' });
+  try {
+    const inv = await pool.query(
+      'SELECT * FROM renda_fixa WHERE id=$1 AND usuario_id=$2', [req.params.id, req.userId]
+    );
+    if (!inv.rows.length) return res.status(404).json({ error: 'Investimento não encontrado.' });
+    const item = inv.rows[0];
+    const novoValor = parseFloat(item.valor_investido) - parseFloat(valor_venda);
+    if (novoValor <= 0.01) {
+      // Venda total: remove o registro
+      await pool.query('DELETE FROM renda_fixa WHERE id=$1 AND usuario_id=$2', [req.params.id, req.userId]);
+      res.json({ vendido: true, message: 'Investimento encerrado (venda total).' });
+    } else {
+      // Venda parcial: atualiza o valor investido
+      const result = await pool.query(
+        'UPDATE renda_fixa SET valor_investido=$1, updated_at=NOW() WHERE id=$2 AND usuario_id=$3 RETURNING *',
+        [novoValor.toFixed(2), req.params.id, req.userId]
+      );
+      const taxas = await buscarTaxasBancoCentral();
+      res.json({ vendido: false, ...result.rows[0], ...calcularRendimento(result.rows[0], taxas) });
+    }
+  } catch (err) {
+    console.error('[renda-fixa vender]', err);
+    res.status(500).json({ error: 'Erro ao registrar venda.' });
   }
 });
 

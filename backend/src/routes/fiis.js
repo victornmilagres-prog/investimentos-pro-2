@@ -77,8 +77,8 @@ router.post('/', async (req, res) => {
     await recalcularPesosFII(req.userId);
     res.status(201).json({ ...result.rows[0], ...dados });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Erro ao adicionar FII.' });
+    console.error('[fiis POST]', err);
+    res.status(500).json({ error: 'Erro ao adicionar FII.', detail: err.message });
   }
 });
 

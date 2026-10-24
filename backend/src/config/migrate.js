@@ -112,8 +112,27 @@ async function migrate() {
     // Migração: novas colunas da watchlist (idempotente)
     await client.query(`ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS nota_pessoal TEXT;`);
     await client.query(`ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS decisao_termometro VARCHAR(20);`);
-    await client.query(`ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS decisao_termometro_data TIMESTAMP;`);
+    await client.query(`ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS decisao_termometro_date TIMESTAMP;`);
     await client.query(`ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS favorito BOOLEAN DEFAULT FALSE;`);
+
+    // Migração: colunas extras de fiis_carteira
+    await client.query(`ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS variacao_dia DECIMAL(15,4) DEFAULT 0;`);
+    await client.query(`ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS variacao_dia_reais DECIMAL(15,4) DEFAULT 0;`);
+    await client.query(`ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS preco_abertura DECIMAL(15,2) DEFAULT 0;`);
+    await client.query(`ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS preco_minimo DECIMAL(15,2) DEFAULT 0;`);
+    await client.query(`ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS preco_maximo DECIMAL(15,2) DEFAULT 0;`);
+    await client.query(`ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS nome_fundo VARCHAR(255);`);
+    await client.query(`ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS administradora VARCHAR(255);`);
+    await client.query(`ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS tipo_fundo VARCHAR(100);`);
+    await client.query(`ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS vpa DECIMAL(15,4) DEFAULT 0;`);
+    await client.query(`ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS preco_justo DECIMAL(15,2) DEFAULT 0;`);
+    await client.query(`ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS status_justo VARCHAR(30);`);
+    await client.query(`ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS setor_fundo VARCHAR(100);`);
+    await client.query(`ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS dividendos_ano DECIMAL(15,2) DEFAULT 0;`);
+    await client.query(`ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS dividendos_lancamentos INTEGER DEFAULT 0;`);
+    await client.query(`ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS dividendos_breakdown JSONB DEFAULT '{}';`);
+    await client.query(`ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS dividendos_geral DECIMAL(15,2) DEFAULT 0;`);
+    await client.query(`ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS dividendos_geral_lancamentos INTEGER DEFAULT 0;`);
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS planejamento (

@@ -99,6 +99,9 @@ export default function RendaFixa() {
   const rendTotalPct = totalInvestido > 0 ? (rendTotalR / totalInvestido) * 100 : 0;
   const rendMedioPct = investimentos.length > 0
     ? investimentos.reduce((s, i) => s + Number(i.rendBrutoPct || 0), 0) / investimentos.length : 0;
+  // Rendimento mensal equivalente (taxa mensal = (1 + taxa_anual/100)^(1/12) - 1)
+  const rendMedioMensal = rendMedioPct > 0 ? (Math.pow(1 + rendMedioPct / 100, 1 / 12) - 1) * 100 : 0;
+  const rendTotalMensal = rendTotalPct > 0 ? (Math.pow(1 + rendTotalPct / 100, 1 / 12) - 1) * 100 : 0;
 
   // Próximo vencimento
   const proxVenc = [...investimentos].sort((a, b) =>
@@ -146,6 +149,102 @@ export default function RendaFixa() {
     }
   };
 
+  // ── Editar investimento ─────────────────────────────────────────────────────
+  const [editando, setEditando] = useState(null); // objeto inv sendo editado
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [salvandoEdit, setSalvandoEdit] = useState(false);
+
+  const abrirEdit = (inv) => {
+    setEditando({
+      id: inv.id, nome: inv.nome, tipo: inv.tipo, indexador: inv.indexador,
+      taxa: String(inv.taxa), valor_investido: String(inv.valor_investido),
+      isento_ir: inv.isento_ir, data_inicio: inv.data_inicio?.slice(0,10) || '',
+      data_vencimento: inv.data_vencimento?.slice(0,10) || '',
+      emissor: inv.emissor || '', liquidez: inv.liquidez || 'Vencimento',
+      objetivo: inv.objetivo || '', observacoes: inv.observacoes || '',
+    });
+    setShowEditModal(true);
+  };
+
+  const salvarEdit = async () => {
+    setSalvandoEdit(true);
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`/_/backend/api/renda-fixa/${editando.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          ...editando,
+          taxa: parseFloat(editando.taxa),
+          valor_investido: parseFloat(editando.valor_investido),
+          isento_ir: editando.isento_ir === true || editando.isento_ir === 'true',
+        }),
+      });
+      const atualizado = await res.json();
+      if (!res.ok) throw new Error(atualizado.error || 'Erro');
+      setInvestimentos(prev => prev.map(i => i.id === editando.id ? { ...i, ...atualizado } : i));
+      setShowEditModal(false);
+      setEditando(null);
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setSalvandoEdit(false);
+    }
+  };
+
+  // ── Excluir investimento ────────────────────────────────────────────────────
+  const excluir = async (id, nome) => {
+    if (!confirm(`Excluir "${nome}"? Esta ação não pode ser desfeita.`)) return;
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`/_/backend/api/renda-fixa/${id}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Erro ao excluir');
+      setInvestimentos(prev => prev.filter(i => i.id !== id));
+    } catch (e) {
+      alert(e.message);
+    }
+  };
+
+  // ── Vender investimento ─────────────────────────────────────────────────────
+  const [vendendo, setVendendo] = useState(null); // { id, nome, valor_investido }
+  const [showVendaModal, setShowVendaModal] = useState(false);
+  const [valorVenda, setValorVenda] = useState('');
+  const [salvandoVenda, setSalvandoVenda] = useState(false);
+
+  const abrirVenda = (inv) => {
+    setVendendo(inv);
+    setValorVenda(String(inv.valor_investido));
+    setShowVendaModal(true);
+  };
+
+  const confirmarVenda = async () => {
+    setSalvandoVenda(true);
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`/_/backend/api/renda-fixa/${vendendo.id}/vender`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ valor_venda: parseFloat(valorVenda), data_venda: new Date().toISOString().slice(0,10) }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro');
+      if (data.vendido) {
+        setInvestimentos(prev => prev.filter(i => i.id !== vendendo.id));
+      } else {
+        setInvestimentos(prev => prev.map(i => i.id === vendendo.id ? { ...i, ...data } : i));
+      }
+      setShowVendaModal(false);
+      setVendendo(null);
+      setValorVenda('');
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setSalvandoVenda(false);
+    }
+  };
+
   // ── Cor por indexador ───────────────────────────────────────────────────────
   const corIdx = { CDI: '#1a56db', Selic: '#0c9e6a', IPCA: '#7c3aed', Prefixado: '#d97706' };
   const corBadge = {
@@ -180,11 +279,6 @@ export default function RendaFixa() {
         :root {
           --bg:#f0f2f5; --surface:#fff; --surface2:#f8f9fb; --border:#e2e6ed;
           --fg:#0f1923; --fg2:#5a6474; --fg3:#8e98a8;
-          --accent:#1a56db; --accent-light:#e8effe;
-          --green:#0c9e6a; --green-light:#e3f6ee;
-          --yellow:#d97706; --yellow-light:#fef3c7;
-          --red:#dc2626; --red-light:#fee2e2;
-          --purple:#7c3aed;   --fg:#0f1923; --fg2:#5a6474; --fg3:#8e98a8;
           --accent:#1a56db; --accent-light:#e8effe;
           --green:#0c9e6a; --green-light:#e3f6ee;
           --yellow:#d97706; --yellow-light:#fef3c7;
@@ -293,7 +387,13 @@ export default function RendaFixa() {
         .badge-cdb{background:var(--accent-light);color:var(--accent);}
         .badge-teso{background:var(--purple-light);color:var(--purple);}
         .badge-isento{background:var(--green-light);color:var(--green);}
-        .card-taxa{font-size:12px;color:var(--fg2);margin-bottom:10px;}
+        .card-taxa{font-size:12px;color:var(--fg2);margin-bottom:4px;}
+        .card-rend-row{display:flex;align-items:center;gap:6px;margin-bottom:10px;}
+        .rend-sep{font-size:11px;color:var(--fg3);}
+        .rend-pill{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;}
+        .rend-pill.rend-aa{color:var(--accent);}
+        .rend-pill.rend-am{color:var(--green);}
+        .rend-period{font-size:10px;font-weight:500;color:var(--fg3);}
         .card-row{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:4px;}
         .ck{font-size:11px;color:var(--fg3);}
         .cv{font-size:13px;font-weight:600;font-variant-numeric:tabular-nums;}
@@ -315,6 +415,12 @@ export default function RendaFixa() {
         .alerta-atencao{background:var(--yellow-light);color:var(--yellow);}
         .alerta-info{background:var(--accent-light);color:var(--accent);}
         .alerta-vencido{background:var(--border);color:var(--fg2);}
+        .card-acoes{display:flex;gap:6px;margin-top:10px;border-top:1px solid var(--border);padding-top:10px;}
+        .btn-card-acao{flex:1;padding:6px 4px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;background:var(--surface);color:var(--fg2);transition:all .15s;letter-spacing:.01em;}
+        .btn-card-acao:hover{background:var(--bg);color:var(--fg);}
+        .btn-editar:hover{border-color:var(--accent);color:var(--accent);}
+        .btn-vender:hover{border-color:var(--green);color:var(--green);}
+        .btn-excluir:hover{border-color:var(--red);color:var(--red);}
         /* Modal */
         .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:16px;z-index:100;}
         .modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);width:100%;max-width:500px;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);}
@@ -388,8 +494,9 @@ export default function RendaFixa() {
           </div>
           <div className="resumo-card">
             <div className="r-label">Rendimento Médio</div>
-            <div className="r-valor" style={{ color: 'var(--accent)' }}>{fmt(rendMedioPct)}%</div>
-            <div className="r-sub">≈ {taxas.cdi > 0 ? fmt((rendMedioPct / taxas.cdi) * 100) : '–'}% do CDI atual</div>
+            <div className="r-valor" style={{ color: 'var(--accent)' }}>{fmt(rendMedioPct)}% <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg2)' }}>a.a.</span></div>
+            <div className="r-sub" style={{ marginBottom: 2 }}>≈ {taxas.cdi > 0 ? fmt((rendMedioPct / taxas.cdi) * 100) : '–'}% do CDI atual</div>
+            <div className="r-sub" style={{ color: 'var(--green)', fontWeight: 600 }}>≈ {fmt(rendMedioMensal, 2)}% a.m.</div>
           </div>
           {proxVenc && (
             <div className="resumo-card venc-card">
@@ -422,7 +529,7 @@ export default function RendaFixa() {
                       <div className="tl-fill" style={{ width: `${pct}%`, background: cor }} />
                     </div>
                     <div className="tl-data">
-                      {new Date(inv.data_vencimento).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}
+                                  {new Date(inv.data_vencimento).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}
                       {(inv.diasParaVencer ?? 999) <= 90 ? ' ⚠️' : ''}
                     </div>
                   </div>
@@ -494,7 +601,7 @@ export default function RendaFixa() {
                   <div className="obj-icon">🎯</div>
                   <div>
                     <h2>{objetivo}</h2>
-                    <span className="qtd">{itens.length} aplicaç{itens.length === 1 ? 'ão' : 'ões'}</span>
+                    <span className="qtd">{itens.length} aplicaç{itens.length === 1 ? 'ão' : 'ões'}|/span>
                   </div>
                 </div>
                 <div className="obj-total">
@@ -513,14 +620,28 @@ export default function RendaFixa() {
                   const progPct = inv.progressoPct ?? Math.min(100, (corridoDias / totalDias) * 100);
                   const alerta = alertaVenc(inv);
 
-                  // Comparativo CDI
+                  // Rendimento mensal do investimento
+                  const rendAnualInv = inv.rendBrutoPct || 0;
+                  const rendMensalInv = rendAnualInv > 0 ? (Math.pow(1 + rendAnualInv / 100, 1 / 12) - 1) * 100 : 0;
+
+                  // Comparativo CDI com contexto de isenção IR
                   let cdiComp = null;
                   if (inv.indexador === 'CDI' && taxas.cdi > 0) {
                     const taxaEfetiva = (inv.taxa / 100) * taxas.cdi;
                     const diff = taxaEfetiva - taxas.cdi;
-                    cdiComp = diff >= 0
-                      ? <span className="cdi-badge cdi-acima">▲ {fmt(diff, 1)}% acima do CDI</span>
-                      : <span className="cdi-badge cdi-abaixo">▼ {fmt(Math.abs(diff), 1)}% abaixo do CDI</span>;
+                    if (diff >= 0) {
+                      cdiComp = <span className="cdi-badge cdi-acima">▲ {fmt(diff, 1)}% acima do CDI</span>;
+                    } else if (inv.isento_ir) {
+                      // Isento IR: compara com CDB equivalente (tabela regressiva ~15-20%)
+                      const aliquota = 0.175; // alíquota média estimada
+                      const cdiLiquido = taxas.cdi * (1 - aliquota);
+                      const diffLiquido = taxaEfetiva - cdiLiquido;
+                      cdiComp = diffLiquido >= 0
+                        ? <span className="cdi-badge cdi-acima">✓ Isento IR compensa · +{fmt(diffLiquido, 1)}% liq.</span>
+                        : <span className="cdi-badge cdi-abaixo">▼ {fmt(Math.abs(diff), 1)}% abaixo do CDI</span>;
+                    } else {
+                      cdiComp = <span className="cdi-badge cdi-abaixo">▼ {fmt(Math.abs(diff), 1)}% abaixo do CDI</span>;
+                    }
                   }
 
                   return (
@@ -535,8 +656,14 @@ export default function RendaFixa() {
                       </div>
                       <div className="card-taxa">
                         {inv.emissor} · {fmt(inv.taxa)}% {inv.indexador !== 'Prefixado' ? `do ${inv.indexador}` : 'a.a.'}
-                        {inv.taxaAnual > 0 && <strong> · ≈{fmt(inv.taxaAnual)}% a.a.</strong>}
                       </div>
+                      {rendAnualInv > 0 && (
+                        <div className="card-rend-row">
+                          <span className="rend-pill rend-aa">≈ {fmt(rendAnualInv)}% <span className="rend-period">a.a.</span></span>
+                          <span className="rend-sep">·</span>
+                          <span className="rend-pill rend-am">≈ {fmt(rendMensalInv, 2)}% <span className="rend-period">a.m.</span></span>
+                        </div>
+                      )}
                       <div className="card-row">
                         <span className="ck">Investido</span>
                         <span className="cv">{fmtR(inv.valor_investido)}</span>
@@ -568,6 +695,11 @@ export default function RendaFixa() {
                           <span className={`alerta ${alerta.cls}`}>{alerta.txt}</span>
                         </div>
                       )}
+                      <div className="card-acoes">
+                        <button className="btn-card-acao btn-editar" onClick={() => abrirEdit(inv)} title="Editar">✏️ Editar</button>
+                        <button className="btn-card-acao btn-vender" onClick={() => abrirVenda(inv)} title="Registrar venda">💰 Vender</button>
+                        <button className="btn-card-acao btn-excluir" onClick={() => excluir(inv.id, inv.nome)} title="Excluir">🗑️ Excluir</button>
+                      </div>
                     </div>
                   );
                 })}
@@ -687,6 +819,117 @@ export default function RendaFixa() {
               <button className="btn-cancel" onClick={() => setShowModal(false)}>Cancelar</button>
               <button className="btn-salvar" onClick={salvar} disabled={salvando}>
                 {salvando ? 'Salvando...' : 'Salvar Lançamento'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar */}
+      {showEditModal && editando && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowEditModal(false)}>
+          <div className="modal">
+            <div className="modal-head">
+              <h3>Editar Investimento</h3>
+              <button className="btn-close" onClick={() => setShowEditModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-grp">
+                <label>Nome / Instituição</label>
+                <input type="text" value={editando.nome} onChange={e => setEditando(f => ({...f, nome: e.target.value}))} />
+              </div>
+              <div className="form-row">
+                <div className="form-grp">
+                  <label>Tipo</label>
+                  <select value={editando.tipo} onChange={e => setEditando(f => ({...f, tipo: e.target.value}))}>
+                    {['LCA','LCI','CDB','Tesouro Direto','Debênture','Outro'].map(t => <option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div className="form-grp">
+                  <label>Indexador</label>
+                  <select value={editando.indexador} onChange={e => setEditando(f => ({...f, indexador: e.target.value}))}>
+                    {['CDI','Selic','IPCA','Prefixado'].map(i => <option key={i}>{i}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-grp">
+                  <label>Taxa (%)</label>
+                  <input type="number" value={editando.taxa} onChange={e => setEditando(f => ({...f, taxa: e.target.value}))} />
+                </div>
+                <div className="form-grp">
+                  <label>Valor Investido (R$)</label>
+                  <input type="number" value={editando.valor_investido} onChange={e => setEditando(f => ({...f, valor_investido: e.target.value}))} />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-grp">
+                  <label>Data de Início</label>
+                  <input type="date" value={editando.data_inicio} onChange={e => setEditando(f => ({...f, data_inicio: e.target.value}))} />
+                </div>
+                <div className="form-grp">
+                  <label>Data de Vencimento</label>
+                  <input type="date" value={editando.data_vencimento} onChange={e => setEditando(f => ({...f, data_vencimento: e.target.value}))} />
+                </div>
+              </div>
+              <div className="form-grp">
+                <label>Emissor</label>
+                <input type="text" value={editando.emissor} onChange={e => setEditando(f => ({...f, emissor: e.target.value}))} />
+              </div>
+              <div className="form-grp">
+                <label>Objetivo</label>
+                <input type="text" value={editando.objetivo} onChange={e => setEditando(f => ({...f, objetivo: e.target.value}))} />
+              </div>
+              <div className="form-grp">
+                <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer'}}>
+                  <input type="checkbox" checked={editando.isento_ir}
+                    onChange={e => setEditando(f => ({...f, isento_ir: e.target.checked}))} />
+                  Isento de Imposto de Renda (LCI, LCA, CRI, CRA, Poupança)
+                </label>
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn-cancel" onClick={() => setShowEditModal(false)}>Cancelar</button>
+              <button className="btn-salvar" onClick={salvarEdit} disabled={salvandoEdit}>
+                {salvandoEdit ? 'Salvando...' : 'Salvar Alterações'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Vender */}
+      {showVendaModal && vendendo && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowVendaModal(false)}>
+          <div className="modal" style={{maxWidth:400}}>
+            <div className="modal-head">
+              <h3>Registrar Venda</h3>
+              <button className="btn-close" onClick={() => setShowVendaModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <p style={{color:'var(--fg2)',marginBottom:16}}>{vendendo.nome}</p>
+              <div className="form-grp">
+                <label>Valor investido atual</label>
+                <div style={{padding:'8px 12px',background:'var(--bg)',borderRadius:8,color:'var(--fg2)',fontSize:14}}>
+                  {fmtR(vendendo.valor_investido)}
+                </div>
+              </div>
+              <div className="form-grp">
+                <label>Valor da venda (R$)</label>
+                <input type="number" value={valorVenda}
+                  onChange={e => setValorVenda(e.target.value)}
+                  placeholder="Ex: 5000.00" />
+                <span className="form-hint">
+                  {parseFloat(valorVenda) >= parseFloat(vendendo.valor_investido)
+                    ? '🔴 Venda total — o registro será removido'
+                    : `🟡 Venda parcial — restará ${fmtR(parseFloat(vendendo.valor_investido) - (parseFloat(valorVenda)||0))}`}
+                </span>
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn-cancel" onClick={() => setShowVendaModal(false)}>Cancelar</button>
+              <button className="btn-salvar" onClick={confirmarVenda} disabled={salvandoVenda || !valorVenda}>
+                {salvandoVenda ? 'Registrando...' : 'Confirmar Venda'}
               </button>
             </div>
           </div>
