@@ -218,11 +218,12 @@ const atual = Number(precoAtual);
 const meta = Number(precoMeta);
 const entrada = Number(precoEntrada);
 if (!atual || !meta || meta <= 0) return null;
-const base = entrada > 0 ? entrada : atual * 0.9;
-const range = meta - base;
+// Meta de compra: preço precisa CAIR até a meta
+const base = entrada > 0 ? entrada : atual * 1.1;
+const range = base - meta;
 if (range <= 0) return null;
-const pct = Math.max(0, Math.min(100, ((atual - base) / range) * 100));
-const atingiu = atual >= meta;
+const pct = Math.max(0, Math.min(100, ((base - atual) / range) * 100));
+const atingiu = atual <= meta;
 const cor = atingiu ? '#16A34A' : pct >= 70 ? '#D97706' : '#2563EB';
 return (
 <div style={{ marginBottom: 8 }}>
@@ -997,7 +998,7 @@ Atualizar cotações
 {/* Tabs Ações / FIIs */}
 <div style={{display:'flex',gap:0,border:'0.5px solid #E8ECF0',borderRadius:8,overflow:'hidden',marginBottom:16,width:'fit-content'}}>
 <button onClick={()=>setAbaRadar('acoes')}
-style={{padding:'7px 20px',fontSize:13,fontWeight:500,
+style={{padding:"7px 20px",fontSize:13,fontWeight:500,
 background:abaRadar==='acoes'?'#2563EB':'#FFFFFF',
 color:abaRadar==='acoes'?'#FFFFFF':'#8896A8',
 border:'none',cursor:'pointer',position:'relative'}}>
