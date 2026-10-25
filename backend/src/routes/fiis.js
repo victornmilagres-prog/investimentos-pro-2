@@ -377,6 +377,37 @@ async function recalcularPesosFII(usuarioId) {
   }
 }
 
+// GET /api/fiis/cotacoes-live — variação do dia em tempo real (Brapi quote batch)
+router.get('/cotacoes-live', async (req, res) => {
+  try {
+    const fiis = await pool.query('SELECT ticker FROM fiis_carteira WHERE usuario_id=$1', [req.userId]);
+    if (!fiis.rows.length) return res.json({});
+
+    const tickers = fiis.rows.map(r => r.ticker).join(',');
+    const axios = require('axios');
+    const BRAPI_BASE = process.env.BRAPI_BASE_URL || 'https://brapi.dev/api';
+    const TOKEN = process.env.BRAPI_TOKEN;
+
+    const r = await axios.get(
+      `${BRAPI_BASE}/quote/${tickers}?token=${TOKEN}&fundamental=false`,
+      { timeout: 10000 }
+    );
+
+    const cotacoes = {};
+    for (const q of (r.data?.results || [])) {
+      cotacoes[q.symbol] = {
+        preco_atual: q.regularMarketPrice ?? null,
+        variacao_dia: q.regularMarketChangePercent ?? null,
+        variacao_dia_reais: q.regularMarketChange ?? null,
+      };
+    }
+    res.json(cotacoes);
+  } catch (err) {
+    console.error('[cotacoes-live]', err.message);
+    res.status(500).json({ error: 'Erro ao buscar cotações ao vivo.' });
+  }
+});
+
 // GET /api/fiis/:ticker/portfolio
 router.get('/:ticker/portfolio', async (req, res) => {
   const ticker = req.params.ticker.toUpperCase();
