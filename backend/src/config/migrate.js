@@ -112,7 +112,7 @@ async function migrate() {
     // Migração: novas colunas da watchlist (idempotente)
     await client.query(`ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS nota_pessoal TEXT;`);
     await client.query(`ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS decisao_termometro VARCHAR(20);`);
-    await client.query(`ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS decisao_termometro_date TIMESTAMP;`);
+    await client.query(`ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS decisao_termometro_data TIMESTAMP;`);
     await client.query(`ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS favorito BOOLEAN DEFAULT FALSE;`);
 
     // Migração: colunas extras de fiis_carteira
