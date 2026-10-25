@@ -353,9 +353,14 @@ async function buscarAcao(ticker, dividaManual = null) {
 async function buscarFII(ticker, ajustes = {}) {
   ticker = ticker.trim().toUpperCase();
 
-  const urlQuote = `${BRAPI_BASE}/quote/${ticker}?fundamental=true&dividends=true&modules=${encodeURIComponent(MODULES)}&token=${TOKEN}`;
-  const resQuote = await axios.get(urlQuote, { timeout: 15000 });
-  const quote = resQuote.data?.results?.[0] || {};
+  let quote = {};
+  try {
+    const urlQuote = `${BRAPI_BASE}/quote/${ticker}?fundamental=true&dividends=true&modules=${encodeURIComponent(MODULES)}&token=${TOKEN}`;
+    const resQuote = await axios.get(urlQuote, { timeout: 15000 });
+    quote = resQuote.data?.results?.[0] || {};
+  } catch(e) {
+    console.warn(`[buscarFII] Brapi quote falhou para ${ticker}: ${e.message}`);
+  }
 
   const nomeFundo = quote.longName || quote.shortName || quote.displayName || '';
   const administradora = quote.managedBy || quote.fundFamily || quote.companyOfficers?.[0]?.name || '';
