@@ -720,26 +720,18 @@ export default function RendaFixa() {
                       const diasCorridos = inv.diasCorridos ?? corridoDias;
                       const aliqAtual = diasCorridos <= 180 ? 0.225 : diasCorridos <= 360 ? 0.20 : diasCorridos <= 720 ? 0.175 : 0.15;
 
-                      // Comparacao CDB: sempre usa IR 22,5% (pior caso para o CDB = melhor caso para o LCA/LCI)
-                      // Responde: "esse LCA/LCI isento equivale a um CDB de X% CDI considerando IR 22,5%?"
+                      // Equivalencia CDB: para TODO investimento isento de IR (LCA, LCI, CRI, CRA, etc)
+                      // Responde: "esse investimento isento equivale a um CDB de X% do indexador considerando IR 22,5%"
+                      // Usa sempre IR 22,5% (aliquota maxima) — referencia padrao de comparacao
                       let cdiComp = null;
-                      if (inv.indexador === 'CDI' && taxas.cdi > 0) {
-                        if (inv.isento_ir) {
-                          const equivCDB = inv.taxa / (1 - 0.225);
-                          const valeApena = equivCDB >= 100;
-                          if (valeApena) {
-                            cdiComp = <span className="cdi-badge cdi-acima">= CDB {fmt(equivCDB, 1)}% CDI (IR 22,5%) - Vale a pena</span>;
-                          } else {
-                            cdiComp = <span className="cdi-badge cdi-abaixo">= CDB {fmt(equivCDB, 1)}% CDI (IR 22,5%) - Nao compensa</span>;
-                          }
+                      if (inv.isento_ir) {
+                        const equivCDB = inv.taxa / (1 - 0.225);
+                        const valeApena = equivCDB >= 100;
+                        const idx = inv.indexador === 'Prefixado' ? 'a.a.' : `do ${inv.indexador}`;
+                        if (valeApena) {
+                          cdiComp = <span className="cdi-badge cdi-acima">= CDB {fmt(equivCDB, 1)}% {idx} (IR 22,5%) - Vale a pena</span>;
                         } else {
-                          const taxaEfetiva = (inv.taxa / 100) * taxas.cdi;
-                          const diff = taxaEfetiva - taxas.cdi;
-                          if (diff >= 0) {
-                            cdiComp = <span className="cdi-badge cdi-acima">+{fmt(diff, 1)}% acima do CDI</span>;
-                          } else {
-                            cdiComp = <span className="cdi-badge cdi-abaixo">{fmt(diff, 1)}% abaixo do CDI</span>;
-                          }
+                          cdiComp = <span className="cdi-badge cdi-abaixo">= CDB {fmt(equivCDB, 1)}% {idx} (IR 22,5%) - Nao compensa</span>;
                         }
                       }
 
