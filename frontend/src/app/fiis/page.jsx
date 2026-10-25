@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { RefreshCw, Building2, X } from 'lucide-react';
 import api from '@/lib/api';
@@ -533,6 +533,249 @@ function ModalDividendosFII({ fiis, onFechar, onSalvar }) {
             style={{padding:'9px 20px',borderRadius:7,fontSize:13,fontWeight:600,border:'none',cursor:'pointer',background:'#D4A017',color:'#fff',opacity:linhasSel.length===0?0.5:1}}>
             {salvando?'Salvando...':'Lançar dividendos'}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── MODAL IMPORTAR B3 ────────────────────────────────────────────────────
+function ModalImportarB3({ fiis, onFechar, onSalvar }) {
+  const [parsendo, setParsendo]     = useState(false);
+  const [salvando, setSalvando]     = useState(false);
+  const [arquivo, setArquivo]       = useState(null);
+  const [linhas, setLinhas]         = useState([]);   // todas as linhas parseadas
+  const [anosAtivos, setAnosAtivos] = useState({});   // { 2024: true, 2025: true }
+  const [avisoFora, setAvisoFora]   = useState([]);
+  const [feedback, setFeedback]     = useState('');
+  const [importado, setImportado]   = useState(false);
+
+  // Agrupa linhas por ano
+  const porAno = useMemo(() => {
+    const map = {};
+    for (const l of linhas) {
+      if (!map[l.ano]) map[l.ano] = [];
+      map[l.ano].push(l);
+    }
+    return map;
+  }, [linhas]);
+
+  const anos = Object.keys(porAno).map(Number).sort((a,b)=>b-a);
+
+  const linhasSelecionadas = linhas.filter(l => anosAtivos[l.ano]);
+
+  const totalSel = linhasSelecionadas.reduce((s,l) => s + (l.valor_total || 0), 0);
+
+  const handleArquivo = async (f) => {
+    if (!f) return;
+    setArquivo(f); setParsendo(true); setFeedback(''); setAvisoFora([]);
+    setLinhas([]); setAnosAtivos({}); setImportado(false);
+    try {
+      const resultado = await parsearArquivoB3FII(f);
+      const tickersFII = new Set(fiis.map(x => x.ticker));
+      const fora = [];
+      const novas = [];
+      let idSeq = Date.now();
+      for (const l of resultado) {
+        if (!tickersFII.has(l.ticker)) { fora.push(l.ticker); continue; }
+        novas.push({
+          id: idSeq++, ticker: l.ticker, tipo: l.tipo_dividendo,
+          valor: l.valor_por_cota, valor_total: l.valor_total,
+          quantidade: l.quantidade || null, mes: l.mes, ano: l.ano,
+        });
+      }
+      // Ativa todos os anos por padrão
+      const anos = {};
+      for (const n of novas) anos[n.ano] = true;
+      setLinhas(novas);
+      setAnosAtivos(anos);
+      setAvisoFora([...new Set(fora)]);
+      const anosUnicos = Object.keys(anos).length;
+      setFeedback(`✓ ${novas.length} lançamento(s) em ${anosUnicos} ano(s) encontrado(s)`);
+    } catch (err) {
+      console.error(err);
+      setFeedback('⚠ Erro ao ler o arquivo. Verifique se é o extrato de proventos da B3.');
+    } finally { setParsendo(false); }
+  };
+
+  const toggleAno = (ano) => {
+    setAnosAtivos(prev => ({ ...prev, [ano]: !prev[ano] }));
+  };
+
+  const confirmar = async () => {
+    if (!linhasSelecionadas.length) return;
+    setSalvando(true);
+    try {
+      const lancamentos = linhasSelecionadas.map(l => ({
+        ticker: l.ticker, tipo_dividendo: l.tipo,
+        valor_por_cota: l.valor, quantidade: l.quantidade,
+        valor_total_override: l.valor_total ?? null,
+        mes: l.mes, ano: l.ano,
+      }));
+      await onSalvar(lancamentos);
+      setImportado(true);
+      setFeedback(`✅ ${lancamentos.length} lançamento(s) importado(s) com sucesso!`);
+    } catch (err) {
+      setFeedback('⚠ Erro ao salvar. Tente novamente.');
+    } finally { setSalvando(false); }
+  };
+
+  const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}
+      onClick={e=>e.target===e.currentTarget&&onFechar()}>
+      <div style={{background:'#fff',borderRadius:16,width:'100%',maxWidth:680,maxHeight:'92vh',display:'flex',flexDirection:'column',overflow:'hidden',boxShadow:'0 24px 64px rgba(0,0,0,0.25)'}}>
+
+        {/* Header */}
+        <div style={{padding:'18px 22px',borderBottom:'1px solid #E8ECF0',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
+          <div>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <span style={{fontSize:20}}>⬆</span>
+              <span style={{fontSize:17,fontWeight:700,color:'#1A1A2E'}}>Importar Extrato B3</span>
+            </div>
+            <p style={{fontSize:12,color:'#8896A8',marginTop:2}}>Importe o extrato de proventos da B3 — todos os anos de uma vez</p>
+          </div>
+          <button onClick={onFechar} style={{background:'none',border:'none',cursor:'pointer',color:'#8896A8',padding:4}}><X size={20}/></button>
+        </div>
+
+        {/* Body */}
+        <div style={{flex:1,overflowY:'auto',padding:'18px 22px'}}>
+
+          {/* Upload */}
+          <label style={{display:'block',cursor:'pointer'}}>
+            <div style={{border:'2px dashed #93C5FD',borderRadius:12,padding:'22px 20px',textAlign:'center',background:'#EFF6FF',transition:'background 0.15s'}}
+              onDragOver={e=>{e.preventDefault();e.currentTarget.style.background='#DBEAFE'}}
+              onDragLeave={e=>{e.currentTarget.style.background='#EFF6FF'}}
+              onDrop={e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f)handleArquivo(f);}}>
+              <p style={{fontSize:28,marginBottom:4}}>📂</p>
+              <p style={{fontSize:14,fontWeight:700,color:'#2563EB',marginBottom:2}}>
+                {parsendo ? 'Lendo arquivo...' : arquivo ? arquivo.name : 'Selecionar ou arrastar arquivo'}
+              </p>
+              <p style={{fontSize:12,color:'#60A5FA'}}>Extrato de Proventos (.xlsx, .xls, .csv) — exportado do InfoMoney/B3</p>
+            </div>
+            <input type="file" accept=".csv,.xlsx,.xls" style={{display:'none'}} disabled={parsendo||salvando}
+              onChange={e=>{const f=e.target.files[0];if(f)handleArquivo(f);}}/>
+          </label>
+
+          {/* Feedback */}
+          {feedback && (
+            <div style={{marginTop:10,padding:'10px 14px',borderRadius:8,
+              background:feedback.startsWith('✅')?'#F0FDF4':feedback.startsWith('✓')?'#EFF6FF':'#FFFBEB',
+              border:`1px solid ${feedback.startsWith('✅')?'#86EFAC':feedback.startsWith('✓')?'#93C5FD':'#FCD34D'}`}}>
+              <p style={{fontSize:13,fontWeight:600,color:feedback.startsWith('✅')?'#16A34A':feedback.startsWith('✓')?'#2563EB':'#92400E'}}>{feedback}</p>
+            </div>
+          )}
+
+          {/* Aviso tickers fora da carteira */}
+          {avisoFora.length > 0 && (
+            <div style={{marginTop:8,padding:'10px 14px',borderRadius:8,background:'#FFFBEB',border:'1px solid #FCD34D'}}>
+              <p style={{fontSize:12,fontWeight:600,color:'#92400E',marginBottom:2}}>⚠ Ativos ignorados (não estão na sua carteira):</p>
+              <p style={{fontSize:12,color:'#92400E'}}>{avisoFora.join(', ')}</p>
+            </div>
+          )}
+
+          {/* Preview por ano */}
+          {anos.length > 0 && !importado && (
+            <div style={{marginTop:18}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                <p style={{fontSize:12,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em'}}>
+                  Selecione os anos para importar
+                </p>
+                <div style={{display:'flex',gap:6}}>
+                  <button onClick={()=>setAnosAtivos(Object.fromEntries(anos.map(a=>[a,true])))}
+                    style={{fontSize:11,padding:'3px 10px',borderRadius:6,border:'1px solid #93C5FD',background:'#EFF6FF',color:'#2563EB',cursor:'pointer',fontWeight:600}}>
+                    Todos
+                  </button>
+                  <button onClick={()=>setAnosAtivos(Object.fromEntries(anos.map(a=>[a,false])))}
+                    style={{fontSize:11,padding:'3px 10px',borderRadius:6,border:'1px solid #E8ECF0',background:'#F8F9FA',color:'#8896A8',cursor:'pointer',fontWeight:600}}>
+                    Nenhum
+                  </button>
+                </div>
+              </div>
+
+              <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                {anos.map(ano => {
+                  const lsAno = porAno[ano];
+                  const totalAno = lsAno.reduce((s,l)=>s+(l.valor_total||0),0);
+                  const ativo = !!anosAtivos[ano];
+                  // Agrupa por ticker para exibir resumo compacto
+                  const porTicker = {};
+                  for (const l of lsAno) {
+                    if (!porTicker[l.ticker]) porTicker[l.ticker] = { total:0, meses:[] };
+                    porTicker[l.ticker].total += l.valor_total || 0;
+                    porTicker[l.ticker].meses.push(l.mes);
+                  }
+                  return (
+                    <div key={ano} style={{border:`1px solid ${ativo?'#93C5FD':'#E8ECF0'}`,borderRadius:10,overflow:'hidden',
+                      background:ativo?'#FAFCFF':'#FAFAFA',transition:'all 0.15s'}}>
+                      {/* Cabeçalho do ano */}
+                      <div style={{padding:'10px 14px',display:'flex',alignItems:'center',gap:10,cursor:'pointer',
+                        background:ativo?'#EFF6FF':'#F1F5F9'}} onClick={()=>toggleAno(ano)}>
+                        <input type="checkbox" checked={ativo} onChange={()=>toggleAno(ano)}
+                          style={{accentColor:'#2563EB',width:16,height:16,cursor:'pointer'}}
+                          onClick={e=>e.stopPropagation()}/>
+                        <span style={{fontSize:15,fontWeight:700,color:ativo?'#2563EB':'#8896A8'}}>{ano}</span>
+                        <span style={{fontSize:12,color:'#8896A8',marginLeft:2}}>{lsAno.length} lançamento(s)</span>
+                        <span style={{flex:1}}/>
+                        <span style={{fontSize:13,fontWeight:700,color:ativo?'#2563EB':'#8896A8'}}>{fmt.brl(totalAno)}</span>
+                      </div>
+                      {/* Tabela compacta dos tickers */}
+                      {ativo && (
+                        <div style={{padding:'8px 14px 12px'}}>
+                          <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                            {Object.entries(porTicker).sort((a,b)=>b[1].total-a[1].total).map(([ticker,info])=>{
+                              const mesesUnicos = [...new Set(info.meses)].sort((a,b)=>a-b);
+                              return (
+                                <div key={ticker} style={{display:'flex',alignItems:'center',gap:8,padding:'5px 8px',borderRadius:6,background:'#fff',border:'1px solid #E8ECF0'}}>
+                                  <span style={{fontWeight:700,fontSize:12,minWidth:60,color:'#1A1A2E'}}>{ticker}</span>
+                                  <span style={{fontSize:11,color:'#8896A8',flex:1}}>
+                                    {mesesUnicos.length} {mesesUnicos.length===1?'mês':'meses'}: {mesesUnicos.map(m=>meses[m-1]).join(', ')}
+                                  </span>
+                                  <span style={{fontSize:12,fontWeight:600,color:'#16A34A'}}>{fmt.brl(info.total)}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {importado && (
+            <div style={{marginTop:20,textAlign:'center',padding:'24px 0'}}>
+              <p style={{fontSize:32,marginBottom:8}}>🎉</p>
+              <p style={{fontSize:15,fontWeight:700,color:'#16A34A',marginBottom:4}}>Dividendos importados com sucesso!</p>
+              <p style={{fontSize:13,color:'#8896A8'}}>Os dados já aparecem na sua carteira.</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{padding:'14px 22px',borderTop:'1px solid #E8ECF0',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,background:'#FAFBFC'}}>
+          <div>
+            {linhasSelecionadas.length > 0 && !importado && (
+              <p style={{fontSize:12,color:'#8896A8'}}>
+                <span style={{fontWeight:700,color:'#1A1A2E'}}>{linhasSelecionadas.length}</span> lançamento(s) · Total: <span style={{fontWeight:700,color:'#16A34A'}}>{fmt.brl(totalSel)}</span>
+              </p>
+            )}
+          </div>
+          <div style={{display:'flex',gap:10}}>
+            <button onClick={onFechar} style={{padding:'9px 20px',borderRadius:7,fontSize:13,fontWeight:600,border:'none',cursor:'pointer',background:'#EDF2F7',color:'#8896A8'}}>
+              {importado ? 'Fechar' : 'Cancelar'}
+            </button>
+            {!importado && linhasSelecionadas.length > 0 && (
+              <button onClick={confirmar} disabled={salvando}
+                style={{padding:'9px 22px',borderRadius:7,fontSize:13,fontWeight:700,border:'none',cursor:'pointer',
+                  background:'#2563EB',color:'#fff',opacity:salvando?0.7:1,display:'flex',alignItems:'center',gap:6}}>
+                {salvando ? '⏳ Importando...' : `⬆ Importar ${anos.filter(a=>anosAtivos[a]).length > 1 ? anos.filter(a=>anosAtivos[a]).length + ' anos' : 'dividendos'}`}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -1355,6 +1598,7 @@ export default function FIIsPage() {
   const [atualizando, setAtualizando] = useState(false);
   const [modalCompra, setModalCompra] = useState(null);
   const [modalDiv, setModalDiv]       = useState(false);
+  const [modalB3, setModalB3]         = useState(false);
   const [busca, setBusca]             = useState('');
 
   const [activeTab, setActiveTab] = useState('carteira');
@@ -1428,7 +1672,7 @@ export default function FIIsPage() {
             <button onClick={()=>setModalCompra('comprar')} style={{padding:'8px 14px',borderRadius:7,fontSize:12,fontWeight:600,border:'1px solid #9AE6B4',background:'#C6F6D5',color:'#276749',cursor:'pointer'}}>▲ Comprar cota</button>
             <button onClick={()=>setModalCompra('vender')}  style={{padding:'8px 14px',borderRadius:7,fontSize:12,fontWeight:600,border:'1px solid #FC8181',background:'#FED7D7',color:'#9B2C2C',cursor:'pointer'}}>▼ Vender cota</button>
             <button onClick={()=>setModalDiv(true)}         style={{padding:'8px 14px',borderRadius:7,fontSize:12,fontWeight:600,border:'1px solid #F6E05E',background:'#FEFCBF',color:'#7B6213',cursor:'pointer'}}>💰 Lançar dividendos</button>
-            <button onClick={()=>setModalDiv(true)}         style={{padding:'8px 14px',borderRadius:7,fontSize:12,fontWeight:600,border:'1px solid #90CDF4',background:'#EBF8FF',color:'#2B6CB0',cursor:'pointer'}}>⬆ Importar B3</button>
+            <button onClick={()=>setModalB3(true)}          style={{padding:'8px 14px',borderRadius:7,fontSize:12,fontWeight:600,border:'1px solid #90CDF4',background:'#EBF8FF',color:'#2B6CB0',cursor:'pointer'}}>⬆ Importar B3</button>
           </>}
         </div>
       </div>
@@ -1506,6 +1750,10 @@ export default function FIIsPage() {
       {modalDiv && (
         <ModalDividendosFII fiis={fiis}
           onFechar={()=>setModalDiv(false)} onSalvar={salvarDividendos}/>
+      )}
+      {modalB3 && (
+        <ModalImportarB3 fiis={fiis}
+          onFechar={()=>setModalB3(false)} onSalvar={salvarDividendos}/>
       )}
     </div>
   );
