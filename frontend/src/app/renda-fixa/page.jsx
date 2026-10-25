@@ -625,22 +625,38 @@ export default function RendaFixa() {
                   const rendMensalInv = rendAnualInv > 0 ? (Math.pow(1 + rendAnualInv / 100, 1 / 12) - 1) * 100 : 0;
 
                   // Comparativo CDI com contexto de isenção IR
+                  // Alíquota IR pela tabela regressiva brasileira (prazo total do investimento)
+                  const prazoTotalDias = Math.max(1, Math.floor((new Date(inv.data_vencimento) - new Date(inv.data_inicio)) / 86400000));
+                  const aliquotaIRPrazo = prazoTotalDias <= 180 ? 0.225
+                    : prazoTotalDias <= 360 ? 0.20
+                    : prazoTotalDias <= 720 ? 0.175
+                    : 0.15;
+
                   let cdiComp = null;
                   if (inv.indexador === 'CDI' && taxas.cdi > 0) {
-                    const taxaEfetiva = (inv.taxa / 100) * taxas.cdi;
+                    const taxaEfetiva = (inv.taxa / 100) * taxas.cdi; // rendimento bruto % a.a.
                     const diff = taxaEfetiva - taxas.cdi;
-                    if (diff >= 0) {
-                      cdiComp = <span className="cdi-badge cdi-acima">▲ {fmt(diff, 1)}% acima do CDI</span>;
-                    } else if (inv.isento_ir) {
-                      // Isento IR: compara com CDB equivalente (tabela regressiva ~15-20%)
-                      const aliquota = 0.175; // alíquota média estimada
-                      const cdiLiquido = taxas.cdi * (1 - aliquota);
-                      const diffLiquido = taxaEfetiva - cdiLiquido;
-                      cdiComp = diffLiquido >= 0
-                        ? <span className="cdi-badge cdi-acima">✓ Isento IR compensa · +{fmt(diffLiquido, 1)}% liq.</span>
-                        : <span className="cdi-badge cdi-abaixo">▼ {fmt(Math.abs(diff), 1)}% abaixo do CDI</span>;
+
+                    if (inv.isento_ir) {
+                      // Equivalente CDB: quanto % do CDI um CDB tributado precisaria render para
+                      // empatar líquido com este investimento isento
+                      // Líquido isento = taxaEfetiva
+                      // Líquido CDB = taxaCDB * (1 - aliquota)
+                      // taxaCDB * (1 - aliquota) = taxaEfetiva => taxaCDB = taxaEfetiva / (1 - aliquota)
+                      const equivCDB = inv.taxa / (1 - aliquotaIRPrazo); // % do CDI equivalente
+                      const valeApena = inv.taxa >= (1 - aliquotaIRPrazo) * 100; // vs CDB 100% CDI
+                      if (valeApena) {
+                        cdiComp = <span className="cdi-badge cdi-acima">≈ CDB {fmt(equivCDB, 1)}% CDI · Vale a pena ✓</span>;
+                      } else {
+                        cdiComp = <span className="cdi-badge cdi-abaixo">≈ CDB {fmt(equivCDB, 1)}% CDI · Não compensa ✗</span>;
+                      }
                     } else {
-                      cdiComp = <span className="cdi-badge cdi-abaixo">▼ {fmt(Math.abs(diff), 1)}% abaixo do CDI</span>;
+                      // Não isento: mostra simplesmente quanto está vs CDI bruto
+                      if (diff >= 0) {
+                        cdiComp = <span className="cdi-badge cdi-acima">▲ {fmt(diff, 1)}% acima do CDI</span>;
+                      } else {
+                        cdiComp = <span className="cdi-badge cdi-abaixo">▼ {fmt(Math.abs(diff), 1)}% abaixo do CDI</span>;
+                      }
                     }
                   }
 
