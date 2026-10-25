@@ -166,6 +166,105 @@ function useDividendosFII(fiis) {
   return { anosDisponiveis, anoFiltro, setAnoFiltro, resumoAno, resumoGeral, carregarDados };
 }
 
+// ─── hook cotações ao vivo ─────────────────────────────────────────────────
+function useCotacoesLive(fiis) {
+  const [cotacoes, setCotacoes] = useState({});
+
+  const buscar = async () => {
+    if (!fiis.length) return;
+    try {
+      const r = await api.get('/fiis/cotacoes-live');
+      setCotacoes(r.data || {});
+    } catch {}
+  };
+
+  useEffect(() => {
+    buscar();
+    const id = setInterval(buscar, 60000); // atualiza a cada 60s
+    return () => clearInterval(id);
+  }, [fiis.length]);
+
+  return cotacoes;
+}
+
+// ─── mini gráfico de dividendos (12 meses) ────────────────────────────────
+function MiniGraficoDividendos({ ticker }) {
+  const [dados, setDados] = useState(null);
+
+  useEffect(() => {
+    const buscar = async () => {
+      try {
+        const anoAtual = new Date().getFullYear();
+        const anos = [anoAtual - 1, anoAtual];
+        const resultados = await Promise.all(
+          anos.map(a => api.get(`/fiis/dividendos/resumo?ano=${a}`).then(r => ({ ano: a, data: r.data })).catch(() => ({ ano: a, data: {} })))
+        );
+        // Montar array de 12 meses: últimos 12 meses
+        const hoje = new Date();
+        const meses = [];
+        for (let i = 11; i >= 0; i--) {
+          const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+          meses.push({ mes: d.getMonth() + 1, ano: d.getFullYear(), label: d.toLocaleString('pt-BR', { month: 'short' }) });
+        }
+        // Buscar dividendos mensais por ticker
+        const porMes = {};
+        for (const { ano, data } of resultados) {
+          const tickerData = data[ticker];
+          if (tickerData?.porMes) {
+            for (const [mes, val] of Object.entries(tickerData.porMes)) {
+              porMes[`${ano}-${mes}`] = val;
+            }
+          }
+        }
+        const valores = meses.map(m => ({ ...m, valor: porMes[`${m.ano}-${m.mes}`] || 0 }));
+        setDados(valores);
+      } catch {}
+    };
+    buscar();
+  }, [ticker]);
+
+  if (!dados || dados.every(d => d.valor === 0)) return null;
+
+  const maxVal = Math.max(...dados.map(d => d.valor), 0.001);
+  const totalAno = dados.slice(-12).reduce((s, d) => s + d.valor, 0);
+
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+        <span style={{ fontSize: 10, color: '#8896A8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Dividendos 12 meses
+        </span>
+        {totalAno > 0 && (
+          <span style={{ fontSize: 11, color: '#16A34A', fontWeight: 600 }}>
+            Total: {fmt.brl(totalAno)}
+          </span>
+        )}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 40 }}>
+        {dados.map((d, i) => {
+          const h = Math.max((d.valor / maxVal) * 34, d.valor > 0 ? 3 : 0);
+          const isLast = i === dados.length - 1;
+          return (
+            <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+              <div
+                title={`${d.label}: ${fmt.brl(d.valor)}`}
+                style={{
+                  width: '100%', height: h, borderRadius: '2px 2px 0 0',
+                  background: isLast ? '#2563EB' : d.valor > 0 ? '#BFDBFE' : 'transparent',
+                  transition: 'height 0.3s'
+                }}
+              />
+              {(i === 0 || i === 5 || i === 11) && (
+                <span style={{ fontSize: 8, color: '#8896A8' }}>{d.label}</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── MODAL COMPRAR / VENDER ────────────────────────────────────────────────
 function ModalCompraVenda({ fiis, tipo, onFechar, onSalvar }) {
   const [ticker, setTicker] = useState(fiis[0]?.ticker || '');
@@ -695,7 +794,7 @@ function ModalPortfolio({ ticker, nomeFundo, onFechar }) {
 }
 
 // ─── CARD FII ─────────────────────────────────────────────────────────────
-function FIICard({ f, onRemover, onSalvar, onAbrirDividendo, resumoAno, resumoGeral }) {
+function FIICard({ f, onRemover, onSalvar, onAbrirDividendo, resumoAno, resumoGeral, cotacaoLive }) {
   const [editando, setEditando] = useState(false);
   const [qtd, setQtd]     = useState(String(f.quantidade ?? ''));
   const [preco, setPreco] = useState(String(f.preco_compra ?? ''));
@@ -796,6 +895,31 @@ function FIICard({ f, onRemover, onSalvar, onAbrirDividendo, resumoAno, resumoGe
         </div>
       </div>
 
+      {/* Alerta P/VP */}
+      {f.pvp > 0 && (() => {
+        const pvp = f.pvp;
+        const oport = pvp < 0.95;
+        const ok    = pvp >= 0.95 && pvp < 1.05;
+        const caro  = pvp >= 1.05;
+        const bg    = oport ? '#F0FDF4' : ok ? '#F8FAFC' : '#FEF2F2';
+        const border= oport ? '#BBF7D0' : ok ? '#E2E8F0' : '#FECACA';
+        const cor   = oport ? '#15803D' : ok ? '#64748B' : '#DC2626';
+        const ico   = oport ? '🟢' : ok ? '🔵' : '🔴';
+        const txt   = oport
+          ? `Oportunidade — cota ${Math.abs((1-pvp)*100).toFixed(0)}% abaixo do VPA`
+          : ok
+          ? `Preço justo — dentro da faixa ideal`
+          : `Atenção — prêmio de ${((pvp-1)*100).toFixed(0)}% sobre o VPA`;
+        return (
+          <div style={{background:bg,border:`1px solid ${border}`,borderRadius:8,padding:'7px 10px',display:'flex',alignItems:'center',gap:8,fontSize:12}}>
+            <span>{ico}</span>
+            <span style={{color:cor,fontWeight:500}}>
+              <strong>P/VP {fmt.num(pvp)}</strong> — {txt}
+            </span>
+          </div>
+        );
+      })()}
+
       {/* Preço Justo */}
       {f.preco_justo > 0 && (
         <div style={{background:'#FDF4FF',border:'1px solid #E9D5FF',borderRadius:10,padding:'10px 14px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
@@ -851,6 +975,9 @@ function FIICard({ f, onRemover, onSalvar, onAbrirDividendo, resumoAno, resumoGe
           </div>
         )}
       </div>
+
+      {/* Mini gráfico dividendos 12M */}
+      <MiniGraficoDividendos ticker={f.ticker} />
 
       {/* Dividendos do ano */}
       <div style={{background:'#FFFDF0',border:'1px solid #F6E05E',borderRadius:10,padding:'10px 14px'}}>
@@ -912,13 +1039,20 @@ function FIICard({ f, onRemover, onSalvar, onAbrirDividendo, resumoAno, resumoGe
       {/* Footer */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingTop:4,borderTop:'1px solid #E8ECF0'}}>
         <div>
-          <div style={{display:'flex',alignItems:'baseline',gap:8}}>
-            <span style={{fontSize:16,fontWeight:700,color:'#1A1A2E'}}>{fmt.brl(f.preco_atual)}</span>
-            {f.variacao_dia!=null&&(
-              <span style={{fontSize:12,fontWeight:600,color:f.variacao_dia>=0?'#16A34A':'#DC2626',background:f.variacao_dia>=0?'#F0FDF4':'#FEF2F2',padding:'2px 8px',borderRadius:20}}>
-                {f.variacao_dia>=0?'▲':'▼'} {f.variacao_dia>=0?'+':''}{fmt.pct(f.variacao_dia)} hoje
-              </span>
-            )}
+          <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
+            <span style={{fontSize:16,fontWeight:700,color:'#1A1A2E'}}>
+              {fmt.brl(cotacaoLive?.preco_atual ?? f.preco_atual)}
+            </span>
+            {(() => {
+              const vd = cotacaoLive?.variacao_dia ?? f.variacao_dia;
+              if (vd == null) return null;
+              return (
+                <span style={{fontSize:12,fontWeight:600,color:vd>=0?'#16A34A':'#DC2626',background:vd>=0?'#F0FDF4':'#FEF2F2',padding:'2px 8px',borderRadius:20,display:'flex',alignItems:'center',gap:2}}>
+                  {vd>=0?'▲':'▼'} {vd>=0?'+':''}{fmt.pct(vd)} hoje
+                  {cotacaoLive && <span style={{fontSize:9,opacity:0.7,marginLeft:2}}>●</span>}
+                </span>
+              );
+            })()}
           </div>
         </div>
         <div style={{display:'flex',gap:6}}>
@@ -1107,6 +1241,114 @@ const BuscaFIIs = ({ valor, onChange }) => (
   </div>
 );
 
+function TabRanking({ fiis, cotacoes, resumoGeral }) {
+  const [sortKey, setSortKey] = useState('score');
+  const [sortDir, setSortDir] = useState('desc');
+
+  const toggleSort = (key) => {
+    if (sortKey === key) setSortDir(d => d === 'desc' ? 'asc' : 'desc');
+    else { setSortKey(key); setSortDir('desc'); }
+  };
+
+  const dados = fiis.map(f => {
+    const live = cotacoes[f.ticker] || {};
+    const vd   = live.variacao_dia ?? f.variacao_dia;
+    const preco = live.preco_atual ?? f.preco_atual;
+    const dyM   = f.preco_atual > 0 && f.dividendo_mensal > 0 ? (f.dividendo_mensal / f.preco_atual) * 100 : null;
+    const dyA   = resumoGeral?.[f.ticker]?.totalAno > 0 && f.preco_atual > 0
+      ? (resumoGeral[f.ticker].totalAno / f.preco_atual) * 100 : null;
+    return { ...f, vd, preco, dyM, dyA };
+  });
+
+  const sorted = [...dados].sort((a, b) => {
+    const va = a[sortKey] ?? (sortDir==='desc' ? -Infinity : Infinity);
+    const vb = b[sortKey] ?? (sortDir==='desc' ? -Infinity : Infinity);
+    return sortDir === 'desc' ? vb - va : va - vb;
+  });
+
+  const Th = ({ k, label, right }) => (
+    <th onClick={() => toggleSort(k)} style={{
+      padding:'10px 12px',fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',
+      letterSpacing:'0.05em',cursor:'pointer',whiteSpace:'nowrap',userSelect:'none',
+      textAlign:right?'right':'left',background:'#F8FAFC',
+      borderBottom:'2px solid #E8ECF0',
+    }}>
+      {label} {sortKey===k ? (sortDir==='desc'?'↓':'↑') : ''}
+    </th>
+  );
+
+  return (
+    <div style={{background:'#FFF',border:'1px solid #E8ECF0',borderRadius:14,overflow:'hidden'}}>
+      <div style={{overflowX:'auto'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+          <thead>
+            <tr>
+              <th style={{padding:'10px 12px',fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',background:'#F8FAFC',borderBottom:'2px solid #E8ECF0',textAlign:'left'}}>#</th>
+              <Th k="ticker" label="Ticker" />
+              <Th k="score" label="Score" right />
+              <Th k="preco" label="Preço" right />
+              <Th k="vd" label="Var. Dia" right />
+              <Th k="dyM" label="DY Mensal" right />
+              <Th k="dyA" label="DY Anual" right />
+              <Th k="pvp" label="P/VP" right />
+              <Th k="volume_diario" label="Volume" right />
+              <Th k="patrimonio_liquido" label="Patrimônio" right />
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((f, i) => {
+              const isOdd = i % 2 === 0;
+              const pvpColor = !f.pvp ? '#8896A8' : f.pvp < 0.95 ? '#15803D' : f.pvp < 1.05 ? '#1A1A2E' : '#DC2626';
+              const vdColor  = f.vd == null ? '#8896A8' : f.vd >= 0 ? '#16A34A' : '#DC2626';
+              return (
+                <tr key={f.ticker} style={{background:isOdd?'#FFF':'#FAFBFC',borderBottom:'1px solid #F0F2F5',transition:'background 0.1s'}}
+                  onMouseEnter={e=>e.currentTarget.style.background='#EFF6FF'}
+                  onMouseLeave={e=>e.currentTarget.style.background=isOdd?'#FFF':'#FAFBFC'}>
+                  <td style={{padding:'10px 12px',color:'#8896A8',fontWeight:600}}>{i+1}</td>
+                  <td style={{padding:'10px 12px'}}>
+                    <div style={{fontWeight:700,color:'#1A1A2E'}}>{f.ticker}</div>
+                    {f.tipo_fundo && <div style={{fontSize:10,color:'#8896A8'}}>{f.tipo_fundo}</div>}
+                  </td>
+                  <td style={{padding:'10px 12px',textAlign:'right'}}>
+                    <span style={{
+                      display:'inline-block',padding:'2px 8px',borderRadius:20,fontSize:12,fontWeight:700,
+                      background: f.score>=3?'#F0FDF4':f.score>=2?'#FFFBEB':'#FEF2F2',
+                      color: f.score>=3?'#15803D':f.score>=2?'#92400E':'#991B1B',
+                    }}>{f.score ?? 0}/4</span>
+                  </td>
+                  <td style={{padding:'10px 12px',textAlign:'right',fontWeight:600}}>{f.preco ? fmt.brl(f.preco) : '—'}</td>
+                  <td style={{padding:'10px 12px',textAlign:'right',fontWeight:600,color:vdColor}}>
+                    {f.vd != null ? `${f.vd >= 0 ? '+' : ''}${fmt.pct(f.vd)}` : '—'}
+                    {cotacoes[f.ticker] && <span style={{fontSize:9,marginLeft:2,opacity:0.6}}>●</span>}
+                  </td>
+                  <td style={{padding:'10px 12px',textAlign:'right',color:f.dyM>=1?'#15803D':'#1A1A2E',fontWeight:f.dyM>=1?700:400}}>
+                    {f.dyM != null ? `${fmt.pct(f.dyM)}` : '—'}
+                  </td>
+                  <td style={{padding:'10px 12px',textAlign:'right',color:f.dyA>=10?'#15803D':'#1A1A2E',fontWeight:f.dyA>=10?700:400}}>
+                    {f.dyA != null ? `${fmt.pct(f.dyA)}` : '—'}
+                  </td>
+                  <td style={{padding:'10px 12px',textAlign:'right',color:pvpColor,fontWeight:600}}>
+                    {f.pvp ? fmt.num(f.pvp) : '—'}
+                  </td>
+                  <td style={{padding:'10px 12px',textAlign:'right',color:'#4A5568'}}>
+                    {f.volume_diario ? fmt.abrev(f.volume_diario) : '—'}
+                  </td>
+                  <td style={{padding:'10px 12px',textAlign:'right',color:'#4A5568'}}>
+                    {f.patrimonio_liquido ? fmt.abrev(f.patrimonio_liquido) : '—'}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div style={{padding:'10px 16px',fontSize:11,color:'#8896A8',borderTop:'1px solid #E8ECF0'}}>
+        Clique nos cabeçalhos para ordenar. ● = cotação ao vivo.
+      </div>
+    </div>
+  );
+}
+
 export default function FIIsPage() {
   const [fiis, setFiis]               = useState([]);
   const [loading, setLoading]         = useState(true);
@@ -1115,7 +1357,9 @@ export default function FIIsPage() {
   const [modalDiv, setModalDiv]       = useState(false);
   const [busca, setBusca]             = useState('');
 
+  const [activeTab, setActiveTab] = useState('carteira');
   const { anosDisponiveis, anoFiltro, setAnoFiltro, resumoAno, resumoGeral, carregarDados } = useDividendosFII(fiis);
+  const cotacoes = useCotacoesLive(fiis);
 
   const carregar = async () => {
     try { const r = await api.get('/fiis'); setFiis(r.data); }
@@ -1197,40 +1441,61 @@ export default function FIIsPage() {
         <FIIsForm onAdicionado={carregar}/>
       </Suspense>
 
-      {/* Critérios — DY Mensal ≥ 1% */}
-      <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:12,padding:'12px 20px',marginBottom:20,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-        <span style={{fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginRight:4}}>Critérios de avaliação (Score /4)</span>
-        {['DY Mensal ≥ 1%','P/VP < 1,05','Volume Diário > R$ 1M','Patrimônio > R$ 1B'].map(c=>(
-          <span key={c} style={{fontSize:12,fontWeight:500,padding:'3px 10px',borderRadius:20,background:'#F0F2F5',color:'#4A5568',border:'1px solid #E8ECF0'}}>{c}</span>
-        ))}
-      </div>
-
-      {fiis.length > 0 && <BuscaFIIs valor={busca} onChange={setBusca} />}
-
-      {/* Cards */}
-      {fiis.length > 0 ? (
-        <div className="grid-cards">
-          {fiis.filter(f => {
-            const q = busca.toLowerCase();
-            return !q || f.ticker.toLowerCase().includes(q)
-              || (f.nome_fundo || '').toLowerCase().includes(q)
-              || (f.tipo_fundo || '').toLowerCase().includes(q);
-          }).map(f=>(
-            <FIICard key={f.ticker} f={f}
-              onRemover={remover}
-              onSalvar={salvarEdicao}
-              onAbrirDividendo={()=>setModalDiv(true)}
-              resumoAno={resumoAno}
-              resumoGeral={resumoGeral}
-            />
+      {/* Tabs: Carteira / Ranking */}
+      {fiis.length > 0 && (
+        <div style={{display:'flex',gap:4,marginBottom:20,borderBottom:'2px solid #E8ECF0',paddingBottom:0}}>
+          {[{id:'carteira',label:'📋 Carteira'},{id:'ranking',label:'🏆 Ranking'}].map(tab=>(
+            <button key={tab.id} onClick={()=>setActiveTab(tab.id)}
+              style={{padding:'8px 18px',border:'none',borderBottom:`2px solid ${activeTab===tab.id?'#2563EB':'transparent'}`,
+                background:'none',cursor:'pointer',fontSize:13,fontWeight:activeTab===tab.id?700:500,
+                color:activeTab===tab.id?'#2563EB':'#8896A8',marginBottom:-2,transition:'all 0.15s'}}>
+              {tab.label}
+            </button>
           ))}
         </div>
-      ) : (
-        <div style={{background:'#FFF',border:'1px solid #E8ECF0',borderRadius:14,padding:40,textAlign:'center'}}>
-          <Building2 size={40} style={{color:'#D0D8E0',margin:'0 auto 12px'}}/>
-          <p style={{color:'#4A5568',fontWeight:500,marginBottom:4}}>Nenhum FII adicionado</p>
-          <p style={{color:'#8896A8',fontSize:13}}>Digite um ticker acima para buscar e avaliar um fundo imobiliário.</p>
+      )}
+
+      {activeTab === 'carteira' && <>
+        {/* Critérios — DY Mensal ≥ 1% */}
+        <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:12,padding:'12px 20px',marginBottom:20,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+          <span style={{fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginRight:4}}>Critérios de avaliação (Score /4)</span>
+          {['DY Mensal ≥ 1%','P/VP < 1,05','Volume Diário > R$ 1M','Patrimônio > R$ 1B'].map(c=>(
+            <span key={c} style={{fontSize:12,fontWeight:500,padding:'3px 10px',borderRadius:20,background:'#F0F2F5',color:'#4A5568',border:'1px solid #E8ECF0'}}>{c}</span>
+          ))}
         </div>
+
+        {fiis.length > 0 && <BuscaFIIs valor={busca} onChange={setBusca} />}
+
+        {/* Cards */}
+        {fiis.length > 0 ? (
+          <div className="grid-cards">
+            {fiis.filter(f => {
+              const q = busca.toLowerCase();
+              return !q || f.ticker.toLowerCase().includes(q)
+                || (f.nome_fundo || '').toLowerCase().includes(q)
+                || (f.tipo_fundo || '').toLowerCase().includes(q);
+            }).map(f=>(
+              <FIICard key={f.ticker} f={f}
+                onRemover={remover}
+                onSalvar={salvarEdicao}
+                onAbrirDividendo={()=>setModalDiv(true)}
+                resumoAno={resumoAno}
+                resumoGeral={resumoGeral}
+                cotacaoLive={cotacoes[f.ticker]}
+              />
+            ))}
+          </div>
+        ) : (
+          <div style={{background:'#FFF',border:'1px solid #E8ECF0',borderRadius:14,padding:40,textAlign:'center'}}>
+            <Building2 size={40} style={{color:'#D0D8E0',margin:'0 auto 12px'}}/>
+            <p style={{color:'#4A5568',fontWeight:500,marginBottom:4}}>Nenhum FII adicionado</p>
+            <p style={{color:'#8896A8',fontSize:13}}>Digite um ticker acima para buscar e avaliar um fundo imobiliário.</p>
+          </div>
+        )}
+      </>}
+
+      {activeTab === 'ranking' && fiis.length > 0 && (
+        <TabRanking fiis={fiis} cotacoes={cotacoes} resumoGeral={resumoGeral} />
       )}
 
       {/* Modais */}
