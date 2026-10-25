@@ -14,15 +14,14 @@ async function buscarTaxasBancoCentral() {
   if (taxasCache.cdi > 0 && agora - taxasCache.timestamp < 3600000) return taxasCache;
   try {
     const [resCdi, resSelic, resIpca] = await Promise.allSettled([
-      axios.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.4391/dados/ultimos/1?formato=json', { timeout: 8000 }),
-      axios.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json', { timeout: 8000 }),
-      axios.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.13522/dados/ultimos/1?formato=json', { timeout: 8000 }),
+      axios.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.4389/dados/ultimos/1?formato=json', { timeout: 8000 }),  // CDI % a.a.
+      axios.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json', { timeout: 8000 }),   // Selic % a.a.
+      axios.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.13522/dados/ultimos/1?formato=json', { timeout: 8000 }), // IPCA % a.m.
     ]);
-    const cdiMensal  = resCdi.status   === 'fulfilled' ? parseFloat(resCdi.value.data[0]?.valor   || 0) : taxasCache.cdi;
-    const cdi        = parseFloat(((Math.pow(1 + cdiMensal  / 100, 12) - 1) * 100).toFixed(4));
-    const selic      = resSelic.status === 'fulfilled' ? parseFloat(resSelic.value.data[0]?.valor || 0) : taxasCache.selic;
+    const cdi        = resCdi.status   === 'fulfilled' ? parseFloat(resCdi.value.data[0]?.valor   || 0) : taxasCache.cdi;   // já é % a.a.
+    const selic      = resSelic.status === 'fulfilled' ? parseFloat(resSelic.value.data[0]?.valor || 0) : taxasCache.selic;  // já é % a.a.
     const ipcaMensal = resIpca.status  === 'fulfilled' ? parseFloat(resIpca.value.data[0]?.valor  || 0) : taxasCache.ipca;
-    const ipca       = parseFloat(((Math.pow(1 + ipcaMensal / 100, 12) - 1) * 100).toFixed(4));
+    const ipca       = parseFloat(((Math.pow(1 + ipcaMensal / 100, 12) - 1) * 100).toFixed(4));                             // converte a.m. → a.a.
     taxasCache  = { cdi, selic, ipca, timestamp: agora };
   } catch(e) { console.error('[taxas BCB]', e.message); }
   return taxasCache;
