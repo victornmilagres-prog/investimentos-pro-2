@@ -512,41 +512,103 @@ function ModalPortfolio({ ticker, nomeFundo, onFechar }) {
 
               {/* Imóveis */}
               {dados.properties?.length > 0 && (() => {
-                // calcula ocupação geral: usa propertiesSummary ou média dos imóveis
+                // helpers
+                const extractUF = addr => {
+                  if (!addr) return null;
+                  const m = addr.match(/\b([A-Z]{2})\b(?:\s*[-–]\s*\d{5})?$/);
+                  if (m) return m[1];
+                  const estados = {AC:'AC',AL:'AL',AM:'AM',AP:'AP',BA:'BA',CE:'CE',DF:'DF',ES:'ES',GO:'GO',MA:'MA',MG:'MG',MS:'MS',MT:'MT',PA:'PA',PB:'PB',PE:'PE',PI:'PI',PR:'PR',RJ:'RJ',RN:'RN',RO:'RO',RR:'RR',RS:'RS',SC:'SC',SE:'SE',SP:'SP',TO:'TO'};
+                  const parts = addr.toUpperCase().split(/[\s,\-\/]+/);
+                  for (let i = parts.length - 1; i >= 0; i--) { if (estados[parts[i]]) return parts[i]; }
+                  return null;
+                };
+
+                // totalizadores
                 const vacGeral = dados.propertiesSummary?.vacancyRate != null
                   ? dados.propertiesSummary.vacancyRate
                   : dados.properties.filter(p => p.vacancyRate != null).length > 0
                     ? dados.properties.filter(p => p.vacancyRate != null).reduce((acc, p) => acc + (p.vacancyRate || 0), 0) / dados.properties.filter(p => p.vacancyRate != null).length
                     : null;
                 const ocupacaoGeral = vacGeral != null ? 100 - vacGeral * 100 : null;
-                const corOcupacao = ocupacaoGeral == null ? '#8896A8' : ocupacaoGeral >= 90 ? '#16A34A' : ocupacaoGeral >= 70 ? '#D97706' : '#DC2626';
+                const corOcup = v => v == null ? '#8896A8' : v >= 90 ? '#16A34A' : v >= 70 ? '#D97706' : '#DC2626';
+
+                const inadProp = dados.properties.filter(p => p.delinquencyRate != null);
+                const inadMedia = inadProp.length > 0 ? inadProp.reduce((a, p) => a + p.delinquencyRate, 0) / inadProp.length : null;
+
+                const totalUnidades = dados.properties.reduce((a, p) => a + (p.unitCount || 0), 0);
+                const areaTotal = dados.properties.reduce((a, p) => a + (p.area || 0), 0);
+
+                const ufsSet = new Set(dados.properties.map(p => extractUF(p.address)).filter(Boolean));
+                const ufs = [...ufsSet].sort();
+
                 return (
                 <div>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-                    <p style={{fontSize:12,fontWeight:700,color:'#1A1A2E',textTransform:'uppercase',letterSpacing:'0.05em',margin:0}}>
-                      🏢 Imóveis ({dados.properties.length})
-                    </p>
+                  <p style={{fontSize:12,fontWeight:700,color:'#1A1A2E',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:10}}>
+                    🏢 Imóveis ({dados.properties.length})
+                  </p>
+
+                  {/* Painel totalizador */}
+                  <div style={{background:'#F1F5F9',borderRadius:12,padding:'12px 16px',marginBottom:12,display:'flex',flexDirection:'column',gap:10}}>
+                    {/* Ocupação */}
                     {ocupacaoGeral != null && (
-                      <div style={{display:'flex',alignItems:'center',gap:8}}>
-                        <div style={{width:80,height:6,background:'#E8ECF0',borderRadius:3,overflow:'hidden'}}>
-                          <div style={{width:`${Math.min(ocupacaoGeral,100)}%`,height:'100%',background:corOcupacao,borderRadius:3,transition:'width 0.4s'}}/>
+                      <div>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                          <span style={{fontSize:11,color:'#64748B',fontWeight:600}}>Ocupação geral</span>
+                          <span style={{fontSize:13,fontWeight:700,color:corOcup(ocupacaoGeral)}}>{ocupacaoGeral.toFixed(1)}% alugado</span>
                         </div>
-                        <span style={{fontSize:12,fontWeight:700,color:corOcupacao,whiteSpace:'nowrap'}}>
-                          {ocupacaoGeral.toFixed(1)}% alugado
-                        </span>
+                        <div style={{height:7,background:'#E8ECF0',borderRadius:4,overflow:'hidden'}}>
+                          <div style={{width:`${Math.min(ocupacaoGeral,100)}%`,height:'100%',background:corOcup(ocupacaoGeral),borderRadius:4,transition:'width 0.5s'}}/>
+                        </div>
                       </div>
                     )}
+                    {/* Linha de métricas */}
+                    <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
+                      {inadMedia != null && (
+                        <div style={{display:'flex',flexDirection:'column',gap:1}}>
+                          <span style={{fontSize:10,color:'#8896A8',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em'}}>Inadimplência</span>
+                          <span style={{fontSize:13,fontWeight:700,color: inadMedia > 0.05 ? '#DC2626' : inadMedia > 0.02 ? '#D97706' : '#16A34A'}}>{(inadMedia*100).toFixed(1)}%</span>
+                        </div>
+                      )}
+                      {totalUnidades > 0 && (
+                        <div style={{display:'flex',flexDirection:'column',gap:1}}>
+                          <span style={{fontSize:10,color:'#8896A8',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em'}}>Unidades</span>
+                          <span style={{fontSize:13,fontWeight:700,color:'#1A1A2E'}}>{totalUnidades.toLocaleString('pt-BR')}</span>
+                        </div>
+                      )}
+                      {areaTotal > 0 && (
+                        <div style={{display:'flex',flexDirection:'column',gap:1}}>
+                          <span style={{fontSize:10,color:'#8896A8',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em'}}>Área total</span>
+                          <span style={{fontSize:13,fontWeight:700,color:'#1A1A2E'}}>{fmtArea(areaTotal)}</span>
+                        </div>
+                      )}
+                      {ufs.length > 0 && (
+                        <div style={{display:'flex',flexDirection:'column',gap:1}}>
+                          <span style={{fontSize:10,color:'#8896A8',fontWeight:600,textTransform:'uppercase',letterSpacing:'0.04em'}}>Estados</span>
+                          <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                            {ufs.map(uf => (
+                              <span key={uf} style={{fontSize:11,fontWeight:700,color:'#475569',background:'#E2E8F0',padding:'1px 7px',borderRadius:10}}>{uf}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Lista de imóveis */}
                   <div style={{display:'flex',flexDirection:'column',gap:8}}>
                     {dados.properties.map((p, i) => {
-                      const ocup = p.vacancyRate != null ? 100 - p.vacancyRate * 100 : null;
-                      const cor = ocup == null ? '#8896A8' : ocup >= 90 ? '#16A34A' : ocup >= 70 ? '#D97706' : '#DC2626';
+                      const ocup = p.vacancyRate != null ? 100 - p.vacancyRate * 100 : p.leasedRate != null ? p.leasedRate * 100 : null;
+                      const uf = extractUF(p.address);
                       return (
                       <div key={i} style={{background:'#F8FAFC',border:'1px solid #E8ECF0',borderRadius:10,padding:'12px 14px'}}>
-                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,marginBottom:6}}>
-                          <div>
-                            <p style={{fontSize:13,fontWeight:600,color:'#1A1A2E',marginBottom:2}}>{p.name}</p>
-                            {p.address && <p style={{fontSize:11,color:'#8896A8'}}>{p.address}</p>}
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,marginBottom:8}}>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:2}}>
+                              <p style={{fontSize:13,fontWeight:600,color:'#1A1A2E',margin:0}}>{p.name}</p>
+                              {uf && <span style={{fontSize:10,fontWeight:700,color:'#475569',background:'#E2E8F0',padding:'1px 6px',borderRadius:8,flexShrink:0}}>{uf}</span>}
+                              {p.propertyClass && <span style={{fontSize:10,color:'#8896A8',background:'#F1F5F9',padding:'1px 6px',borderRadius:8,flexShrink:0}}>{p.propertyClass}</span>}
+                            </div>
+                            {p.address && <p style={{fontSize:11,color:'#8896A8',margin:0}}>{p.address}</p>}
                           </div>
                           <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4,flexShrink:0}}>
                             {p.revenueShare > 0 && (
@@ -556,17 +618,21 @@ function ModalPortfolio({ ticker, nomeFundo, onFechar }) {
                             )}
                             {ocup != null && (
                               <div style={{display:'flex',alignItems:'center',gap:5}}>
-                                <div style={{width:50,height:5,background:'#E8ECF0',borderRadius:3,overflow:'hidden'}}>
-                                  <div style={{width:`${Math.min(ocup,100)}%`,height:'100%',background:cor,borderRadius:3}}/>
+                                <div style={{width:52,height:5,background:'#E8ECF0',borderRadius:3,overflow:'hidden'}}>
+                                  <div style={{width:`${Math.min(ocup,100)}%`,height:'100%',background:corOcup(ocup),borderRadius:3}}/>
                                 </div>
-                                <span style={{fontSize:11,fontWeight:700,color:cor,whiteSpace:'nowrap'}}>{ocup.toFixed(0)}% alugado</span>
+                                <span style={{fontSize:11,fontWeight:700,color:corOcup(ocup),whiteSpace:'nowrap'}}>{ocup.toFixed(0)}% alugado</span>
                               </div>
                             )}
                           </div>
                         </div>
-                        <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
+                        <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
                           {p.area > 0 && <span style={{fontSize:11,color:'#64748B'}}>📐 {fmtArea(p.area)}</span>}
-                          {p.propertyClass && <span style={{fontSize:11,color:'#8896A8'}}>{p.propertyClass}</span>}
+                          {p.unitCount > 0 && <span style={{fontSize:11,color:'#64748B'}}>🏠 {p.unitCount} unid.</span>}
+                          {p.delinquencyRate > 0 && <span style={{fontSize:11,color:'#D97706'}}>⚠️ Inadimp. {(p.delinquencyRate*100).toFixed(1)}%</span>}
+                          {p.constructionProgressActual > 0 && p.constructionProgressActual < 1 && (
+                            <span style={{fontSize:11,color:'#7E22CE'}}>🏗️ Em obra {(p.constructionProgressActual*100).toFixed(0)}%</span>
+                          )}
                         </div>
                       </div>
                       );
