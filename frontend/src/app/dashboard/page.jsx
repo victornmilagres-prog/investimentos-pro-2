@@ -58,7 +58,7 @@ export default function DashboardPage() {
         api.get('/renda-fixa'),
         api.get('/fiis/dividendos-resumo').catch(() => ({ data: null })),
       ]);
-      setDados({ ...dash.data, rendaFixaLista: rf.data || [], dividendosResumo: divs.data });
+      setDados({ ...dash.data, rendaFixaLista: rf.data?.itens || [], dividendosResumo: divs.data });
     } catch { /* silencia */ }
     finally { setLoading(false); }
   };
@@ -85,7 +85,15 @@ export default function DashboardPage() {
   );
 
   // ── cálculos ─────────────────────────────────────────────────────────────
-  const { resumo, rankingAcoes, rankingFIIs, oportunidades, riscos, rendaFixaLista, dividendosResumo } = dados;
+  const {
+    resumo = {},
+    rankingAcoes = [],
+    rankingFIIs = [],
+    oportunidades = [],
+    riscos = [],
+    rendaFixaLista = [],
+    dividendosResumo = null,
+  } = dados || {};
 
   const ganhoTotal   = (resumo.ganhoAcoes || 0) + (resumo.ganhoFIIs || 0);
   const totalInvest  = (resumo.patrimonioTotal || 0) - ganhoTotal;
