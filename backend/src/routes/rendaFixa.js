@@ -16,12 +16,16 @@ async function buscarTaxasBancoCentral() {
     const [resCdi, resSelic, resIpca] = await Promise.allSettled([
       axios.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.4389/dados/ultimos/1?formato=json', { timeout: 8000 }),  // CDI % a.a.
       axios.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json', { timeout: 8000 }),   // Selic % a.a.
-      axios.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.13522/dados/ultimos/1?formato=json', { timeout: 8000 }), // IPCA % a.m.
+      axios.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.433/dados/ultimos/12?formato=json', { timeout: 8000 }), // IPCA % a.m. (série 433)
     ]);
-    const cdi        = resCdi.status   === 'fulfilled' ? parseFloat(resCdi.value.data[0]?.valor   || 0) : taxasCache.cdi;   // já é % a.a.
-    const selic      = resSelic.status === 'fulfilled' ? parseFloat(resSelic.value.data[0]?.valor || 0) : taxasCache.selic;  // já é % a.a.
-    const ipcaMensal = resIpca.status  === 'fulfilled' ? parseFloat(resIpca.value.data[0]?.valor  || 0) : taxasCache.ipca;
-    const ipca       = parseFloat(((Math.pow(1 + ipcaMensal / 100, 12) - 1) * 100).toFixed(4));                             // converte a.m. → a.a.
+    const cdi  = resCdi.status   === 'fulfilled' ? parseFloat(resCdi.value.data[0]?.valor   || 0) : taxasCache.cdi;   // já é % a.a.
+    const selic = resSelic.status === 'fulfilled' ? parseFloat(resSelic.value.data[0]?.valor || 0) : taxasCache.selic;  // já é % a.a.
+    // IPCA: acumula 12 meses mensais → taxa anual equivalente
+    let ipca = taxasCache.ipca;
+    if (resIpca.status === 'fulfilled' && Array.isArray(resIpca.value.data) && resIpca.value.data.length > 0) {
+      const acum = resIpca.value.data.reduce((acc, d) => acc * (1 + parseFloat(d.valor || 0) / 100), 1);
+      ipca = parseFloat(((acum - 1) * 100).toFixed(4));
+    }
     taxasCache  = { cdi, selic, ipca, timestamp: agora };
   } catch(e) { console.error('[taxas BCB]', e.message); }
   return taxasCache;
