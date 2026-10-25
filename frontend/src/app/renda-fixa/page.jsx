@@ -3,13 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-// ââ UtilitÃ¡rios ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ── Utilitários ──────────────────────────────────────────────────────────────
 const fmt = (v, dec = 2) =>
   Number(v).toLocaleString('pt-BR', { minimumFractionDigits: dec, maximumFractionDigits: dec });
 const fmtR = (v) => `R$ ${fmt(v)}`;
 const fmtP = (v) => `${v >= 0 ? '+' : ''}${fmt(v)}%`;
 
-// ââ Componente principal âââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// ── Componente principal ─────────────────────────────────────────────────────
 export default function RendaFixa() {
   const router = useRouter();
 
@@ -36,7 +36,7 @@ export default function RendaFixa() {
   const [sugestoesFiltradas, setSugestoesFiltradas] = useState([]);
   const [salvando, setSalvando] = useState(false);
 
-  // ââ Buscar dados ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  // ── Buscar dados ────────────────────────────────────────────────────────────
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) { router.push('/login'); return; }
@@ -54,7 +54,7 @@ export default function RendaFixa() {
       .catch(() => { setErro('Erro ao carregar dados.'); setLoading(false); });
   }, []);
 
-  // ââ Derivados âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  // ── Derivados ───────────────────────────────────────────────────────────────
   const objetivosUnicos = ['Todos', ...new Set(investimentos.map(i => i.objetivo || 'Sem objetivo'))];
   const tiposUnicos = ['Todos', ...new Set(investimentos.map(i => i.tipo))];
 
@@ -68,7 +68,7 @@ export default function RendaFixa() {
       if (filtroVenc !== 'Todos') {
         const venc = new Date(i.data_vencimento);
         const dias = Math.ceil((venc - hoje) / 86400000);
-        if (filtroVenc === 'Este mÃªs' && dias > 30) return false;
+        if (filtroVenc === 'Este mês' && dias > 30) return false;
         if (filtroVenc === '90 dias' && dias > 90) return false;
         if (filtroVenc === 'Este ano' && venc.getFullYear() !== hoje.getFullYear()) return false;
       }
@@ -103,14 +103,14 @@ export default function RendaFixa() {
   const rendMedioMensal = rendMedioPct > 0 ? (Math.pow(1 + rendMedioPct / 100, 1 / 12) - 1) * 100 : 0;
   const rendTotalMensal = rendTotalPct > 0 ? (Math.pow(1 + rendTotalPct / 100, 1 / 12) - 1) * 100 : 0;
 
-  // PrÃ³ximo vencimento
+  // Próximo vencimento
   const proxVenc = [...investimentos].sort((a, b) =>
     new Date(a.data_vencimento) - new Date(b.data_vencimento)
   ).find(i => new Date(i.data_vencimento) > hoje);
   const diasProx = proxVenc
     ? Math.ceil((new Date(proxVenc.data_vencimento) - hoje) / 86400000) : null;
 
-  // SugestÃµes de objetivo
+  // Sugestões de objetivo
   const objetivosExistentes = [...new Set(investimentos.map(i => i.objetivo).filter(Boolean))];
   const mostrarSugestoes = (val) => {
     setSugestoesFiltradas(objetivosExistentes.filter(o =>
@@ -118,7 +118,7 @@ export default function RendaFixa() {
     ));
   };
 
-  // ââ Salvar novo investimento ââââââââââââââââââââââââââââââââââââââââââââââââ
+  // ── Salvar novo investimento ────────────────────────────────────────────────
   const salvar = async () => {
     setSalvando(true);
     const token = localStorage.getItem('token');
@@ -149,7 +149,7 @@ export default function RendaFixa() {
     }
   };
 
-  // ââ Editar investimento âââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  // ── Editar investimento ─────────────────────────────────────────────────────
   const [editando, setEditando] = useState(null); // objeto inv sendo editado
   const [showEditModal, setShowEditModal] = useState(false);
   const [salvandoEdit, setSalvandoEdit] = useState(false);
@@ -192,9 +192,9 @@ export default function RendaFixa() {
     }
   };
 
-  // ââ Excluir investimento ââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  // ── Excluir investimento ────────────────────────────────────────────────────
   const excluir = async (id, nome) => {
-    if (!confirm(`Excluir "${nome}"? Esta aÃ§Ã£o nÃ£o pode ser desfeita.`)) return;
+    if (!confirm(`Excluir "${nome}"? Esta ação não pode ser desfeita.`)) return;
     const token = localStorage.getItem('token');
     try {
       const res = await fetch(`/_/backend/api/renda-fixa/${id}`, {
@@ -207,7 +207,7 @@ export default function RendaFixa() {
     }
   };
 
-  // ââ Vender investimento âââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  // ── Vender investimento ─────────────────────────────────────────────────────
   const [vendendo, setVendendo] = useState(null); // { id, nome, valor_investido }
   const [showVendaModal, setShowVendaModal] = useState(false);
   const [valorVenda, setValorVenda] = useState('');
@@ -245,24 +245,24 @@ export default function RendaFixa() {
     }
   };
 
-  // ââ Cor por indexador âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  // ── Cor por indexador ───────────────────────────────────────────────────────
   const corIdx = { CDI: '#1a56db', Selic: '#0c9e6a', IPCA: '#7c3aed', Prefixado: '#d97706' };
   const corBadge = {
     LCA: 'badge-lca', LCI: 'badge-lci', CDB: 'badge-cdb',
-    'Tesouro Direto': 'badge-teso', DebÃªnture: 'badge-deb', Outro: 'badge-outro'
+    'Tesouro Direto': 'badge-teso', Debênture: 'badge-deb', Outro: 'badge-outro'
   };
 
-  // ââ Alerta vencimento âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  // ── Alerta vencimento ───────────────────────────────────────────────────────
   const alertaVenc = (inv) => {
     const dias = inv.diasParaVencer ?? Math.ceil((new Date(inv.data_vencimento) - hoje) / 86400000);
     if (dias <= 0) return { cls: 'alerta-vencido', txt: 'Vencido' };
-    if (dias <= 30) return { cls: 'alerta-critico', txt: `ð¨ Vence em ${dias} dias` };
-    if (dias <= 90) return { cls: 'alerta-atencao', txt: `â ï¸ Vence em ${dias} dias â planeje o reinvestimento` };
-    if (dias <= 180) return { cls: 'alerta-info', txt: `ð Vence em ${dias} dias` };
+    if (dias <= 30) return { cls: 'alerta-critico', txt: `🚨 Vence em ${dias} dias` };
+    if (dias <= 90) return { cls: 'alerta-atencao', txt: `⚠️ Vence em ${dias} dias — planeje o reinvestimento` };
+    if (dias <= 180) return { cls: 'alerta-info', txt: `📅 Vence em ${dias} dias` };
     return null;
   };
 
-  // ââ Render ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  // ── Render ──────────────────────────────────────────────────────────────────
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', color: 'var(--fg2)' }}>
       Carregando...
@@ -275,7 +275,7 @@ export default function RendaFixa() {
   return (
     <>
       <style>{`
-        /* ââ Tokens ââ */
+        /* ── Tokens ── */
         :root {
           --bg:#f0f2f5; --surface:#fff; --surface2:#f8f9fb; --border:#e2e6ed;
           --fg:#0f1923; --fg2:#5a6474; --fg3:#8e98a8;
@@ -450,10 +450,10 @@ export default function RendaFixa() {
           <h1>Renda <span>Fixa</span></h1>
           <div className="rf-header-right">
             <button className="btn-outline" onClick={() => setShowTimeline(v => !v)}>
-              ð Vencimentos
+              📅 Vencimentos
             </button>
             <button className="btn-primary" onClick={() => setShowModal(true)}>
-              + Novo LanÃ§amento
+              + Novo Lançamento
             </button>
           </div>
         </div>
@@ -480,30 +480,30 @@ export default function RendaFixa() {
           <div className="resumo-card">
             <div className="r-label">Total Investido</div>
             <div className="r-valor">{fmtR(totalInvestido)}</div>
-            <div className="r-sub">{investimentos.length} aplicaÃ§Ãµes</div>
+            <div className="r-sub">{investimentos.length} aplicações</div>
           </div>
           <div className="resumo-card">
             <div className="r-label">Valor Bruto Atual</div>
             <div className="r-valor" style={{ color: 'var(--green)' }}>{fmtR(totalBruto)}</div>
-            <div className="r-delta delta-pos">â² {fmtR(rendTotalR)} ({fmt(rendTotalPct)}%)</div>
+            <div className="r-delta delta-pos">▲ {fmtR(rendTotalR)} ({fmt(rendTotalPct)}%)</div>
           </div>
           <div className="resumo-card">
-            <div className="r-label">Valor LÃ­quido (IR)</div>
+            <div className="r-label">Valor Líquido (IR)</div>
             <div className="r-valor" style={{ color: 'var(--green)' }}>{fmtR(totalLiquido)}</div>
             <div className="r-sub">IR descontado: {fmtR(totalBruto - totalLiquido)}</div>
           </div>
           <div className="resumo-card">
-            <div className="r-label">Rendimento MÃ©dio</div>
+            <div className="r-label">Rendimento Médio</div>
             <div className="r-valor" style={{ color: 'var(--accent)' }}>{fmt(rendMedioPct)}% <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg2)' }}>a.a.</span></div>
-            <div className="r-sub" style={{ marginBottom: 2 }}>â {taxas.cdi > 0 ? fmt((rendMedioPct / taxas.cdi) * 100) : 'â'}% do CDI atual</div>
-            <div className="r-sub" style={{ color: 'var(--green)', fontWeight: 600 }}>â {fmt(rendMedioMensal, 2)}% a.m.</div>
+            <div className="r-sub" style={{ marginBottom: 2 }}>≈ {taxas.cdi > 0 ? fmt((rendMedioPct / taxas.cdi) * 100) : '–'}% do CDI atual</div>
+            <div className="r-sub" style={{ color: 'var(--green)', fontWeight: 600 }}>≈ {fmt(rendMedioMensal, 2)}% a.m.</div>
           </div>
           {proxVenc && (
             <div className="resumo-card venc-card">
-              <div className="r-label">PrÃ³ximo Vencimento</div>
+              <div className="r-label">Próximo Vencimento</div>
               <div className="r-valor">{proxVenc.nome}</div>
               <div className="r-sub">
-                {diasProx <= 90 ? 'â ï¸' : 'ð'} {diasProx} dias Â· {new Date(proxVenc.data_vencimento).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}
+                {diasProx <= 90 ? '⚠️' : '📅'} {diasProx} dias · {new Date(proxVenc.data_vencimento).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' })}
               </div>
             </div>
           )}
@@ -512,7 +512,7 @@ export default function RendaFixa() {
         {/* Timeline */}
         {showTimeline && (
           <div className="timeline-section">
-            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>ð Linha do Tempo â Vencimentos</div>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 14 }}>📅 Linha do Tempo — Vencimentos</div>
             {[...investimentos]
               .sort((a, b) => new Date(a.data_vencimento) - new Date(b.data_vencimento))
               .map(inv => {
@@ -529,14 +529,14 @@ export default function RendaFixa() {
                       <div className="tl-fill" style={{ width: `${pct}%`, background: cor }} />
                     </div>
                     <div className="tl-data">
-                      {new Date(inv.data_vencimento).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}
-                      {(inv.diasParaVencer ?? 999) <= 90 ? ' â ï¸' : ''}
+                                  {new Date(inv.data_vencimento).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' })}
+                      {(inv.diasParaVencer ?? 999) <= 90 ? ' ⚠️' : ''}
                     </div>
                   </div>
                 );
               })}
             <div style={{ fontSize: 11, color: 'var(--fg3)', marginTop: 8 }}>
-              A barra indica quanto do prazo total jÃ¡ transcorreu.
+              A barra indica quanto do prazo total já transcorreu.
             </div>
           </div>
         )}
@@ -569,16 +569,16 @@ export default function RendaFixa() {
           <div className="filtro-divider" />
           <span className="filtro-label">Vencimento</span>
           <div className="chip-group">
-            {['Todos', 'Este mÃªs', '90 dias', 'Este ano'].map(v => (
+            {['Todos', 'Este mês', '90 dias', 'Este ano'].map(v => (
               <div key={v} className={`chip${filtroVenc === v ? ' active' : ''}`}
                 onClick={() => setFiltroVenc(v)}>{v}</div>
             ))}
           </div>
           <select className="sort-sel" value={sortBy} onChange={e => setSortBy(e.target.value)}>
-            <option value="vencimento">Ordenar: Vencimento â</option>
+            <option value="vencimento">Ordenar: Vencimento ↑</option>
             <option value="rendimento">Ordenar: Maior rendimento</option>
             <option value="valor">Ordenar: Maior valor</option>
-            <option value="nome">Ordenar: Nome AâZ</option>
+            <option value="nome">Ordenar: Nome A–Z</option>
             <option value="cdi">Ordenar: % CDI</option>
           </select>
         </div>
@@ -598,16 +598,16 @@ export default function RendaFixa() {
             <div className="obj-section" key={objetivo}>
               <div className="obj-header">
                 <div className="obj-title">
-                  <div className="obj-icon">ð¯</div>
+                  <div className="obj-icon">🎯</div>
                   <div>
                     <h2>{objetivo}</h2>
-                    <span className="qtd">{itens.length} aplicaÃ§{itens.length === 1 ? 'Ã£o' : 'Ãµes'}</span>
+                    <span className="qtd">{itens.length} aplicaç{itens.length === 1 ? 'ão' : 'ões'}|/span>
                   </div>
                 </div>
                 <div className="obj-total">
                   <div className="t-label">Total atual</div>
                   <div className="t-valor">{fmtR(totObj)}</div>
-                  <div className="t-rend">+{fmtR(totObj - invObj)} Â· LÃ­q: {fmtR(liqObj)}</div>
+                  <div className="t-rend">+{fmtR(totObj - invObj)} · Líq: {fmtR(liqObj)}</div>
                 </div>
               </div>
 
@@ -624,23 +624,23 @@ export default function RendaFixa() {
                   const rendAnualInv = inv.taxaAnual || 0;
                   const rendMensalInv = rendAnualInv > 0 ? (Math.pow(1 + rendAnualInv / 100, 1 / 12) - 1) * 100 : 0;
 
-                  // Comparativo CDI com contexto de isenÃ§Ã£o IR
+                  // Comparativo CDI com contexto de isenção IR
                   let cdiComp = null;
                   if (inv.indexador === 'CDI' && taxas.cdi > 0) {
                     const taxaEfetiva = (inv.taxa / 100) * taxas.cdi;
                     const diff = taxaEfetiva - taxas.cdi;
                     if (diff >= 0) {
-                      cdiComp = <span className="cdi-badge cdi-acima">â² {fmt(diff, 1)}% acima do CDI</span>;
+                      cdiComp = <span className="cdi-badge cdi-acima">▲ {fmt(diff, 1)}% acima do CDI</span>;
                     } else if (inv.isento_ir) {
                       // Isento IR: compara com CDB equivalente (tabela regressiva ~15-20%)
-                      const aliquota = 0.175; // alÃ­quota mÃ©dia estimada
+                      const aliquota = 0.175; // alíquota média estimada
                       const cdiLiquido = taxas.cdi * (1 - aliquota);
                       const diffLiquido = taxaEfetiva - cdiLiquido;
                       cdiComp = diffLiquido >= 0
-                        ? <span className="cdi-badge cdi-acima">â Isento IR compensa Â· +{fmt(diffLiquido, 1)}% liq.</span>
-                        : <span className="cdi-badge cdi-abaixo">â¼ {fmt(Math.abs(diff), 1)}% abaixo do CDI</span>;
+                        ? <span className="cdi-badge cdi-acima">✓ Isento IR compensa · +{fmt(diffLiquido, 1)}% liq.</span>
+                        : <span className="cdi-badge cdi-abaixo">▼ {fmt(Math.abs(diff), 1)}% abaixo do CDI</span>;
                     } else {
-                      cdiComp = <span className="cdi-badge cdi-abaixo">â¼ {fmt(Math.abs(diff), 1)}% abaixo do CDI</span>;
+                      cdiComp = <span className="cdi-badge cdi-abaixo">▼ {fmt(Math.abs(diff), 1)}% abaixo do CDI</span>;
                     }
                   }
 
@@ -655,13 +655,13 @@ export default function RendaFixa() {
                         </div>
                       </div>
                       <div className="card-taxa">
-                        {inv.emissor} Â· {fmt(inv.taxa)}% {inv.indexador !== 'Prefixado' ? `do ${inv.indexador}` : 'a.a.'}
+                        {inv.emissor} · {fmt(inv.taxa)}% {inv.indexador !== 'Prefixado' ? `do ${inv.indexador}` : 'a.a.'}
                       </div>
                       {rendAnualInv > 0 && (
                         <div className="card-rend-row">
-                          <span className="rend-pill rend-aa">â {fmt(rendAnualInv)}% <span className="rend-period">a.a.</span></span>
-                          <span className="rend-sep">Â·</span>
-                          <span className="rend-pill rend-am">â {fmt(rendMensalInv, 2)}% <span className="rend-period">a.m.</span></span>
+                          <span className="rend-pill rend-aa">≈ {fmt(rendAnualInv)}% <span className="rend-period">a.a.</span></span>
+                          <span className="rend-sep">·</span>
+                          <span className="rend-pill rend-am">≈ {fmt(rendMensalInv, 2)}% <span className="rend-period">a.m.</span></span>
                         </div>
                       )}
                       <div className="card-row">
@@ -674,7 +674,7 @@ export default function RendaFixa() {
                       </div>
                       {!inv.isento_ir && (
                         <div className="card-row">
-                          <span className="ck">Valor lÃ­quido (IR {inv.aliquotaIR}%)</span>
+                          <span className="ck">Valor líquido (IR {inv.aliquotaIR}%)</span>
                           <span className="cv cv-green">{fmtR(inv.valorLiquido || inv.valor_investido)}</span>
                         </div>
                       )}
@@ -696,9 +696,9 @@ export default function RendaFixa() {
                         </div>
                       )}
                       <div className="card-acoes">
-                        <button className="btn-card-acao btn-editar" onClick={() => abrirEdit(inv)} title="Editar">âï¸ Editar</button>
-                        <button className="btn-card-acao btn-vender" onClick={() => abrirVenda(inv)} title="Registrar venda">ð° Vender</button>
-                        <button className="btn-card-acao btn-excluir" onClick={() => excluir(inv.id, inv.nome)} title="Excluir">ðï¸ Excluir</button>
+                        <button className="btn-card-acao btn-editar" onClick={() => abrirEdit(inv)} title="Editar">✏️ Editar</button>
+                        <button className="btn-card-acao btn-vender" onClick={() => abrirVenda(inv)} title="Registrar venda">💰 Vender</button>
+                        <button className="btn-card-acao btn-excluir" onClick={() => excluir(inv.id, inv.nome)} title="Excluir">🗑️ Excluir</button>
                       </div>
                     </div>
                   );
@@ -714,25 +714,25 @@ export default function RendaFixa() {
         <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
           <div className="modal">
             <div className="modal-head">
-              <h3>Novo LanÃ§amento de Renda Fixa</h3>
-              <button className="btn-close" onClick={() => setShowModal(false)}>â</button>
+              <h3>Novo Lançamento de Renda Fixa</h3>
+              <button className="btn-close" onClick={() => setShowModal(false)}>✕</button>
             </div>
             <div className="modal-body">
               <div className="form-sec" style={{ borderTop: 'none', paddingTop: 0 }}>
-                ð¯ Objetivo <span style={{ fontWeight: 400, color: 'var(--fg3)', textTransform: 'none', letterSpacing: 0 }}>(opcional)</span>
+                🎯 Objetivo <span style={{ fontWeight: 400, color: 'var(--fg3)', textTransform: 'none', letterSpacing: 0 }}>(opcional)</span>
               </div>
               <div className="form-grp">
-                <label>Para que Ã© esse investimento? <span style={{ color: 'var(--fg3)', fontWeight: 400 }}>â deixe em branco se nÃ£o houver</span></label>
+                <label>Para que é esse investimento? <span style={{ color: 'var(--fg3)', fontWeight: 400 }}>— deixe em branco se não houver</span></label>
                 <input
                   type="text"
                   value={form.objetivo}
-                  placeholder="Ex: Reserva de emergÃªncia, Futuro do filho..."
+                  placeholder="Ex: Reserva de emergência, Futuro do filho..."
                   onChange={e => { setForm(f => ({ ...f, objetivo: e.target.value })); mostrarSugestoes(e.target.value); }}
                   onFocus={() => mostrarSugestoes(form.objetivo)}
                 />
                 {sugestoesFiltradas.length > 0 && (
                   <div style={{ marginTop: 6 }}>
-                    <span className="form-hint" style={{ display: 'block', marginBottom: 5 }}>Objetivos jÃ¡ cadastrados:</span>
+                    <span className="form-hint" style={{ display: 'block', marginBottom: 5 }}>Objetivos já cadastrados:</span>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {sugestoesFiltradas.map(o => (
                         <div key={o} className="obj-chip"
@@ -743,10 +743,10 @@ export default function RendaFixa() {
                     </div>
                   </div>
                 )}
-                <span className="form-hint">ð¡ Sem objetivo, aparece em &quot;Sem objetivo&quot; na listagem.</span>
+                <span className="form-hint">💡 Sem objetivo, aparece em &quot;Sem objetivo&quot; na listagem.</span>
               </div>
 
-              <div className="form-sec">ð Dados do Investimento</div>
+              <div className="form-sec">📋 Dados do Investimento</div>
               <div className="form-grp">
                 <label>Nome / Apelido</label>
                 <input type="text" value={form.nome} placeholder="Ex: LCA Reserva Nov/28"
@@ -757,12 +757,12 @@ export default function RendaFixa() {
                   <label>Tipo</label>
                   <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))}>
                     <option>LCA</option><option>LCI</option><option>CDB</option>
-                    <option>Tesouro Direto</option><option>DebÃªnture</option><option>Outro</option>
+                    <option>Tesouro Direto</option><option>Debênture</option><option>Outro</option>
                   </select>
                 </div>
                 <div className="form-grp">
-                  <label>InstituiÃ§Ã£o</label>
-                  <input type="text" value={form.emissor} placeholder="Ex: XP, Nubank, ItaÃº..."
+                  <label>Instituição</label>
+                  <input type="text" value={form.emissor} placeholder="Ex: XP, Nubank, Itaú..."
                     onChange={e => setForm(f => ({ ...f, emissor: e.target.value }))} />
                 </div>
               </div>
@@ -791,13 +791,13 @@ export default function RendaFixa() {
                   <select value={form.isento_ir ? 'true' : 'false'}
                     onChange={e => setForm(f => ({ ...f, isento_ir: e.target.value === 'true' }))}>
                     <option value="true">Sim (LCA/LCI)</option>
-                    <option value="false">NÃ£o (CDB/outros)</option>
+                    <option value="false">Não (CDB/outros)</option>
                   </select>
                 </div>
               </div>
               <div className="form-row">
                 <div className="form-grp">
-                  <label>Data de AplicaÃ§Ã£o</label>
+                  <label>Data de Aplicação</label>
                   <input type="date" value={form.data_inicio}
                     onChange={e => setForm(f => ({ ...f, data_inicio: e.target.value }))} />
                 </div>
@@ -808,9 +808,9 @@ export default function RendaFixa() {
                 </div>
               </div>
 
-              <div className="form-sec">ð ObservaÃ§Ãµes <span style={{ fontWeight: 400, color: 'var(--fg3)', textTransform: 'none', letterSpacing: 0 }}>(opcional)</span></div>
+              <div className="form-sec">📝 Observações <span style={{ fontWeight: 400, color: 'var(--fg3)', textTransform: 'none', letterSpacing: 0 }}>(opcional)</span></div>
               <div className="form-grp">
-                <textarea placeholder="CondiÃ§Ãµes especiais, motivo da escolha..."
+                <textarea placeholder="Condições especiais, motivo da escolha..."
                   value={form.observacoes}
                   onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))} />
               </div>
@@ -818,7 +818,7 @@ export default function RendaFixa() {
             <div className="modal-foot">
               <button className="btn-cancel" onClick={() => setShowModal(false)}>Cancelar</button>
               <button className="btn-salvar" onClick={salvar} disabled={salvando}>
-                {salvando ? 'Salvando...' : 'Salvar LanÃ§amento'}
+                {salvando ? 'Salvando...' : 'Salvar Lançamento'}
               </button>
             </div>
           </div>
@@ -831,18 +831,18 @@ export default function RendaFixa() {
           <div className="modal">
             <div className="modal-head">
               <h3>Editar Investimento</h3>
-              <button className="btn-close" onClick={() => setShowEditModal(false)}>â</button>
+              <button className="btn-close" onClick={() => setShowEditModal(false)}>✕</button>
             </div>
             <div className="modal-body">
               <div className="form-grp">
-                <label>Nome / InstituiÃ§Ã£o</label>
+                <label>Nome / Instituição</label>
                 <input type="text" value={editando.nome} onChange={e => setEditando(f => ({...f, nome: e.target.value}))} />
               </div>
               <div className="form-row">
                 <div className="form-grp">
                   <label>Tipo</label>
                   <select value={editando.tipo} onChange={e => setEditando(f => ({...f, tipo: e.target.value}))}>
-                    {['LCA','LCI','CDB','Tesouro Direto','DebÃªnture','Outro'].map(t => <option key={t}>{t}</option>)}
+                    {['LCA','LCI','CDB','Tesouro Direto','Debênture','Outro'].map(t => <option key={t}>{t}</option>)}
                   </select>
                 </div>
                 <div className="form-grp">
@@ -864,7 +864,7 @@ export default function RendaFixa() {
               </div>
               <div className="form-row">
                 <div className="form-grp">
-                  <label>Data de InÃ­cio</label>
+                  <label>Data de Início</label>
                   <input type="date" value={editando.data_inicio} onChange={e => setEditando(f => ({...f, data_inicio: e.target.value}))} />
                 </div>
                 <div className="form-grp">
@@ -884,14 +884,14 @@ export default function RendaFixa() {
                 <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer'}}>
                   <input type="checkbox" checked={editando.isento_ir}
                     onChange={e => setEditando(f => ({...f, isento_ir: e.target.checked}))} />
-                  Isento de Imposto de Renda (LCI, LCA, CRI, CRA, PoupanÃ§a)
+                  Isento de Imposto de Renda (LCI, LCA, CRI, CRA, Poupança)
                 </label>
               </div>
             </div>
             <div className="modal-foot">
               <button className="btn-cancel" onClick={() => setShowEditModal(false)}>Cancelar</button>
               <button className="btn-salvar" onClick={salvarEdit} disabled={salvandoEdit}>
-                {salvandoEdit ? 'Salvando...' : 'Salvar AlteraÃ§Ãµes'}
+                {salvandoEdit ? 'Salvando...' : 'Salvar Alterações'}
               </button>
             </div>
           </div>
@@ -904,7 +904,7 @@ export default function RendaFixa() {
           <div className="modal" style={{maxWidth:400}}>
             <div className="modal-head">
               <h3>Registrar Venda</h3>
-              <button className="btn-close" onClick={() => setShowVendaModal(false)}>â</button>
+              <button className="btn-close" onClick={() => setShowVendaModal(false)}>✕</button>
             </div>
             <div className="modal-body">
               <p style={{color:'var(--fg2)',marginBottom:16}}>{vendendo.nome}</p>
@@ -921,8 +921,8 @@ export default function RendaFixa() {
                   placeholder="Ex: 5000.00" />
                 <span className="form-hint">
                   {parseFloat(valorVenda) >= parseFloat(vendendo.valor_investido)
-                    ? 'ð´ Venda total â o registro serÃ¡ removido'
-                    : `ð¡ Venda parcial â restarÃ¡ ${fmtR(parseFloat(vendendo.valor_investido) - (parseFloat(valorVenda)||0))}`}
+                    ? '🔴 Venda total — o registro será removido'
+                    : `🟡 Venda parcial — restará ${fmtR(parseFloat(vendendo.valor_investido) - (parseFloat(valorVenda)||0))}`}
                 </span>
               </div>
             </div>
