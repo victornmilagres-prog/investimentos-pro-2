@@ -697,7 +697,7 @@ export default function RendaFixa() {
                       )}
                       <div className="card-acoes">
                         <button className="btn-card-acao btn-editar" onClick={() => abrirEdit(inv)} title="Editar">✏️ Editar</button>
-                        <button className="btn-card-acao btn-vender" onClick={() => abrirVenda(inv)} title="Registrar venda">💰 Vender</button>
+                        <button className="btn-card-acao btn-vender" onClick={() => abrirVenda(inv)} title="Registrar venda">💰️ Vender</button>
                         <button className="btn-card-acao btn-excluir" onClick={() => excluir(inv.id, inv.nome)} title="Excluir">🗑️ Excluir</button>
                       </div>
                     </div>
