@@ -377,4 +377,45 @@ async function recalcularPesosFII(usuarioId) {
   }
 }
 
+// GET /api/fiis/:ticker/portfolio
+router.get('/:ticker/portfolio', async (req, res) => {
+  const ticker = req.params.ticker.toUpperCase();
+  try {
+    const axios = require('axios');
+    const BRAPI_BASE = process.env.BRAPI_BASE_URL || 'https://brapi.dev/api';
+    const TOKEN = process.env.BRAPI_TOKEN;
+
+    const [portfolioRes, propertiesRes] = await Promise.allSettled([
+      axios.get(`${BRAPI_BASE}/v2/fii/portfolio?symbols=${ticker}&token=${TOKEN}`, { timeout: 15000 }),
+      axios.get(`${BRAPI_BASE}/v2/fii/properties?symbols=${ticker}&token=${TOKEN}`, { timeout: 15000 }),
+    ]);
+
+    const portfolioData = portfolioRes.status === 'fulfilled' ? portfolioRes.value.data?.fiis?.[0] : null;
+    const propertiesData = propertiesRes.status === 'fulfilled' ? propertiesRes.value.data?.fiis?.[0] : null;
+
+    if (!portfolioData && !propertiesData) {
+      return res.status(404).json({ error: 'Portfólio não encontrado para este FII.' });
+    }
+
+    // Mesclar dados das duas fontes
+    const resultado = {
+      symbol: ticker,
+      referenceDate: portfolioData?.referenceDate || propertiesData?.referenceDate,
+      summary: portfolioData?.summary || {},
+      allocations: portfolioData?.allocations || [],
+      properties: portfolioData?.properties || propertiesData?.properties || [],
+      financialAssets: portfolioData?.financialAssets || [],
+      fundHoldings: portfolioData?.fundHoldings || [],
+      lands: portfolioData?.lands || [],
+      rights: portfolioData?.rights || [],
+      propertiesSummary: propertiesData?.summary || null,
+    };
+
+    res.json(resultado);
+  } catch (err) {
+    console.error('[fiis portfolio]', err.message);
+    res.status(500).json({ error: 'Erro ao buscar portfólio do FII.' });
+  }
+});
+
 module.exports = router;
