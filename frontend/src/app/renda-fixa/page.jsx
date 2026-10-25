@@ -716,27 +716,21 @@ export default function RendaFixa() {
                       const rendAnualInv = inv.taxaAnual || 0;
                       const rendMensalInv = rendAnualInv > 0 ? (Math.pow(1 + rendAnualInv / 100, 1 / 12) - 1) * 100 : 0;
 
-                      // Aliquota pelo PRAZO TOTAL (para equivalencia CDB no vencimento)
-                      const aliqPrazo = prazoTotalDias <= 180 ? 0.225 : prazoTotalDias <= 360 ? 0.20 : prazoTotalDias <= 720 ? 0.175 : 0.15;
-
                       // Aliquota ATUAL pelos dias corridos (para alerta IR e calculo de liquidez real)
                       const diasCorridos = inv.diasCorridos ?? corridoDias;
                       const aliqAtual = diasCorridos <= 180 ? 0.225 : diasCorridos <= 360 ? 0.20 : diasCorridos <= 720 ? 0.175 : 0.15;
 
-                      // Comparacao CDB: equivalencia no vencimento (usa aliq do prazo total)
-                      // Para LCA/LCI isenta: taxa real = taxa% * CDI (isenta)
-                      // CDB equivalente = taxa_efetiva_isenta / (1 - aliq_prazo)
-                      // "Vale a pena" quando o CDB equivalente >= 100% CDI
-                      // Equivale a: taxa% >= (1 - aliq_prazo) * 100
+                      // Comparacao CDB: sempre usa IR 22,5% (pior caso para o CDB = melhor caso para o LCA/LCI)
+                      // Responde: "esse LCA/LCI isento equivale a um CDB de X% CDI considerando IR 22,5%?"
                       let cdiComp = null;
                       if (inv.indexador === 'CDI' && taxas.cdi > 0) {
                         if (inv.isento_ir) {
-                          const equivCDB = inv.taxa / (1 - aliqPrazo);
+                          const equivCDB = inv.taxa / (1 - 0.225);
                           const valeApena = equivCDB >= 100;
                           if (valeApena) {
-                            cdiComp = <span className="cdi-badge cdi-acima">CDB equiv {fmt(equivCDB, 1)}% CDI - Vale a pena</span>;
+                            cdiComp = <span className="cdi-badge cdi-acima">= CDB {fmt(equivCDB, 1)}% CDI (IR 22,5%) - Vale a pena</span>;
                           } else {
-                            cdiComp = <span className="cdi-badge cdi-abaixo">CDB equiv {fmt(equivCDB, 1)}% CDI - Nao compensa</span>;
+                            cdiComp = <span className="cdi-badge cdi-abaixo">= CDB {fmt(equivCDB, 1)}% CDI (IR 22,5%) - Nao compensa</span>;
                           }
                         } else {
                           const taxaEfetiva = (inv.taxa / 100) * taxas.cdi;
