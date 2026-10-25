@@ -601,7 +601,7 @@ export default function RendaFixa() {
                   <div className="obj-icon">🎯</div>
                   <div>
                     <h2>{objetivo}</h2>
-                    <span className="qtd">{itens.length} aplicaç{itens.length === 1 ? 'ão' : 'ões'}|/span>
+                    <span className="qtd">{itens.length} aplicaç{itens.length === 1 ? 'ão' : 'ões'}</span>
                   </div>
                 </div>
                 <div className="obj-total">
