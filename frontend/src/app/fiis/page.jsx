@@ -440,11 +440,171 @@ function ModalDividendosFII({ fiis, onFechar, onSalvar }) {
   );
 }
 
+// ─── MODAL PORTFÓLIO FII ──────────────────────────────────────────────────
+function ModalPortfolio({ ticker, nomeFundo, onFechar }) {
+  const [dados, setDados] = useState(null);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get(`/fiis/${ticker}/portfolio`);
+        setDados(res.data);
+      } catch (e) {
+        setErro(e.response?.data?.error || 'Erro ao carregar portfólio.');
+      } finally {
+        setCarregando(false);
+      }
+    })();
+  }, [ticker]);
+
+  const fmtPct = v => v != null ? `${(v * 100).toFixed(2)}%` : '—';
+  const fmtBrl = v => v != null && v > 0 ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }) : '—';
+  const fmtArea = v => v != null && v > 0 ? `${v.toLocaleString('pt-BR')} m²` : '—';
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:'16px'}}>
+      <div style={{background:'#fff',borderRadius:16,width:'100%',maxWidth:640,maxHeight:'88vh',display:'flex',flexDirection:'column',overflow:'hidden',boxShadow:'0 20px 60px rgba(0,0,0,0.25)'}}>
+        {/* Header */}
+        <div style={{padding:'18px 22px',borderBottom:'1px solid #E8ECF0',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
+          <div>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <Building2 size={18} color="#2563EB"/>
+              <span style={{fontSize:17,fontWeight:700,color:'#1A1A2E'}}>Portfólio — {ticker}</span>
+            </div>
+            {nomeFundo && <p style={{fontSize:12,color:'#8896A8',marginTop:2}}>{nomeFundo}</p>}
+          </div>
+          <button onClick={onFechar} style={{background:'none',border:'none',cursor:'pointer',color:'#8896A8',padding:4}}><X size={20}/></button>
+        </div>
+
+        {/* Conteúdo */}
+        <div style={{flex:1,overflowY:'auto',padding:'18px 22px'}}>
+          {carregando && <p style={{textAlign:'center',color:'#8896A8',padding:'40px 0'}}>Carregando portfólio...</p>}
+          {erro && <p style={{textAlign:'center',color:'#DC2626',padding:'40px 0'}}>{erro}</p>}
+          {dados && !carregando && (
+            <div style={{display:'flex',flexDirection:'column',gap:18}}>
+              {/* Data de referência + summary */}
+              {dados.referenceDate && (
+                <p style={{fontSize:11,color:'#8896A8'}}>Referência: {dados.referenceDate} · Dados do último informe trimestral</p>
+              )}
+
+              {/* Alocações */}
+              {dados.allocations?.length > 0 && (
+                <div>
+                  <p style={{fontSize:12,fontWeight:700,color:'#1A1A2E',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:10}}>Alocação</p>
+                  <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                    {dados.allocations.map((a, i) => {
+                      const labels = { fii: 'FII', real_estate: 'Imóveis', fund_share: 'Cotas de Fundo', cash: 'Caixa', cri: 'CRI', lci: 'LCI' };
+                      const colors = { fii: { bg:'#EFF6FF', color:'#2563EB' }, real_estate: { bg:'#FEF3C7', color:'#92400E' }, fund_share: { bg:'#F3E8FF', color:'#7E22CE' }, cash: { bg:'#F0FDF4', color:'#16A34A' }, cri: { bg:'#FFF7ED', color:'#C2410C' }, lci: { bg:'#E0F2FE', color:'#0369A1' } };
+                      const c = colors[a.assetClass] || { bg:'#F1F5F9', color:'#475569' };
+                      return (
+                        <div key={i} style={{background:c.bg,borderRadius:10,padding:'8px 14px',textAlign:'center'}}>
+                          <p style={{fontSize:10,color:c.color,fontWeight:600,marginBottom:3}}>{labels[a.assetClass] || a.assetClass}</p>
+                          <p style={{fontSize:13,fontWeight:700,color:c.color}}>{a.count} {a.count === 1 ? 'ativo' : 'ativos'}</p>
+                          {a.value > 0 && <p style={{fontSize:10,color:c.color,opacity:0.8}}>{fmtBrl(a.value)}</p>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Imóveis */}
+              {dados.properties?.length > 0 && (
+                <div>
+                  <p style={{fontSize:12,fontWeight:700,color:'#1A1A2E',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:10}}>
+                    🏢 Imóveis ({dados.properties.length})
+                    {dados.propertiesSummary?.vacancyRate > 0 && (
+                      <span style={{fontSize:11,fontWeight:400,color:'#8896A8',marginLeft:8,textTransform:'none'}}>
+                        Vacância média: {fmtPct(dados.propertiesSummary.vacancyRate)}
+                      </span>
+                    )}
+                  </p>
+                  <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                    {dados.properties.map((p, i) => (
+                      <div key={i} style={{background:'#F8FAFC',border:'1px solid #E8ECF0',borderRadius:10,padding:'12px 14px'}}>
+                        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8,marginBottom:6}}>
+                          <div>
+                            <p style={{fontSize:13,fontWeight:600,color:'#1A1A2E',marginBottom:2}}>{p.name}</p>
+                            {p.address && <p style={{fontSize:11,color:'#8896A8'}}>{p.address}</p>}
+                          </div>
+                          {p.revenueShare > 0 && (
+                            <span style={{fontSize:12,fontWeight:700,color:'#2563EB',background:'#EFF6FF',padding:'3px 10px',borderRadius:20,whiteSpace:'nowrap',flexShrink:0}}>
+                              {fmtPct(p.revenueShare)} receita
+                            </span>
+                          )}
+                        </div>
+                        <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
+                          {p.area > 0 && <span style={{fontSize:11,color:'#64748B'}}>📐 {fmtArea(p.area)}</span>}
+                          {p.vacancyRate > 0 && <span style={{fontSize:11,color:'#D97706'}}>🔴 Vacância {fmtPct(p.vacancyRate)}</span>}
+                          {p.vacancyRate === 0 && p.area > 0 && <span style={{fontSize:11,color:'#16A34A'}}>✅ 100% alugado</span>}
+                          {p.propertyClass && <span style={{fontSize:11,color:'#8896A8'}}>{p.propertyClass}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Ativos financeiros */}
+              {dados.financialAssets?.length > 0 && (
+                <div>
+                  <p style={{fontSize:12,fontWeight:700,color:'#1A1A2E',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:10}}>
+                    📄 Ativos Financeiros ({dados.financialAssets.length})
+                  </p>
+                  <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                    {dados.financialAssets.slice(0,10).map((a, i) => (
+                      <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 12px',background:'#F8FAFC',borderRadius:8,gap:8}}>
+                        <div style={{flex:1,minWidth:0}}>
+                          <p style={{fontSize:12,fontWeight:500,color:'#1A1A2E',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.name || a.issuer || '—'}</p>
+                          {a.assetClass && <p style={{fontSize:10,color:'#8896A8',marginTop:1}}>{a.assetClass.toUpperCase()}</p>}
+                        </div>
+                        {a.value > 0 && <p style={{fontSize:12,fontWeight:600,color:'#2563EB',whiteSpace:'nowrap'}}>{fmtBrl(a.value)}</p>}
+                      </div>
+                    ))}
+                    {dados.financialAssets.length > 10 && (
+                      <p style={{fontSize:11,color:'#8896A8',textAlign:'center',padding:4}}>+ {dados.financialAssets.length - 10} ativos</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Cotas de fundos */}
+              {dados.fundHoldings?.length > 0 && (
+                <div>
+                  <p style={{fontSize:12,fontWeight:700,color:'#1A1A2E',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:10}}>
+                    🏛️ Cotas de Fundos ({dados.fundHoldings.length})
+                  </p>
+                  <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                    {dados.fundHoldings.map((h, i) => (
+                      <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 12px',background:'#F8FAFC',borderRadius:8,gap:8}}>
+                        <p style={{fontSize:12,fontWeight:500,color:'#1A1A2E'}}>{h.name || h.symbol || '—'}</p>
+                        {h.value > 0 && <p style={{fontSize:12,fontWeight:600,color:'#7E22CE'}}>{fmtBrl(h.value)}</p>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Sem dados */}
+              {!dados.properties?.length && !dados.financialAssets?.length && !dados.fundHoldings?.length && (
+                <p style={{textAlign:'center',color:'#8896A8',padding:'30px 0'}}>Sem dados de portfólio disponíveis para este FII.</p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── CARD FII ─────────────────────────────────────────────────────────────
 function FIICard({ f, onRemover, onSalvar, onAbrirDividendo, resumoAno, resumoGeral }) {
   const [editando, setEditando] = useState(false);
   const [qtd, setQtd]     = useState(String(f.quantidade ?? ''));
   const [preco, setPreco] = useState(String(f.preco_compra ?? ''));
+  const [verPortfolio, setVerPortfolio] = useState(false);
 
   const perf     = calcPerformance(f.preco_atual, f.preco_compra, f.quantidade);
   const maxScore = 4;
@@ -667,6 +827,10 @@ function FIICard({ f, onRemover, onSalvar, onAbrirDividendo, resumoAno, resumoGe
           </div>
         </div>
         <div style={{display:'flex',gap:6}}>
+          <button onClick={()=>setVerPortfolio(true)}
+            style={{padding:'4px 10px',borderRadius:5,fontSize:11,fontWeight:600,border:'none',cursor:'pointer',background:'#EFF6FF',color:'#2563EB'}}>
+            🏢 Portfólio
+          </button>
           <button onClick={onAbrirDividendo}
             style={{padding:'4px 10px',borderRadius:5,fontSize:11,fontWeight:600,border:'none',cursor:'pointer',background:'#FEFCBF',color:'#7B6213'}}>
             💰 Dividendo
@@ -675,6 +839,11 @@ function FIICard({ f, onRemover, onSalvar, onAbrirDividendo, resumoAno, resumoGe
           <button className="btn-icon" onClick={()=>onRemover(f.ticker)}>🗑️</button>
         </div>
       </div>
+
+      {/* Modal Portfólio */}
+      {verPortfolio && (
+        <ModalPortfolio ticker={f.ticker} nomeFundo={f.nome_fundo} onFechar={()=>setVerPortfolio(false)}/>
+      )}
     </div>
   );
 }
