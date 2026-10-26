@@ -244,17 +244,55 @@ export default function DashboardPage() {
           <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={dot('var(--warning)')} />Renda passiva recebida
           </p>
-          {/* estado vazio — sem dividendos importados */}
+
+          {/* Renda Fixa — rendimentos calculados */}
+          {rendaFixaLista.length > 0 && (() => {
+            const totalInvestido = rendaFixaLista.reduce((s, r) => s + parseFloat(r.valor_investido || 0), 0);
+            const totalRendBruto = rendaFixaLista.reduce((s, r) => s + parseFloat(r.rendBruto || 0), 0);
+            const totalRendLiq   = rendaFixaLista.reduce((s, r) => s + parseFloat(r.rendLiquido || 0), 0);
+            return (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--warning)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    📄 Renda Fixa
+                  </span>
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{rendaFixaLista.length} aplicações</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                  <div style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--bg-warning)', border: '1px solid var(--border)' }}>
+                    <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Rendimento bruto</p>
+                    <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--warning)' }}>{fmt.brl(totalRendBruto)}</p>
+                    <p style={{ fontSize: 10, color: 'var(--text-muted)' }}>sobre {fmt.brl(totalInvestido)}</p>
+                  </div>
+                  <div style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--bg-success)', border: '1px solid var(--border)' }}>
+                    <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Rendimento líquido</p>
+                    <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--success)' }}>{fmt.brl(totalRendLiq)}</p>
+                    <p style={{ fontSize: 10, color: 'var(--text-muted)' }}>após IR regressivo</p>
+                  </div>
+                </div>
+                {/* top 3 */}
+                {rendaFixaLista.slice(0, 3).map((r, i) => (
+                  <div key={r.id || i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: i < 2 ? '1px solid var(--border)' : 'none' }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-secondary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.nome || r.instituicao}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--success)', whiteSpace: 'nowrap' }}>+{fmt.brl(r.rendLiquido || 0)}</span>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{r.rendLiquidoPct ? `${Number(r.rendLiquidoPct).toFixed(1)}%` : ''}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* Aviso FIIs e Ações */}
           <div style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-            padding: '20px 12px', borderRadius: 8, border: '1.5px dashed var(--border)',
-            background: 'var(--bg)', textAlign: 'center',
+            padding: '10px 12px', borderRadius: 8,
+            border: '1.5px dashed var(--border)', background: 'var(--bg)',
+            fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6,
           }}>
-            <span style={{ fontSize: 28 }}>📥</span>
-            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>Sem dividendos lançados</p>
-            <p style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5, maxWidth: 200 }}>
-              Acesse <strong>FIIs → ⬆ Importar B3</strong> para carregar seu extrato e ver a renda real aqui.
+            <p style={{ fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>
+              📥 Para relatório completo, adicione:
             </p>
+            <p>• <strong>Dividendos de FIIs</strong> — Acesse <strong>FIIs → Importar B3</strong></p>
+            <p>• <strong>Dividendos de Ações</strong> — registre em <strong>Ações → Dividendos</strong></p>
           </div>
         </div>
 
