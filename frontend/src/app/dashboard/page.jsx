@@ -67,7 +67,23 @@ export default function DashboardPage() {
     } finally { setAtualizando(false); }
   };
 
-  useEffect(() => { carregar(); }, []);
+  useEffect(() => {
+    carregar();
+
+    // Auto-refresh a cada 15 min durante o pregão (10h–17h, seg–sex)
+    const intervalo = setInterval(() => {
+      const agora = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+      const hora      = agora.getHours();
+      const diaSemana = agora.getDay(); // 0=dom … 6=sab
+      const diaUtil   = diaSemana >= 1 && diaSemana <= 5;
+      const pregaoAberto = hora >= 10 && hora < 17;
+      if (diaUtil && pregaoAberto) {
+        carregar();
+      }
+    }, 15 * 60 * 1000); // 15 minutos
+
+    return () => clearInterval(intervalo);
+  }, []);
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 260 }}>
