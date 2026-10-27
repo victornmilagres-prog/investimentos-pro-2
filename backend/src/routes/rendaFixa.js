@@ -7,11 +7,13 @@ const router = express.Router();
 router.use(auth);
 
 // ─── Cache das taxas do Banco Central ─────────────────────────────────────
-let taxasCache = { cdi: 0, selic: 0, ipca: 0, timestamp: 0 };
+// Fallback com taxas aproximadas caso a API do BCB não responda
+const TAXAS_FALLBACK = { cdi: 13.65, selic: 13.75, ipca: 4.83 };
+let taxasCache = { ...TAXAS_FALLBACK, timestamp: 0 };
 
 async function buscarTaxasBancoCentral() {
   const agora = Date.now();
-  if (taxasCache.cdi > 0 && agora - taxasCache.timestamp < 3600000) return taxasCache;
+  if (taxasCache.timestamp > 0 && agora - taxasCache.timestamp < 3600000) return taxasCache;
   try {
     const [resCdi, resSelic, resIpca] = await Promise.allSettled([
       axios.get('https://api.bcb.gov.br/dados/serie/bcdata.sgs.4389/dados/ultimos/1?formato=json', { timeout: 8000 }),  // CDI % a.a.
