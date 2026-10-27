@@ -15,6 +15,7 @@ const planejamentoRoutes = require('./routes/planejamento');
 const dashboardRoutes = require('./routes/dashboard');
 const notificacoesRoutes = require('./routes/notificacoes');
 const outrosAtivosRoutes = require('./routes/outros-ativos');
+const { iniciarCron }    = require('./services/cronService');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -161,6 +162,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Investimentos Pro 2.0 rodando na porta ${PORT}`);
+  iniciarCron();
 });
 
 module.exports = app;
