@@ -137,6 +137,12 @@ router.post('/', async (req, res) => {
     `, [req.userId, nome, tipo, indexador, parseFloat(taxa), parseFloat(valor_investido), data_inicio, data_vencimento,
         emissor || null, liquidez || 'Vencimento', isento_ir || false, observacoes || null]);
     const taxas = await buscarTaxasBancoCentral();
+    // Histórico
+    await pool.query(
+      `INSERT INTO historico_operacoes (usuario_id, categoria, ticker, tipo, total, observacao, data_operacao)
+       VALUES ($1,'renda_fixa',$2,'aplicacao',$3,$4,$5)`,
+      [req.userId, nome.substring(0, 50), parseFloat(valor_investido), `${tipo} ${indexador} ${taxa}%`, data_inicio]
+    ).catch(e => console.error('[hist rf aplicacao]', e.message));
     res.status(201).json({ ...result.rows[0], ...calcularRendimento(result.rows[0], taxas) });
   } catch (err) {
     console.error('[renda-fixa POST]', err);
@@ -186,6 +192,12 @@ router.post('/:id/vender', async (req, res) => {
     if (!inv.rows.length) return res.status(404).json({ error: 'Investimento não encontrado.' });
     const item = inv.rows[0];
     const novoValor = parseFloat(item.valor_investido) - parseFloat(valor_venda);
+    // Histórico
+    await pool.query(
+      `INSERT INTO historico_operacoes (usuario_id, categoria, ticker, tipo, total, data_operacao)
+       VALUES ($1,'renda_fixa',$2,'resgate',$3,$4)`,
+      [req.userId, item.nome.substring(0, 50), parseFloat(valor_venda), data_venda || new Date().toISOString().slice(0, 10)]
+    ).catch(e => console.error('[hist rf resgate]', e.message));
     if (novoValor <= 0.01) {
       // Venda total: remove o registro
       await pool.query('DELETE FROM renda_fixa WHERE id=$1 AND usuario_id=$2', [req.params.id, req.userId]);
