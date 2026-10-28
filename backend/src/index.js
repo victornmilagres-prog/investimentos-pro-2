@@ -15,6 +15,7 @@ const planejamentoRoutes = require('./routes/planejamento');
 const dashboardRoutes = require('./routes/dashboard');
 const notificacoesRoutes = require('./routes/notificacoes');
 const outrosAtivosRoutes = require('./routes/outros-ativos');
+const historicoRoutes    = require('./routes/historico');
 const { iniciarCron }    = require('./services/cronService');
 
 const app = express();
@@ -116,6 +117,24 @@ async function runMigrations() {
       )
     `);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_outros_ativos_usuario ON outros_ativos(usuario_id)`);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS historico_operacoes (
+        id              SERIAL PRIMARY KEY,
+        usuario_id      INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+        categoria       VARCHAR(20) NOT NULL,
+        ticker          VARCHAR(50) NOT NULL,
+        tipo            VARCHAR(20) NOT NULL,
+        quantidade      NUMERIC(20,8),
+        preco_unitario  NUMERIC(14,4),
+        total           NUMERIC(14,2) NOT NULL,
+        resultado       NUMERIC(14,2),
+        observacao      TEXT,
+        data_operacao   DATE NOT NULL DEFAULT CURRENT_DATE,
+        created_at      TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_historico_usuario ON historico_operacoes(usuario_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_historico_usuario_data ON historico_operacoes(usuario_id, data_operacao DESC)`);
     console.log('Migrations OK');
   } catch (err) {
     console.error('Migration error:', err.message);
@@ -151,6 +170,7 @@ app.use('/api/planejamento', planejamentoRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notificacoes', notificacoesRoutes);
 app.use('/api/outros-ativos', outrosAtivosRoutes);
+app.use('/api/historico', historicoRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
