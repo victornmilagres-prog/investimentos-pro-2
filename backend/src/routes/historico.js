@@ -202,33 +202,41 @@ router.post('/importar-b3', upload.single('arquivo'), async (req, res) => {
 
     if (!rows.length) return res.status(400).json({ error: 'Planilha vazia ou formato não reconhecido.' });
 
+    // Normaliza string removendo acentos para comparação robusta
+    const norm = (s) => (s || '').toString().normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+
     // Detecta nomes das colunas (B3 pode variar ligeiramente)
     const firstRow = rows[0];
     const keys = Object.keys(firstRow);
-    const col = (patterns) => keys.find(k => patterns.some(p => k.toLowerCase().includes(p.toLowerCase()))) || null;
+    console.log('[importar-b3] colunas detectadas:', keys);
+    const col = (patterns) => keys.find(k => patterns.some(p => norm(k).includes(norm(p)))) || null;
 
     const COL_DATA        = col(['Data']);
-    const COL_MOV         = col(['Movimentação', 'Movimentacao', 'Tipo']);
+    const COL_MOV         = col(['Movimentacao', 'Movimentação', 'Tipo', 'Moviment']);
     const COL_PRODUTO     = col(['Produto']);
-    const COL_ENTRADA_SAIDA = col(['Entrada', 'Saída', 'Saida']);
-    const COL_QTD         = col(['Quantidade']);
-    const COL_PRECO       = col(['Preço unitário', 'Preco unitario', 'Preço Unitário']);
-    const COL_VALOR       = col(['Valor da Operação', 'Valor da Operacao', 'Valor']);
+    const COL_ENTRADA_SAIDA = col(['Entrada', 'Saida', 'Saída']);
+    const COL_QTD         = col(['Quantidade', 'Qtd']);
+    const COL_PRECO       = col(['Preco unitario', 'Preço unitário', 'Preco Unit', 'Preco']);
+    const COL_VALOR       = col(['Valor da Operacao', 'Valor da Operação', 'Valor Operacao', 'Valor']);
+
+    console.log('[importar-b3] mapeamento:', { COL_DATA, COL_MOV, COL_PRODUTO, COL_QTD, COL_PRECO, COL_VALOR });
 
     if (!COL_PRODUTO || !COL_VALOR) {
-      return res.status(400).json({ error: 'Formato não reconhecido. Certifique-se de exportar a planilha de Movimentação da B3.' });
+      return res.status(400).json({
+        error: `Formato não reconhecido. Colunas encontradas: ${keys.join(', ')}. Certifique-se de exportar a planilha de Movimentação da B3.`
+      });
     }
 
     // Tipos de movimentação que interessam
-    const TIPOS_INTERESSE = ['rendimento', 'dividendo', 'juros sobre capital', 'jcp', 'amortização', 'amortizacao', 'provento'];
+    const TIPOS_INTERESSE = ['rendimento', 'dividendo', 'juros sobre capital', 'jcp', 'amortizacao', 'amortização', 'provento'];
 
     let inseridos = 0;
     let ignorados = 0;
     const erros = [];
 
     for (const row of rows) {
-      const movStr = (row[COL_MOV] || '').toString().toLowerCase().trim();
-      if (!TIPOS_INTERESSE.some(t => movStr.includes(t))) {
+      const movStr = norm(row[COL_MOV] || '');
+      if (!COL_MOV || !TIPOS_INTERESSE.some(t => movStr.includes(norm(t)))) {
         ignorados++;
         continue;
       }
