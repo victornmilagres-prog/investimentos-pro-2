@@ -90,4 +90,101 @@ router.post('/', async (req, res) => {
   }
 });
 
+// POST /api/historico/migrar — popula histórico retroativo com dados existentes
+router.post('/migrar', async (req, res) => {
+  try {
+    let inseridos = 0;
+
+    // 1. Ações (acoes_carteira)
+    const acoes = await pool.query(
+      `SELECT ticker, quantidade, preco_medio, quantidade * preco_medio AS total
+       FROM acoes_carteira WHERE usuario_id=$1 AND quantidade > 0`,
+      [req.userId]
+    );
+    for (const row of acoes.rows) {
+      // Só insere se ainda não existe entrada de compra para este ticker (evita duplicar)
+      const exists = await pool.query(
+        `SELECT 1 FROM historico_operacoes WHERE usuario_id=$1 AND ticker=$2 AND tipo='compra' AND categoria='acao' LIMIT 1`,
+        [req.userId, row.ticker]
+      );
+      if (exists.rows.length === 0) {
+        await pool.query(
+          `INSERT INTO historico_operacoes (usuario_id,categoria,ticker,tipo,quantidade,preco_unitario,total,observacao,data_operacao)
+           VALUES ($1,'acao',$2,'compra',$3,$4,$5,'Migrado do portfólio existente',CURRENT_DATE)`,
+          [req.userId, row.ticker, parseFloat(row.quantidade), parseFloat(row.preco_medio), parseFloat(row.total)]
+        );
+        inseridos++;
+      }
+    }
+
+    // 2. FIIs (fiis_carteira)
+    const fiis = await pool.query(
+      `SELECT ticker, quantidade, preco_medio, quantidade * preco_medio AS total
+       FROM fiis_carteira WHERE usuario_id=$1 AND quantidade > 0`,
+      [req.userId]
+    );
+    for (const row of fiis.rows) {
+      const exists = await pool.query(
+        `SELECT 1 FROM historico_operacoes WHERE usuario_id=$1 AND ticker=$2 AND tipo='compra' AND categoria='fii' LIMIT 1`,
+        [req.userId, row.ticker]
+      );
+      if (exists.rows.length === 0) {
+        await pool.query(
+          `INSERT INTO historico_operacoes (usuario_id,categoria,ticker,tipo,quantidade,preco_unitario,total,observacao,data_operacao)
+           VALUES ($1,'fii',$2,'compra',$3,$4,$5,'Migrado do portfólio existente',CURRENT_DATE)`,
+          [req.userId, row.ticker, parseFloat(row.quantidade), parseFloat(row.preco_medio), parseFloat(row.total)]
+        );
+        inseridos++;
+      }
+    }
+
+    // 3. Renda Fixa (renda_fixa)
+    const rf = await pool.query(
+      `SELECT nome, valor_investido, data_inicio FROM renda_fixa WHERE usuario_id=$1`,
+      [req.userId]
+    );
+    for (const row of rf.rows) {
+      const ticker = (row.nome || '').substring(0, 50);
+      const exists = await pool.query(
+        `SELECT 1 FROM historico_operacoes WHERE usuario_id=$1 AND ticker=$2 AND tipo='aplicacao' AND categoria='renda_fixa' LIMIT 1`,
+        [req.userId, ticker]
+      );
+      if (exists.rows.length === 0) {
+        await pool.query(
+          `INSERT INTO historico_operacoes (usuario_id,categoria,ticker,tipo,total,observacao,data_operacao)
+           VALUES ($1,'renda_fixa',$2,'aplicacao',$3,'Migrado do portfólio existente',$4)`,
+          [req.userId, ticker, parseFloat(row.valor_investido), row.data_inicio || new Date().toISOString().slice(0,10)]
+        );
+        inseridos++;
+      }
+    }
+
+    // 4. Outros ativos (outros_ativos)
+    const outros = await pool.query(
+      `SELECT ticker, quantidade, preco_compra, tipo, quantidade * preco_compra AS total
+       FROM outros_ativos WHERE usuario_id=$1`,
+      [req.userId]
+    );
+    for (const row of outros.rows) {
+      const exists = await pool.query(
+        `SELECT 1 FROM historico_operacoes WHERE usuario_id=$1 AND ticker=$2 AND tipo='compra' AND categoria='outros' LIMIT 1`,
+        [req.userId, row.ticker]
+      );
+      if (exists.rows.length === 0) {
+        await pool.query(
+          `INSERT INTO historico_operacoes (usuario_id,categoria,ticker,tipo,quantidade,preco_unitario,total,observacao,data_operacao)
+           VALUES ($1,'outros',$2,'compra',$3,$4,$5,$6,CURRENT_DATE)`,
+          [req.userId, row.ticker, parseFloat(row.quantidade), parseFloat(row.preco_compra), parseFloat(row.total), `Migrado — ${row.tipo || 'ativo'}`]
+        );
+        inseridos++;
+      }
+    }
+
+    res.json({ ok: true, inseridos, mensagem: `${inseridos} operação(ões) migrada(s) com sucesso.` });
+  } catch (err) {
+    console.error('[historico migrar]', err);
+    res.status(500).json({ error: 'Erro ao migrar histórico.' });
+  }
+});
+
 module.exports = router;
