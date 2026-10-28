@@ -181,6 +181,13 @@ router.post('/comprar', async (req, res) => {
       'UPDATE fiis_carteira SET quantidade=$1, preco_compra=$2, updated_at=NOW() WHERE usuario_id=$3 AND ticker=$4',
       [novaQtd, parseFloat(novoPM.toFixed(4)), req.userId, ticker.toUpperCase()]
     );
+    // Histórico
+    const totalCompra = Number(quantidade) * Number(preco);
+    await pool.query(
+      `INSERT INTO historico_operacoes (usuario_id, categoria, ticker, tipo, quantidade, preco_unitario, total, data_operacao)
+       VALUES ($1,'fii',$2,'compra',$3,$4,$5,CURRENT_DATE)`,
+      [req.userId, ticker.toUpperCase(), Number(quantidade), Number(preco), parseFloat(totalCompra.toFixed(2))]
+    ).catch(e => console.error('[hist fii compra]', e.message));
     res.json({ message: 'Compra registrada.', novaQtd, novoPM });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao registrar compra.' });
@@ -198,10 +205,25 @@ router.post('/vender', async (req, res) => {
     );
     if (!atual.rows.length) return res.status(404).json({ error: 'FII não encontrado na carteira.' });
     const novaQtd = Math.max(0, Number(atual.rows[0].quantidade) - Number(quantidade));
+    // Busca PM para calcular resultado
+    const fiiInfo = await pool.query(
+      'SELECT preco_atual, preco_compra FROM fiis_carteira WHERE usuario_id=$1 AND ticker=$2',
+      [req.userId, ticker.toUpperCase()]
+    );
+    const precoAtual = Number(fiiInfo.rows[0]?.preco_atual || 0);
+    const pmVenda    = Number(fiiInfo.rows[0]?.preco_compra || 0);
+    const resultadoVenda = precoAtual > 0 ? parseFloat(((precoAtual - pmVenda) * Number(quantidade)).toFixed(2)) : null;
+    const totalVenda = parseFloat((precoAtual * Number(quantidade)).toFixed(2));
     await pool.query(
       'UPDATE fiis_carteira SET quantidade=$1, updated_at=NOW() WHERE usuario_id=$2 AND ticker=$3',
       [novaQtd, req.userId, ticker.toUpperCase()]
     );
+    // Histórico
+    await pool.query(
+      `INSERT INTO historico_operacoes (usuario_id, categoria, ticker, tipo, quantidade, preco_unitario, total, resultado, data_operacao)
+       VALUES ($1,'fii',$2,'venda',$3,$4,$5,$6,CURRENT_DATE)`,
+      [req.userId, ticker.toUpperCase(), Number(quantidade), precoAtual || null, totalVenda, resultadoVenda]
+    ).catch(e => console.error('[hist fii venda]', e.message));
     res.json({ message: 'Venda registrada.', novaQtd });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao registrar venda.' });
@@ -232,6 +254,20 @@ router.post('/dividendos', async (req, res) => {
     for (const ticker of tickers) {
       await recalcularDividendosAno(req.userId, ticker, anoAtual);
       await recalcularDividendosGeral(req.userId, ticker);
+    }
+    // Histórico — um registro por lançamento
+    for (const lanc of lancamentos) {
+      const { ticker, tipo_dividendo = 'Rendimento', valor_por_cota, quantidade, valor_total_override, mes, ano } = lanc;
+      if (!ticker || !valor_por_cota || !mes || !ano) continue;
+      const valorTotal = valor_total_override != null
+        ? Number(valor_total_override)
+        : Number(valor_por_cota) * Number(quantidade || 0);
+      const dataOp = `${ano}-${String(mes).padStart(2, '0')}-01`;
+      await pool.query(
+        `INSERT INTO historico_operacoes (usuario_id, categoria, ticker, tipo, quantidade, preco_unitario, total, observacao, data_operacao)
+         VALUES ($1,'fii',$2,'dividendo',$3,$4,$5,$6,$7)`,
+        [req.userId, ticker.toUpperCase(), Number(quantidade || 0), Number(valor_por_cota), parseFloat(valorTotal.toFixed(2)), tipo_dividendo, dataOp]
+      ).catch(e => console.error('[hist fii div]', e.message));
     }
     res.json({ message: 'Dividendos lançados com sucesso.' });
   } catch (err) {
