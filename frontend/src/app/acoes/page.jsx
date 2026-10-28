@@ -308,8 +308,8 @@ function ModalCompraVenda({ acoes, tipo, onFechar, onSalvar }) {
   const [erro, setErro]     = useState('');
 
   const acao     = acoes.find(a => a.ticker === ticker);
-  const qtdAtual = acao?.quantidade || 0;
-  const pmAtual  = acao?.preco_compra || 0;
+  const qtdAtual = parseFloat(acao?.quantidade || 0);
+  const pmAtual  = parseFloat(acao?.preco_compra || 0);
   const novoQtd  = tipo === 'comprar' ? qtdAtual + Number(qtd||0) : Math.max(0, qtdAtual - Number(qtd||0));
   const novoPM   = tipo === 'comprar' && qtdAtual > 0 && Number(qtd) > 0 && Number(preco) > 0
     ? ((qtdAtual*pmAtual)+(Number(qtd)*Number(preco)))/novoQtd
@@ -974,13 +974,13 @@ export default function AcoesPage() {
   const salvarOperacao = async ({ ticker, tipo, quantidade, preco }) => {
     const acao = acoes.find(a => a.ticker === ticker);
     if (tipo === 'comprar') {
-      const qtdAtual = acao?.quantidade || 0;
-      const pmAtual  = acao?.preco_compra || 0;
+      const qtdAtual = parseFloat(acao?.quantidade || 0);
+      const pmAtual  = parseFloat(acao?.preco_compra || 0);
       const novaQtd  = qtdAtual + quantidade;
       const novoPM   = qtdAtual > 0 ? ((qtdAtual*pmAtual)+(quantidade*preco))/novaQtd : preco;
       await api.put(`/acoes/${ticker}`, { quantidade: novaQtd, preco_compra: parseFloat(novoPM.toFixed(4)) });
     } else {
-      const novaQtd = Math.max(0, (acao?.quantidade||0) - quantidade);
+      const novaQtd = Math.max(0, parseFloat(acao?.quantidade||0) - quantidade);
       await api.put(`/acoes/${ticker}`, { quantidade: novaQtd });
     }
     await carregar();
