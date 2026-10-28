@@ -11,16 +11,34 @@ import api from '@/lib/api';
 const AuthContext = createContext(null);
 export const useAuth = () => useContext(AuthContext);
 
-const NAV = [
-  { href: '/planejamento', label: 'Planejamento Patrimonial', icon: Target },
-  { href: '/dashboard',    label: 'Dashboard',                icon: LayoutDashboard },
-  { href: '/acoes',        label: 'Carteira Ações',           icon: TrendingUp },
-  { href: '/fiis',         label: 'Carteira FII',             icon: Building2 },
-  { href: '/renda-fixa',    label: 'Carteira Renda Fixa',      icon: Landmark },
-  { href: '/outros-ativos', label: 'Outros Ativos',           icon: Globe },
-  { href: '/watchlist',    label: 'No Radar',                 icon: Eye },
-  { href: '/historico',   label: 'Histórico',                icon: History },
+const NAV_GROUPS = [
+  {
+    label: 'PRINCIPAL',
+    items: [
+      { href: '/planejamento', label: 'Planejamento', icon: Target,        color: '#7C3AED' },
+      { href: '/dashboard',    label: 'Dashboard',    icon: LayoutDashboard, color: '#F59E0B' },
+    ],
+  },
+  {
+    label: 'CARTEIRAS',
+    items: [
+      { href: '/acoes',        label: 'Carteira Ações',    icon: TrendingUp, color: '#2563EB' },
+      { href: '/fiis',         label: 'Carteira FII',      icon: Building2,  color: '#16A34A' },
+      { href: '/renda-fixa',   label: 'Renda Fixa',        icon: Landmark,   color: '#D97706' },
+      { href: '/outros-ativos',label: 'Outros Ativos',     icon: Globe,      color: '#0891B2' },
+    ],
+  },
+  {
+    label: 'FERRAMENTAS',
+    items: [
+      { href: '/historico',  label: 'Histórico', icon: History, color: '#64748B' },
+      { href: '/watchlist',  label: 'No Radar',  icon: Eye,     color: '#64748B' },
+    ],
+  },
 ];
+
+// flat list for topbar title lookup
+const NAV = NAV_GROUPS.flatMap(g => g.items);
 
 const BOTTOM_NAV = [
   { href: '/dashboard',  label: 'Dashboard',   icon: LayoutDashboard },
@@ -141,29 +159,50 @@ export default function RootLayout({ children }) {
 
                 {/* Nav */}
                 <nav style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
-                  {NAV.map(({ href, label, icon: Icon }) => {
-                    const active = pathname === href || pathname.startsWith(href + '/');
-                    return (
-                      <a key={href} href={href} style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 10,
-                        padding: '9px 12px',
-                        borderRadius: 8,
-                        marginBottom: 2,
-                        fontSize: 13,
-                        fontWeight: 500,
-                        textDecoration: 'none',
-                        borderLeft: `2px solid ${active ? '#C9A84C' : 'transparent'}`,
-                        background: active ? 'rgba(201,168,76,0.08)' : 'transparent',
-                        color: active ? '#C9A84C' : '#8896A8',
-                        transition: 'all 0.15s',
-                      }}>
-                        <Icon size={18} style={{ flexShrink: 0 }}/>
-                        {sidebarOpen && <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>}
-                      </a>
-                    );
-                  })}
+                  {NAV_GROUPS.map((group, gi) => (
+                    <div key={group.label} style={{ marginBottom: 4 }}>
+                      {/* Group label */}
+                      {sidebarOpen && (
+                        <p style={{
+                          fontSize: 10, fontWeight: 700, letterSpacing: '1px',
+                          color: '#B0BAC7', padding: '8px 12px 4px',
+                          margin: gi === 0 ? '0 0 2px' : '8px 0 2px',
+                        }}>{group.label}</p>
+                      )}
+                      {!sidebarOpen && gi > 0 && (
+                        <div style={{ height: 1, background: '#E8ECF0', margin: '8px 6px 6px' }}/>
+                      )}
+                      {group.items.map(({ href, label, icon: Icon, color }) => {
+                        const active = pathname === href || pathname.startsWith(href + '/');
+                        return (
+                          <a key={href} href={href} style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            padding: '8px 10px',
+                            borderRadius: 8,
+                            marginBottom: 1,
+                            fontSize: 13,
+                            fontWeight: 500,
+                            textDecoration: 'none',
+                            background: active ? `${color}18` : 'transparent',
+                            color: active ? color : '#6B7280',
+                            transition: 'all 0.15s',
+                          }}>
+                            <div style={{
+                              width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+                              background: active ? `${color}22` : '#F3F4F6',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              transition: 'all 0.15s',
+                            }}>
+                              <Icon size={15} color={active ? color : '#9CA3AF'}/>
+                            </div>
+                            {sidebarOpen && <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>}
+                          </a>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </nav>
 
                 {/* Footer */}
