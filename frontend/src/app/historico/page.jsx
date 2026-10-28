@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { History, TrendingUp, TrendingDown, DollarSign, RefreshCw, Search, Filter, ChevronDown } from 'lucide-react';
+import { History, TrendingUp, TrendingDown, DollarSign, RefreshCw, Search, Database } from 'lucide-react';
 import api from '@/lib/api';
 
 const CATEGORIAS = [
@@ -63,6 +63,7 @@ export default function HistoricoPage() {
   const [periodo, setPeriodo]     = useState('tudo');
   const [busca, setBusca]         = useState('');
   const [buscaInput, setBuscaInput] = useState('');
+  const [migrando, setMigrando]     = useState(false);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -100,6 +101,20 @@ export default function HistoricoPage() {
     setBusca(buscaInput.trim().toUpperCase());
   };
 
+  const migrar = async () => {
+    if (!confirm('Importar operações existentes das carteiras para o histórico?\n\nIsso só adiciona registros novos — não duplica os que já existem.')) return;
+    setMigrando(true);
+    try {
+      const r = await api.post('/historico/migrar');
+      alert(r.data.mensagem || 'Migração concluída!');
+      carregar();
+    } catch (e) {
+      alert('Erro ao migrar: ' + (e.response?.data?.error || e.message));
+    } finally {
+      setMigrando(false);
+    }
+  };
+
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto' }}>
       {/* Header */}
@@ -111,6 +126,16 @@ export default function HistoricoPage() {
           <h1 style={{ fontSize: 20, fontWeight: 700, color: '#1A1A2E', margin: 0 }}>Histórico de Operações</h1>
           <p style={{ fontSize: 12, color: '#8896A8', margin: 0 }}>Registro completo de todas as movimentações</p>
         </div>
+        <button onClick={migrar} disabled={migrando} style={{
+          marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6,
+          padding: '8px 16px', background: migrando ? '#E5E7EB' : '#EFF6FF',
+          border: '1px solid #BFDBFE', borderRadius: 8, fontSize: 12, fontWeight: 500,
+          cursor: migrando ? 'not-allowed' : 'pointer', color: '#2563EB',
+        }}>
+          <Database size={13}/>
+          {migrando ? 'Importando...' : 'Importar portfólio existente'}
+        </div>
+        </button>
       </div>
 
       {/* Cards resumo */}
