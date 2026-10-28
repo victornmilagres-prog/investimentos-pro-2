@@ -138,6 +138,13 @@ router.post('/', async (req, res) => {
         nome=EXCLUDED.nome, tipo=EXCLUDED.tipo, updated_at=NOW()
       RETURNING *
     `, [req.userId, ticker.toUpperCase(), nome || ticker, tipo, parseFloat(quantidade), parseFloat(preco_compra), observacoes || null]);
+    // Histórico
+    const totalInvest = parseFloat(quantidade) * parseFloat(preco_compra);
+    await pool.query(
+      `INSERT INTO historico_operacoes (usuario_id, categoria, ticker, tipo, quantidade, preco_unitario, total, observacao, data_operacao)
+       VALUES ($1,'outros',$2,'compra',$3,$4,$5,$6,CURRENT_DATE)`,
+      [req.userId, ticker.toUpperCase(), parseFloat(quantidade), parseFloat(preco_compra), parseFloat(totalInvest.toFixed(2)), tipo]
+    ).catch(e => console.error('[hist outros compra]', e.message));
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error('[outros-ativos POST]', err);
