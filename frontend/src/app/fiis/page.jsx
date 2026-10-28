@@ -275,8 +275,8 @@ function ModalCompraVenda({ fiis, tipo, onFechar, onSalvar }) {
   const [erro, setErro]     = useState('');
 
   const fii     = fiis.find(f => f.ticker === ticker);
-  const qtdAtual = fii?.quantidade || 0;
-  const pmAtual  = fii?.preco_compra || 0;
+  const qtdAtual = parseFloat(fii?.quantidade || 0);
+  const pmAtual  = parseFloat(fii?.preco_compra || 0);
   const novoQtd  = tipo === 'comprar' ? qtdAtual + Number(qtd||0) : Math.max(0, qtdAtual - Number(qtd||0));
   const novoPM   = tipo === 'comprar' && qtdAtual > 0 && Number(qtd) > 0 && Number(preco) > 0
     ? ((qtdAtual*pmAtual)+(Number(qtd)*Number(preco)))/novoQtd
@@ -1631,13 +1631,13 @@ export default function FIIsPage() {
   const salvarOperacao = async ({ ticker, tipo, quantidade, preco }) => {
     const fii = fiis.find(f => f.ticker === ticker);
     if (tipo === 'comprar') {
-      const qtdAtual = fii?.quantidade || 0;
-      const pmAtual  = fii?.preco_compra || 0;
+      const qtdAtual = parseFloat(fii?.quantidade || 0);
+      const pmAtual  = parseFloat(fii?.preco_compra || 0);
       const novaQtd  = qtdAtual + quantidade;
       const novoPM   = qtdAtual > 0 ? ((qtdAtual*pmAtual)+(quantidade*preco))/novaQtd : preco;
       await api.put(`/fiis/${ticker}`, { quantidade: novaQtd, preco_compra: parseFloat(novoPM.toFixed(4)) });
     } else {
-      const novaQtd = Math.max(0, (fii?.quantidade||0) - quantidade);
+      const novaQtd = Math.max(0, parseFloat(fii?.quantidade||0) - quantidade);
       await api.put(`/fiis/${ticker}`, { quantidade: novaQtd });
     }
     await carregar();
