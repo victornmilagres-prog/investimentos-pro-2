@@ -1629,16 +1629,10 @@ export default function FIIsPage() {
   };
 
   const salvarOperacao = async ({ ticker, tipo, quantidade, preco }) => {
-    const fii = fiis.find(f => f.ticker === ticker);
     if (tipo === 'comprar') {
-      const qtdAtual = parseFloat(fii?.quantidade || 0);
-      const pmAtual  = parseFloat(fii?.preco_compra || 0);
-      const novaQtd  = qtdAtual + quantidade;
-      const novoPM   = qtdAtual > 0 ? ((qtdAtual*pmAtual)+(quantidade*preco))/novaQtd : preco;
-      await api.put(`/fiis/${ticker}`, { quantidade: novaQtd, preco_compra: parseFloat(novoPM.toFixed(4)) });
+      await api.post('/fiis/comprar', { ticker, quantidade, preco });
     } else {
-      const novaQtd = Math.max(0, parseFloat(fii?.quantidade||0) - quantidade);
-      await api.put(`/fiis/${ticker}`, { quantidade: novaQtd });
+      await api.post('/fiis/vender', { ticker, quantidade });
     }
     await carregar();
   };
