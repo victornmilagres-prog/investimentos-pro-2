@@ -257,12 +257,13 @@ router.post('/dividendos', async (req, res) => {
     }
     // Histórico — um registro por lançamento
     for (const lanc of lancamentos) {
-      const { ticker, tipo_dividendo = 'Rendimento', valor_por_cota, quantidade, valor_total_override, mes, ano } = lanc;
+      const { ticker, tipo_dividendo = 'Rendimento', valor_por_cota, quantidade, valor_total_override, mes, ano, data_pagamento } = lanc;
       if (!ticker || !valor_por_cota || !mes || !ano) continue;
       const valorTotal = valor_total_override != null
         ? Number(valor_total_override)
         : Number(valor_por_cota) * Number(quantidade || 0);
-      const dataOp = `${ano}-${String(mes).padStart(2, '0')}-01`;
+      // Usa data exata se veio do B3, senão usa dia 1 do mês
+      const dataOp = data_pagamento || `${ano}-${String(mes).padStart(2, '0')}-01`;
       await pool.query(
         `INSERT INTO historico_operacoes (usuario_id, categoria, ticker, tipo, quantidade, preco_unitario, total, observacao, data_operacao)
          VALUES ($1,'fii',$2,'dividendo',$3,$4,$5,$6,$7)`,
