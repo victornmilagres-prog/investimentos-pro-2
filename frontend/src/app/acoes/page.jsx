@@ -190,12 +190,13 @@ async function parsearArquivoB3(file) {
   Object.keys(rows[0]).forEach(k => { colMap[norm(k)] = k; });
 
   const col = (...nomes) => nomes.map(n => colMap[n]).find(Boolean);
-  const colProduto  = col('produto','ativo','ticker');
-  const colTipo     = col('tipo de evento','tipo evento','tipo');
-  const colData     = col('pagamento','data pagamento','data de pagamento','data com','data');
-  const colQtd      = col('quantidade','qtd');
-  const colPreco    = col('preco unitario','preco','valor unitario','valor por cota');
-  const colValorLiq = col('valor liquido','valor bruto','valor');
+  const colProduto      = col('produto','ativo','ticker');
+  const colTipo         = col('movimentacao','tipo de evento','tipo evento','tipo');
+  const colData         = col('data','pagamento','data pagamento','data de pagamento','data com');
+  const colQtd          = col('quantidade','qtd');
+  const colPreco        = col('preco unitario','preco','valor unitario','valor por cota');
+  const colValorLiq     = col('valor da operacao','valor liquido','valor bruto','valor');
+  const colEntradaSaida = col('entrada/saida','entrada saida','entrada');
   if (!colProduto) return [];
 
   const maparTipo = (t = '') => {
@@ -215,12 +216,17 @@ async function parsearArquivoB3(file) {
   };
 
   const parsarData = val => {
-    if (!val) return { mes: null, ano: null };
-    if (val instanceof Date) return { mes: val.getMonth()+1, ano: val.getFullYear() };
-    const m = String(val).match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
-    // formato DD/MM/YYYY
-    if (m) return { mes: Number(m[2]), ano: Number(m[3]) };
-    return { mes: null, ano: null };
+    if (!val) return { mes: null, ano: null, data: null };
+    if (val instanceof Date) {
+      const dia = val.getDate(), mes = val.getMonth()+1, ano = val.getFullYear();
+      return { mes, ano, data: `${ano}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}` };
+    }
+    const m = String(val).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (m) {
+      const dia = Number(m[1]), mes = Number(m[2]), ano = Number(m[3]);
+      return { mes, ano, data: `${ano}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}` };
+    }
+    return { mes: null, ano: null, data: null };
   };
 
   const tickerRe = /^[A-Z][A-Z0-9]{2,5}\d{1,2}$/; // aceita B3SA3, PETR4, BBAS3 etc
@@ -234,35 +240,39 @@ async function parsearArquivoB3(file) {
     const ticker = produtoRaw.split(/[\s\-–]/)[0].toUpperCase().replace(/[^A-Z0-9]/g,'');
     if (!tickerRe.test(ticker)) continue;
 
-    const tipo           = maparTipo(String(row[colTipo] || ''));
-    const { mes, ano }   = parsarData(row[colData]);
-    const qtd            = colQtd ? parseNum(row[colQtd]) : 0;
-    const precoUnit      = colPreco ? parseNum(row[colPreco]) : 0;
-    const valorLiq       = colValorLiq ? parseNum(row[colValorLiq]) : 0;
+    // Filtra apenas créditos (Entrada), ignora débitos/taxas
+    const entSaida = String(row[colEntradaSaida] || '').toLowerCase();
+    if (entSaida && entSaida.includes('debito')) continue;
+
+    const tipo                 = maparTipo(String(row[colTipo] || ''));
+    const { mes, ano, data }   = parsarData(row[colData]);
+    const qtd                  = colQtd ? parseNum(row[colQtd]) : 0;
+    const precoUnit            = colPreco ? parseNum(row[colPreco]) : 0;
+    const valorLiq             = colValorLiq ? parseNum(row[colValorLiq]) : 0;
     if (precoUnit <= 0 && valorLiq <= 0) continue;
 
-    // Inclui preço na chave: mesmo evento = mesmo preço (corretoras diferentes somam)
-    // Eventos distintos no mesmo mês = preços diferentes = linhas separadas
-    const chave = `${ticker}|${tipo}|${mes}|${ano}|${precoUnit}`;
+    // Inclui data na chave: mesmo evento = mesma data (corretoras diferentes somam)
+    const chave = `${ticker}|${tipo}|${data || mes+'|'+ano}|${precoUnit}`;
     if (mapa.has(chave)) {
       const ex = mapa.get(chave);
       ex.quantidade    += qtd;
       ex.valor_liquido += valorLiq;
     } else {
-      mapa.set(chave, { ticker, tipo_provento: tipo, mes, ano, quantidade: qtd, preco_unitario: precoUnit, valor_liquido: valorLiq });
+      mapa.set(chave, { ticker, tipo_provento: tipo, mes, ano, data_pagamento: data, quantidade: qtd, preco_unitario: precoUnit, valor_liquido: valorLiq });
     }
   }
 
   // Exibe o Preço unitário da planilha (bruto, para o usuário ver o valor declarado)
   // Total usa Valor líquido (já com IR descontado — o que realmente foi recebido)
   return Array.from(mapa.values()).map(r => ({
-    ticker:         r.ticker,
-    tipo_provento:  r.tipo_provento,
-    mes:            r.mes,
-    ano:            r.ano,
-    quantidade:     r.quantidade,
-    valor_por_acao: r.preco_unitario,   // Preço unitário exato da planilha
-    valor_total:    r.valor_liquido,    // Valor líquido como total (o que recebeu)
+    ticker:          r.ticker,
+    tipo_provento:   r.tipo_provento,
+    mes:             r.mes,
+    ano:             r.ano,
+    data_pagamento:  r.data_pagamento,   // data exata YYYY-MM-DD
+    quantidade:      r.quantidade,
+    valor_por_acao:  r.preco_unitario,   // Preço unitário exato da planilha
+    valor_total:     r.valor_liquido,    // Valor líquido como total (o que recebeu)
   }));
 }
 
@@ -428,6 +438,7 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
       quantidade: resolverQtd(l),
       valor_total_override: l.valor_total ?? null,  // total exato do arquivo, sem recomputing
       mes: l.mes, ano: l.ano,
+      data_pagamento: l.data_pagamento || null,
     }));
     if (!lancamentos.length) return;
     setSalvando(true);
@@ -482,7 +493,7 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
                 const novasLinhas = [];
                 let idSeq = Date.now();
                 for (const linha of resultado) {
-                  const { ticker, tipo_provento, valor_por_acao, quantidade: qtdArq, mes: mesArq, ano: anoArq } = linha;
+                  const { ticker, tipo_provento, valor_por_acao, quantidade: qtdArq, mes: mesArq, ano: anoArq, data_pagamento } = linha;
                   if (!tickersCarteira.has(ticker)) { fora.push(ticker); continue; }
                   novasLinhas.push({
                     id: idSeq++,
@@ -492,6 +503,7 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
                     quantidade: qtdArq || null,
                     mes: mesArq || mesFiltro+1,
                     ano: anoArq || anoFiltro,
+                    data_pagamento: data_pagamento || null,
                     selecionado: true,
                   });
                 }
