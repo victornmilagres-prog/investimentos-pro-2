@@ -40,11 +40,12 @@ async function parsearArquivoB3FII(file) {
   const col = (...names) => names.map(n => colMap[n]).find(Boolean);
 
   const colProduto  = col('produto', 'ativo', 'ticker');
-  const colTipo     = col('tipo de evento', 'tipo evento', 'tipo');
-  const colData     = col('pagamento', 'data pagamento', 'data de pagamento', 'data com', 'data');
+  const colTipo     = col('movimentacao', 'tipo de evento', 'tipo evento', 'tipo');
+  const colData     = col('data', 'pagamento', 'data pagamento', 'data de pagamento', 'data com');
   const colQtd      = col('quantidade', 'qtd');
   const colPreco    = col('preco unitario', 'preco', 'valor unitario', 'valor por cota');
-  const colValorLiq = col('valor liquido', 'valor bruto', 'valor');
+  const colValorLiq = col('valor da operacao', 'valor liquido', 'valor bruto', 'valor');
+  const colEntradaSaida = col('entrada/saida', 'entrada saida', 'entrada');
 
   if (!colProduto) return [];
 
@@ -67,11 +68,17 @@ async function parsearArquivoB3FII(file) {
   const TICKER_REGEX = /([A-Z]{4}11B?)/;
 
   const parseDataBR = (val) => {
-    if (!val) return { mes: null, ano: null };
-    if (val instanceof Date) return { mes: val.getMonth()+1, ano: val.getFullYear() };
+    if (!val) return { mes: null, ano: null, data: null };
+    if (val instanceof Date) {
+      const dia = val.getDate(), mes = val.getMonth()+1, ano = val.getFullYear();
+      return { mes, ano, data: `${ano}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}` };
+    }
     const m = String(val).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-    if (m) return { mes: Number(m[2]), ano: Number(m[3]) };
-    return { mes: null, ano: null };
+    if (m) {
+      const dia = Number(m[1]), mes = Number(m[2]), ano = Number(m[3]);
+      return { mes, ano, data: `${ano}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}` };
+    }
+    return { mes: null, ano: null, data: null };
   };
 
   const resultado = [];
@@ -84,8 +91,12 @@ async function parsearArquivoB3FII(file) {
     if (!match) continue;
     const ticker = match[1];
 
-    const { mes, ano } = parseDataBR(row[colData]);
+    const { mes, ano, data } = parseDataBR(row[colData]);
     if (!mes || !ano) continue;
+
+    // Filtra apenas créditos, ignora débitos/taxas (B3 usa "Credito"/"Debito")
+    const entSaida = String(row[colEntradaSaida] || '').toLowerCase();
+    if (entSaida && entSaida.includes('debito')) continue;
 
     const tipo = mapTipo(String(row[colTipo] || ''));
     const valorLiquido = parseNum(row[colValorLiq]);
@@ -102,18 +113,23 @@ async function parsearArquivoB3FII(file) {
       quantidade,
       mes,
       ano,
+      data_pagamento: data,   // data exata DD/MM/YYYY → YYYY-MM-DD
     });
   }
 
   const agrupados = {};
   for (const l of resultado) {
-    const chave = `${l.ticker}|${l.tipo_dividendo}|${l.mes}|${l.ano}`;
+    const chave = `${l.ticker}|${l.tipo_dividendo}|${l.data_pagamento || l.mes+'|'+l.ano}`;
     if (!agrupados[chave]) agrupados[chave] = { ...l };
-    else agrupados[chave].valor_total += l.valor_total;
+    else {
+      agrupados[chave].valor_total += l.valor_total;
+      agrupados[chave].quantidade  += l.quantidade;
+    }
   }
 
   return Object.values(agrupados);
 }
+
 
 function badgeDecisao(d = '') {
   const v = (d || '').toUpperCase();
@@ -410,7 +426,7 @@ function ModalDividendosFII({ fiis, onFechar, onSalvar }) {
           <span style={{fontSize:22}}>📂</span>
           <div style={{flex:1}}>
             <p style={{fontSize:13,fontWeight:600,color:'#2563EB',marginBottom:2}}>Importar relatório da B3</p>
-            <p style={{fontSize:12,color:'#4A90D9'}}>Importa todos os meses do arquivo automaticamente</p>
+            <p style={{fontSize:12,color:'#4A90D9'}}>Suporte a XLSX — importa todos os meses automaticamente</p>
           </div>
           <label style={{background:'#EFF6FF',color:'#2563EB',border:'1px solid #93C5FD',padding:'7px 14px',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap'}}>
             {parsendo ? 'Lendo...' : 'Selecionar arquivo'}
@@ -582,6 +598,7 @@ function ModalImportarB3({ fiis, onFechar, onSalvar }) {
           id: idSeq++, ticker: l.ticker, tipo: l.tipo_dividendo,
           valor: l.valor_por_cota, valor_total: l.valor_total,
           quantidade: l.quantidade || null, mes: l.mes, ano: l.ano,
+          data_pagamento: l.data_pagamento || null,
         });
       }
       // Ativa todos os anos por padrão
@@ -611,6 +628,7 @@ function ModalImportarB3({ fiis, onFechar, onSalvar }) {
         valor_por_cota: l.valor, quantidade: l.quantidade,
         valor_total_override: l.valor_total ?? null,
         mes: l.mes, ano: l.ano,
+        data_pagamento: l.data_pagamento || null,
       }));
       await onSalvar(lancamentos);
       setImportado(true);
@@ -652,7 +670,7 @@ function ModalImportarB3({ fiis, onFechar, onSalvar }) {
               <p style={{fontSize:14,fontWeight:700,color:'#2563EB',marginBottom:2}}>
                 {parsendo ? 'Lendo arquivo...' : arquivo ? arquivo.name : 'Selecionar ou arrastar arquivo'}
               </p>
-              <p style={{fontSize:12,color:'#60A5FA'}}>Extrato de Proventos (.xlsx, .xls, .csv) — exportado do InfoMoney/B3</p>
+              <p style={{fontSize:12,color:'#60A5FA'}}>Extrato de Movimentação (.xlsx, .xls, .csv) — exportado do site da B3</p>
             </div>
             <input type="file" accept=".csv,.xlsx,.xls" style={{display:'none'}} disabled={parsendo||salvando}
               onChange={e=>{const f=e.target.files[0];if(f)handleArquivo(f);}}/>
