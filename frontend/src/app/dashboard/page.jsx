@@ -47,13 +47,20 @@ export default function DashboardPage() {
 
   const carregar = async () => {
     try {
-      const [dash, rf] = await Promise.all([
+      const agora = new Date();
+      const mes = agora.getMonth() + 1;
+      const ano = agora.getFullYear();
+      const [dash, rf, divFii, divAcao] = await Promise.all([
         api.get('/dashboard'),
         api.get('/renda-fixa').catch(() => ({ data: { itens: [] } })),
+        api.get(`/fiis/dividendos?mes=${mes}&ano=${ano}`).catch(() => ({ data: [] })),
+        api.get(`/acoes/dividendos?mes=${mes}&ano=${ano}`).catch(() => ({ data: [] })),
       ]);
       setDados({
         ...dash.data,
         rendaFixaLista: Array.isArray(rf.data?.itens) ? rf.data.itens : [],
+        dividendosFii:  Array.isArray(divFii.data)    ? divFii.data    : [],
+        dividendosAcao: Array.isArray(divAcao.data)   ? divAcao.data   : [],
       });
     } catch { /* silencia */ }
     finally { setLoading(false); }
@@ -99,6 +106,8 @@ export default function DashboardPage() {
     oportunidades = [],
     riscos = [],
     rendaFixaLista = [],
+    dividendosFii  = [],
+    dividendosAcao = [],
   } = dados;
 
   // ── cálculos ────────────────────────────────────────────────────────────────
@@ -256,61 +265,152 @@ export default function DashboardPage() {
         </div>
 
         {/* Renda passiva */}
-        <div style={card}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={dot('var(--warning)')} />Renda passiva recebida
-          </p>
+        {(() => {
+          const totalRendBruto = rendaFixaLista.reduce((s, r) => s + parseFloat(r.rendBruto   || 0), 0);
+          const totalRendLiq   = rendaFixaLista.reduce((s, r) => s + parseFloat(r.rendLiquido || 0), 0);
+          const totalInvestido = rendaFixaLista.reduce((s, r) => s + parseFloat(r.valor_investido || 0), 0);
 
-          {/* Renda Fixa — rendimentos calculados */}
-          {rendaFixaLista.length > 0 && (() => {
-            const totalInvestido = rendaFixaLista.reduce((s, r) => s + parseFloat(r.valor_investido || 0), 0);
-            const totalRendBruto = rendaFixaLista.reduce((s, r) => s + parseFloat(r.rendBruto || 0), 0);
-            const totalRendLiq   = rendaFixaLista.reduce((s, r) => s + parseFloat(r.rendLiquido || 0), 0);
-            return (
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--warning)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    📄 Renda Fixa
-                  </span>
-                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{rendaFixaLista.length} aplicações</span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-                  <div style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--bg-warning)', border: '1px solid var(--border)' }}>
-                    <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Rendimento bruto</p>
-                    <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--warning)' }}>{fmt.brl(totalRendBruto)}</p>
-                    <p style={{ fontSize: 10, color: 'var(--text-muted)' }}>sobre {fmt.brl(totalInvestido)}</p>
-                  </div>
-                  <div style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--bg-success)', border: '1px solid var(--border)' }}>
-                    <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Rendimento líquido</p>
-                    <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--success)' }}>{fmt.brl(totalRendLiq)}</p>
-                    <p style={{ fontSize: 10, color: 'var(--text-muted)' }}>após IR regressivo</p>
-                  </div>
-                </div>
-                {/* top 3 */}
-                {rendaFixaLista.slice(0, 3).map((r, i) => (
-                  <div key={r.id || i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: i < 2 ? '1px solid var(--border)' : 'none' }}>
-                    <span style={{ fontSize: 11, color: 'var(--text-secondary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.nome || r.instituicao}</span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--success)', whiteSpace: 'nowrap' }}>+{fmt.brl(r.rendLiquido || 0)}</span>
-                    <span style={{ fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{r.rendLiquidoPct ? `${Number(r.rendLiquidoPct).toFixed(1)}%` : ''}</span>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
+          // agrupar FII por ticker (soma valor_total)
+          const fiiMap = {};
+          dividendosFii.forEach(d => {
+            fiiMap[d.ticker] = (fiiMap[d.ticker] || 0) + parseFloat(d.valor_total || 0);
+          });
+          const fiiLista = Object.entries(fiiMap)
+            .map(([ticker, total]) => ({ ticker, total }))
+            .sort((a, b) => b.total - a.total);
+          const totalFii = fiiLista.reduce((s, d) => s + d.total, 0);
 
-          {/* Aviso FIIs e Ações */}
-          <div style={{
-            padding: '10px 12px', borderRadius: 8,
-            border: '1.5px dashed var(--border)', background: 'var(--bg)',
-            fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6,
-          }}>
-            <p style={{ fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>
-              📥 Para relatório completo, adicione:
-            </p>
-            <p>• <strong>Dividendos de FIIs</strong> — Acesse <strong>FIIs → Importar B3</strong></p>
-            <p>• <strong>Dividendos de Ações</strong> — registre em <strong>Ações → Dividendos</strong></p>
-          </div>
-        </div>
+          // agrupar Ações por ticker
+          const acaoMap = {};
+          dividendosAcao.forEach(d => {
+            acaoMap[d.ticker] = (acaoMap[d.ticker] || 0) + parseFloat(d.valor_total || 0);
+          });
+          const acaoLista = Object.entries(acaoMap)
+            .map(([ticker, total]) => ({ ticker, total }))
+            .sort((a, b) => b.total - a.total);
+          const totalAcao = acaoLista.reduce((s, d) => s + d.total, 0);
+
+          const totalGeral = totalRendLiq + totalFii + totalAcao;
+          const temDados = rendaFixaLista.length > 0 || fiiLista.length > 0 || acaoLista.length > 0;
+
+          return (
+            <div style={card}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={dot('var(--warning)')} />Renda passiva recebida
+              </p>
+
+              {/* Total geral */}
+              {temDados && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', borderRadius: 9, background: 'var(--bg-success)', border: '1px solid var(--border)', marginBottom: 14 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Total recebido (mês)</span>
+                  <span style={{ fontSize: 17, fontWeight: 800, color: 'var(--success)' }}>{fmt.brl(totalGeral)}</span>
+                </div>
+              )}
+
+              {/* ── Renda Fixa ── */}
+              {rendaFixaLista.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--warning)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📄 Renda Fixa</span>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{rendaFixaLista.length} aplicações</span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                    <div style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--bg-warning)', border: '1px solid var(--border)' }}>
+                      <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Rendimento bruto</p>
+                      <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--warning)' }}>{fmt.brl(totalRendBruto)}</p>
+                      <p style={{ fontSize: 10, color: 'var(--text-muted)' }}>sobre {fmt.brl(totalInvestido)}</p>
+                    </div>
+                    <div style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--bg-success)', border: '1px solid var(--border)' }}>
+                      <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Rendimento líquido</p>
+                      <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--success)' }}>{fmt.brl(totalRendLiq)}</p>
+                      <p style={{ fontSize: 10, color: 'var(--text-muted)' }}>após IR regressivo</p>
+                    </div>
+                  </div>
+                  {rendaFixaLista.slice(0, 3).map((r, i) => (
+                    <div key={r.id || i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: i < Math.min(rendaFixaLista.length, 3) - 1 ? '1px solid var(--border)' : 'none' }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-secondary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.nome || r.instituicao}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--success)', whiteSpace: 'nowrap' }}>+{fmt.brl(r.rendLiquido || 0)}</span>
+                      <span style={{ fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{r.rendLiquidoPct ? `${Number(r.rendLiquidoPct).toFixed(1)}%` : ''}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ── FIIs ── */}
+              {fiiLista.length > 0 && (
+                <>
+                  {rendaFixaLista.length > 0 && <div style={{ height: 1, background: 'var(--border)', margin: '0 0 14px' }} />}
+                  <div style={{ marginBottom: 14 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>🏢 FIIs</span>
+                      <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{fiiLista.length} fundos</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                      <div style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--bg-success)', border: '1px solid var(--border)' }}>
+                        <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Dividendos recebidos</p>
+                        <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--success)' }}>{fmt.brl(totalFii)}</p>
+                        <p style={{ fontSize: 10, color: 'var(--text-muted)' }}>isentos de IR</p>
+                      </div>
+                      <div style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                        <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Rendimentos lançados</p>
+                        <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)' }}>{dividendosFii.length}</p>
+                        <p style={{ fontSize: 10, color: 'var(--text-muted)' }}>no mês</p>
+                      </div>
+                    </div>
+                    {fiiLista.slice(0, 3).map((d, i) => (
+                      <div key={d.ticker} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: i < Math.min(fiiLista.length, 3) - 1 ? '1px solid var(--border)' : 'none' }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', minWidth: 58 }}>{d.ticker}</span>
+                        <span style={{ flex: 1 }} />
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--success)', whiteSpace: 'nowrap' }}>+{fmt.brl(d.total)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* ── Ações ── */}
+              {acaoLista.length > 0 && (
+                <>
+                  {(rendaFixaLista.length > 0 || fiiLista.length > 0) && <div style={{ height: 1, background: 'var(--border)', margin: '0 0 14px' }} />}
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>📈 Ações</span>
+                      <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{acaoLista.length} empresas</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+                      <div style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--bg-accent)', border: '1px solid var(--border)' }}>
+                        <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Dividendos recebidos</p>
+                        <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--accent)' }}>{fmt.brl(totalAcao)}</p>
+                        <p style={{ fontSize: 10, color: 'var(--text-muted)' }}>bruto (IRRF 15%)</p>
+                      </div>
+                      <div style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                        <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Lançamentos</p>
+                        <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)' }}>{dividendosAcao.length}</p>
+                        <p style={{ fontSize: 10, color: 'var(--text-muted)' }}>no mês</p>
+                      </div>
+                    </div>
+                    {acaoLista.slice(0, 3).map((d, i) => (
+                      <div key={d.ticker} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: i < Math.min(acaoLista.length, 3) - 1 ? '1px solid var(--border)' : 'none' }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', minWidth: 58 }}>{d.ticker}</span>
+                        <span style={{ flex: 1 }} />
+                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', whiteSpace: 'nowrap' }}>+{fmt.brl(d.total)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Aviso se nenhum dado ainda */}
+              {!temDados && (
+                <div style={{ padding: '10px 12px', borderRadius: 8, border: '1.5px dashed var(--border)', background: 'var(--bg)', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                  <p style={{ fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>📥 Para relatório completo, adicione:</p>
+                  <p>• <strong>Dividendos de FIIs</strong> — Acesse <strong>FIIs → Importar B3</strong></p>
+                  <p>• <strong>Dividendos de Ações</strong> — registre em <strong>Ações → Dividendos</strong></p>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Variação hoje */}
         <div style={card}>
