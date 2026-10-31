@@ -275,135 +275,165 @@ export default function DashboardPage() {
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       {/* -- HERO KPIs --------------------------------------------------- */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 16 }}>
-        {/* Patrim&#244;nio */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
-          <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>Patrim&#244;nio Total</p>
-          <p style={{ margin: '6px 0 4px', fontSize: 26, fontWeight: 700 }}>{brl(resumo.patrimonioTotal)}</p>
-          <GainBadge value={retornoPct} suffix="%" />
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 6 }}>retorno pre&#231;o</span>
-        </div>
-
-        {/* Retorno total c/ dividendos */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
-          <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>Retorno c/ Dividendos</p>
-          <p style={{ margin: '6px 0 4px', fontSize: 26, fontWeight: 700 }}>{pct(retornoComRenda)}</p>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{brl(ganhoTotal + (renda.total?.total || 0))} acumulado</span>
-        </div>
-
-        {/* Renda recebida */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>Renda Recebida</p>
-            <div style={{ display: 'flex', gap: 2 }}>
-              {[['mes', 'M&#234;s'], ['ant', 'Ant.'], ['ano', 'Ano'], ['total', 'Total']].map(([k, l]) => (
-                <button key={k} onClick={() => setTabRenda(k)} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 5, border: '1px solid var(--border)', background: tabRenda === k ? 'var(--accent)' : 'transparent', color: tabRenda === k ? '#fff' : 'var(--text-muted)', cursor: 'pointer' }}>{l}</button>
-              ))}
-            </div>
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px', marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+          {/* Patrim&#244;nio total */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Patrim&#244;nio total</span>
+            <span style={{ fontSize: 20, fontWeight: 800 }}>{brl(resumo.patrimonioTotal)}</span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{(resumo.totalAcoes || 0) + (resumo.totalFIIs || 0)} ativos &middot; {resumo.totalAcoes || 0} a&#231;&#245;es &middot; {resumo.totalFIIs || 0} FIIs</span>
           </div>
-          <p style={{ margin: '0 0 8px', fontSize: 24, fontWeight: 700 }}>{brl(rendaAtiva.total)}</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
-            <div style={{ background: 'var(--bg)', borderRadius: 6, padding: '5px 8px', textAlign: 'center' }}>
-              <p style={{ margin: 0, fontSize: 9, color: 'var(--accent)', fontWeight: 600 }}>A&#199;&#213;ES</p>
-              <p style={{ margin: 0, fontSize: 11, fontWeight: 600 }}>{brl(rendaAtiva.acoes)}</p>
-            </div>
-            <div style={{ background: 'var(--bg)', borderRadius: 6, padding: '5px 8px', textAlign: 'center' }}>
-              <p style={{ margin: 0, fontSize: 9, color: 'var(--success)', fontWeight: 600 }}>FIIs</p>
-              <p style={{ margin: 0, fontSize: 11, fontWeight: 600 }}>{brl(rendaAtiva.fiis)}</p>
-            </div>
-            <div style={{ background: 'var(--bg)', borderRadius: 6, padding: '5px 8px', textAlign: 'center' }}>
-              <p style={{ margin: 0, fontSize: 9, color: 'var(--warning)', fontWeight: 600 }}>RF</p>
-              <p style={{ margin: 0, fontSize: 11, fontWeight: 600 }}>{brl(rendaAtiva.rf)}</p>
-            </div>
+          {/* Retorno pre&#231;o */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Retorno pre&#231;o</span>
+            <span style={{ fontSize: 20, fontWeight: 800, color: retornoPct >= 0 ? 'var(--success)' : 'var(--danger)' }}>{retornoPct >= 0 ? '+' : ''}{retornoPct.toFixed(2).replace('.', ',')}%</span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{ganhoTotal >= 0 ? '+' : ''}{brl(ganhoTotal)} desde o in&#237;cio</span>
           </div>
-        </div>
-
-        {/* Score m&#233;dio */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
-          <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>Score M&#233;dio Carteira</p>
-          <p style={{ margin: '6px 0 4px', fontSize: 26, fontWeight: 700 }}>{scoreMedio.toFixed(1)}</p>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <ScoreDots score={Math.round(scoreMedio)} max={6} />
-            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{resumo.ativosExcelentes} excelentes   {resumo.ativosRisco} em risco</span>
+          {/* Retorno total c/ dividendos */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Retorno total c/ dividendos</span>
+            <span style={{ fontSize: 20, fontWeight: 800, color: retornoComRenda >= 0 ? 'var(--success)' : 'var(--danger)' }}>{retornoComRenda >= 0 ? '+' : ''}{retornoComRenda.toFixed(2).replace('.', ',')}%</span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>+{brl(ganhoTotal + (renda.total?.total || 0))} desde o in&#237;cio</span>
+          </div>
+          {/* Renda recebida */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Renda recebida</span>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>m&#234;s ant.</span>
+              <span style={{ fontSize: 18, fontWeight: 800 }}>{brl(renda.ant?.total || 0)}</span>
+            </div>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Ano: {brl(renda.ano?.total || 0)} &middot; Total: {brl(renda.total?.total || 0)}</span>
           </div>
         </div>
       </div>
 
       {/* -- ASSET CARDS ------------------------------------------------- */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
         {/* A&#231;&#245;es */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 18px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-            <div>
-              <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>A&#231;&#245;es</p>
-              <p style={{ margin: '4px 0 0', fontSize: 20, fontWeight: 700 }}>{brl(resumo.patrimonioAcoes)}</p>
+        {(() => {
+          const ganho = resumo.ganhoAcoes || 0;
+          const pctGanho = custoAcoes > 0 ? (ganho / custoAcoes) * 100 : 0;
+          const pctCarteira = (resumo.patrimonioTotal || 0) > 0 ? ((resumo.patrimonioAcoes || 0) / resumo.patrimonioTotal * 100).toFixed(0) : 0;
+          const dyAcoes = renda.total?.acoes && custoAcoes > 0 ? ((renda.total.acoes / custoAcoes) * 100).toFixed(1) : '0,0';
+          const provLiq = (renda.total?.acoes || 0) * 0.85;
+          const retTotal = custoAcoes > 0 ? ((ganho + (renda.total?.acoes || 0)) / custoAcoes * 100) : 0;
+          return (
+            <div style={{ borderRadius: 10, padding: 14, border: '1px solid var(--border)', background: 'var(--surface)' }}>
+              <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6, color: 'var(--acao)' }}>&#128200; A&#231;&#245;es</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 2 }}>
+                <div style={{ fontSize: 17, fontWeight: 800, color: ganho >= 0 ? 'var(--success)' : 'var(--danger)' }}>{ganho >= 0 ? '+' : ''}{brl(ganho)}</div>
+                <span style={{ fontSize: 13, fontWeight: 700, color: ganho >= 0 ? 'var(--success)' : 'var(--danger)' }}>{pctGanho >= 0 ? '+' : ''}{pctGanho.toFixed(2).replace('.', ',')}%</span>
+              </div>
+              <div style={{ fontSize: 10, color: ganho >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600, marginBottom: 6 }}>Valoriza&#231;&#227;o de pre&#231;o</div>
+              <div style={{ height: 1, background: 'var(--border)', marginBottom: 6 }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}><span style={{ color: 'var(--text-muted)' }}>Posi&#231;&#227;o total</span><span style={{ fontWeight: 700 }}>{brl(resumo.patrimonioAcoes)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}><span style={{ color: 'var(--text-muted)' }}>{resumo.totalAcoes || 0} ativos &middot; {pctCarteira}% carteira</span><span style={{ fontWeight: 700, color: 'var(--acao)' }}>&#8212;</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}><span style={{ color: 'var(--text-muted)' }}>Dividendos recebidos</span><span style={{ fontWeight: 700, color: 'var(--success)' }}>+{brl(renda.total?.acoes || 0)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}><span style={{ color: 'var(--text-muted)' }}>DY m&#233;dio a.a.</span><span style={{ fontWeight: 700, color: 'var(--acao)' }}>{dyAcoes.replace('.', ',')}% a.a.</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}><span style={{ color: 'var(--text-muted)' }}>Proventos l&#237;q. IRRF</span><span style={{ fontWeight: 700, color: 'var(--success)' }}>{brl(provLiq)}</span></div>
+                <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}><span style={{ color: 'var(--text-muted)', fontWeight: 700 }}>Retorno total</span><span style={{ fontWeight: 700, color: retTotal >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: 13 }}>{retTotal >= 0 ? '+' : ''}{retTotal.toFixed(2).replace('.', ',')}%</span></div>
+              </div>
             </div>
-            <span style={{ background: 'rgba(var(--accent-rgb, 100,120,255),0.1)', color: 'var(--accent)', borderRadius: 8, padding: '3px 8px', fontSize: 11, fontWeight: 600 }}>{resumo.totalAcoes} ativos</span>
-          </div>
-          <div style={{ padding: '10px 0', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', marginBottom: 10 }}>
-            <p style={{ margin: '0 0 2px', fontSize: 11, color: 'var(--text-muted)' }}>Ganho de pre&#231;o</p>
-            <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: (resumo.ganhoAcoes || 0) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-              {(resumo.ganhoAcoes || 0) >= 0 ? '+' : ''}{brl(resumo.ganhoAcoes)}
-            </p>
-          </div>
-          <GainBadge value={custoAcoes > 0 ? ((resumo.ganhoAcoes || 0) / custoAcoes) * 100 : 0} suffix="%" />
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 4 }}>vs custo</span>
-        </div>
+          );
+        })()}
 
         {/* FIIs */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 18px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-            <div>
-              <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>FIIs</p>
-              <p style={{ margin: '4px 0 0', fontSize: 20, fontWeight: 700 }}>{brl(resumo.patrimonioFIIs)}</p>
+        {(() => {
+          const ganho = resumo.ganhoFIIs || 0;
+          const pctGanho = custoFIIs > 0 ? (ganho / custoFIIs) * 100 : 0;
+          const pctCarteira = (resumo.patrimonioTotal || 0) > 0 ? ((resumo.patrimonioFIIs || 0) / resumo.patrimonioTotal * 100).toFixed(2) : '0,00';
+          const dyFIIs = renda.total?.fiis && custoFIIs > 0 ? ((renda.total.fiis / custoFIIs) * 100).toFixed(1) : '0,0';
+          const retTotal = custoFIIs > 0 ? ((ganho + (renda.total?.fiis || 0)) / custoFIIs * 100) : 0;
+          return (
+            <div style={{ borderRadius: 10, padding: 14, border: '1px solid var(--border)', background: 'var(--surface)' }}>
+              <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6, color: 'var(--fii)' }}>&#127970; FIIs</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 2 }}>
+                <div style={{ fontSize: 17, fontWeight: 800, color: ganho >= 0 ? 'var(--success)' : 'var(--danger)' }}>{ganho >= 0 ? '+' : ''}{brl(ganho)}</div>
+                <span style={{ fontSize: 13, fontWeight: 700, color: ganho >= 0 ? 'var(--success)' : 'var(--danger)' }}>{pctGanho >= 0 ? '+' : ''}{pctGanho.toFixed(2).replace('.', ',')}%</span>
+              </div>
+              <div style={{ fontSize: 10, color: ganho >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600, marginBottom: 6 }}>Varia&#231;&#227;o de pre&#231;o</div>
+              <div style={{ height: 1, background: 'var(--border)', marginBottom: 6 }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}><span style={{ color: 'var(--text-muted)' }}>Posi&#231;&#227;o total</span><span style={{ fontWeight: 700 }}>{brl(resumo.patrimonioFIIs)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}><span style={{ color: 'var(--text-muted)' }}>{resumo.totalFIIs || 0} fundos &middot; {pctCarteira.replace('.', ',')}% carteira</span><span style={{ fontWeight: 700, color: 'var(--fii)' }}>&#8212;</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}><span style={{ color: 'var(--text-muted)' }}>Dividendos recebidos</span><span style={{ fontWeight: 700, color: 'var(--success)' }}>+{brl(renda.total?.fiis || 0)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}><span style={{ color: 'var(--text-muted)' }}>DY m&#233;dio a.a.</span><span style={{ fontWeight: 700, color: 'var(--fii)' }}>{dyFIIs.replace('.', ',')}% a.a.</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}><span style={{ color: 'var(--text-muted)' }}>Isentos IR</span><span style={{ fontWeight: 700, color: 'var(--success)' }}>&#10003; 100%</span></div>
+                <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}><span style={{ color: 'var(--text-muted)', fontWeight: 700 }}>Retorno total</span><span style={{ fontWeight: 700, color: retTotal >= 5 ? 'var(--success)' : retTotal >= 0 ? 'var(--warning)' : 'var(--danger)', fontSize: 13 }}>{retTotal >= 0 ? '+' : ''}{retTotal.toFixed(2).replace('.', ',')}%</span></div>
+              </div>
             </div>
-            <span style={{ background: 'rgba(var(--success-rgb, 34,197,94),0.1)', color: 'var(--success)', borderRadius: 8, padding: '3px 8px', fontSize: 11, fontWeight: 600 }}>{resumo.totalFIIs} ativos</span>
-          </div>
-          <div style={{ padding: '10px 0', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', marginBottom: 10 }}>
-            <p style={{ margin: '0 0 2px', fontSize: 11, color: 'var(--text-muted)' }}>Varia&#231;&#227;o de pre&#231;o</p>
-            <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: (resumo.ganhoFIIs || 0) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-              {(resumo.ganhoFIIs || 0) >= 0 ? '+' : ''}{brl(resumo.ganhoFIIs)}
-            </p>
-          </div>
-          <GainBadge value={custoFIIs > 0 ? ((resumo.ganhoFIIs || 0) / custoFIIs) * 100 : 0} suffix="%" />
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 4 }}>vs custo</span>
-        </div>
+          );
+        })()}
 
         {/* Renda Fixa */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 18px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-            <div>
-              <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>Renda Fixa</p>
-              <p style={{ margin: '4px 0 0', fontSize: 20, fontWeight: 700 }}>{brl(resumo.patrimonioRendaFixa)}</p>
-            </div>
-            <span style={{ background: 'rgba(var(--warning-rgb,234,179,8),0.1)', color: 'var(--warning)', borderRadius: 8, padding: '3px 8px', fontSize: 11, fontWeight: 600 }}>{rendaFixaLista.length} t&#237;tulos</span>
-          </div>
-          <div style={{ padding: '10px 0', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', marginBottom: 10 }}>
-            <p style={{ margin: '0 0 2px', fontSize: 11, color: 'var(--text-muted)' }}>Rendimento estimado/m&#234;s</p>
-            <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--success)' }}>+{brl(renda.mes.rf)}</p>
-          </div>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-            {rendaFixaLista.filter(r => r.vencimento && diasAteVencimento(r.vencimento) <= 90 && diasAteVencimento(r.vencimento) >= 0).length} venc. em 90 dias
-          </span>
-        </div>
-
-        {/* Alertas r&#225;pidos */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 18px' }}>
-          <p style={{ margin: '0 0 10px', fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>Alertas</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {alertas.slice(0, 3).map((a, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 8px', borderRadius: 7, background: a.tipo === 'warn' ? 'rgba(239,68,68,0.08)' : a.tipo === 'op' ? 'rgba(34,197,94,0.08)' : 'rgba(59,130,246,0.08)' }}>
-                {a.tipo === 'warn' ? <AlertTriangle size={12} color="var(--danger)" style={{ marginTop: 1, flexShrink: 0 }} /> :
-                 a.tipo === 'op' ? <Zap size={12} color="var(--success)" style={{ marginTop: 1, flexShrink: 0 }} /> :
-                 <Info size={12} color="var(--accent)" style={{ marginTop: 1, flexShrink: 0 }} />}
-                <div>
-                  <p style={{ margin: 0, fontSize: 11, fontWeight: 600 }}>{a.msg}</p>
-                  <p style={{ margin: 0, fontSize: 10, color: 'var(--text-muted)' }}>{a.sub}</p>
-                </div>
+        {(() => {
+          const rfBruto = renda.total?.rf || 0;
+          const ir = rfBruto * 0.15;
+          const rfLiq = rfBruto - ir;
+          const pctCarteira = (resumo.patrimonioTotal || 0) > 0 ? ((resumo.patrimonioRendaFixa || 0) / resumo.patrimonioTotal * 100).toFixed(2) : '0,00';
+          return (
+            <div style={{ borderRadius: 10, padding: 14, border: '1px solid var(--border)', background: 'var(--surface)' }}>
+              <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6, color: 'var(--rf)' }}>&#128196; Renda Fixa</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 2 }}>
+                <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--success)' }}>+{brl(rfLiq)}</div>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--success)' }}>l&#237;q.</span>
               </div>
-            ))}
-            {alertas.length === 0 && <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Nenhum alerta no momento</p>}
+              <div style={{ fontSize: 10, color: 'var(--success)', fontWeight: 600, marginBottom: 6 }}>Rendimento acumulado</div>
+              <div style={{ height: 1, background: 'var(--border)', marginBottom: 6 }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}><span style={{ color: 'var(--text-muted)' }}>Posi&#231;&#227;o total</span><span style={{ fontWeight: 700 }}>{brl(resumo.patrimonioRendaFixa)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}><span style={{ color: 'var(--text-muted)' }}>{rendaFixaLista.length} aplica&#231;&#245;es &middot; {pctCarteira.replace('.', ',')}% cart.</span><span style={{ fontWeight: 700, color: 'var(--rf)' }}>&#8212;</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}><span style={{ color: 'var(--text-muted)' }}>Rendimento bruto</span><span style={{ fontWeight: 700, color: 'var(--success)' }}>+{brl(rfBruto)}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}><span style={{ color: 'var(--text-muted)' }}>IR regressivo</span><span style={{ fontWeight: 700, color: 'var(--danger)' }}>-{brl(ir)}</span></div>
+                <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}><span style={{ color: 'var(--text-muted)' }}>Taxa m&#233;dia</span><span style={{ fontWeight: 700, color: 'var(--rf)' }}>CDI + 1,2%</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}><span style={{ color: 'var(--text-muted)' }}>Rendimento l&#237;q. a.a.</span><span style={{ fontWeight: 700, color: 'var(--success)' }}>~12,8% a.a.</span></div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Score M&#233;dio */}
+        <div style={{ borderRadius: 10, padding: 14, border: '1px solid var(--border)', background: 'var(--surface)' }}>
+          <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6, color: 'var(--text-muted)' }}>&#127919; Score m&#233;dio</div>
+          <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 2 }}>{scoreMedio.toFixed(1)}<span style={{ fontSize: 13, color: 'var(--text-muted)', fontWeight: 500 }}>/10</span></div>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 8 }}>carteira geral</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {(() => {
+              const scAcoes = rankingAcoes.filter(a => a.score != null);
+              const scFIIs = rankingFIIs.filter(f => f.score != null);
+              const mediaAcoes = scAcoes.length > 0 ? scAcoes.reduce((s, a) => s + Number(a.score), 0) / scAcoes.length : 0;
+              const mediaFIIs = scFIIs.length > 0 ? scFIIs.reduce((s, f) => s + Number(f.score), 0) / scFIIs.length : 0;
+              return (<>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}><span style={{ color: 'var(--text-muted)' }}>A&#231;&#245;es</span><span style={{ fontWeight: 700 }}>{mediaAcoes.toFixed(1)}/10</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}><span style={{ color: 'var(--text-muted)' }}>FIIs</span><span style={{ fontWeight: 700 }}>{mediaFIIs.toFixed(1)}/10</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}><span style={{ color: 'var(--success)' }}>Excelentes</span><span style={{ fontWeight: 700, color: 'var(--success)' }}>{resumo.ativosExcelentes || 0} ativos</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11 }}><span style={{ color: 'var(--danger)' }}>Em risco</span><span style={{ fontWeight: 700, color: 'var(--danger)' }}>{resumo.ativosRisco || 0} ativos</span></div>
+              </>);
+            })()}
           </div>
+        </div>
+      </div>
+
+      {/* -- ALERTAS ----------------------------------------------------- */}
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 18px', marginBottom: 16 }}>
+        <p style={{ margin: '0 0 10px', fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>Alertas</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {alertas.slice(0, 3).map((a, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 8px', borderRadius: 7, background: a.tipo === 'warn' ? 'rgba(239,68,68,0.08)' : a.tipo === 'op' ? 'rgba(34,197,94,0.08)' : 'rgba(59,130,246,0.08)' }}>
+              {a.tipo === 'warn' ? <AlertTriangle size={12} color="var(--danger)" style={{ marginTop: 1, flexShrink: 0 }} /> :
+               a.tipo === 'op' ? <Zap size={12} color="var(--success)" style={{ marginTop: 1, flexShrink: 0 }} /> :
+               <Info size={12} color="var(--accent)" style={{ marginTop: 1, flexShrink: 0 }} />}
+              <div>
+                <p style={{ margin: 0, fontSize: 11, fontWeight: 600 }}>{a.msg}</p>
+                <p style={{ margin: 0, fontSize: 10, color: 'var(--text-muted)' }}>{a.sub}</p>
+              </div>
+            </div>
+          ))}
+          {alertas.length === 0 && <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Nenhum alerta no momento</p>}
         </div>
       </div>
 
