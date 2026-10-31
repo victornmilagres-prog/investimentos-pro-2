@@ -4,16 +4,16 @@ import { RefreshCw, TrendingUp, TrendingDown, AlertTriangle, Info, Zap, Target, 
 import api from '@/lib/api';
 import { fmt } from '@/lib/utils';
 
-// ââ helpers ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// -- helpers ----------------------------------------------------------------
 function pct(val) {
-  if (val == null || isNaN(val)) return 'â';
+  if (val == null || isNaN(val)) return '-';
   const n = Number(val);
   const sign = n > 0 ? '+' : '';
   return `${sign}${n.toFixed(2)}%`;
 }
 
 function brl(val) {
-  if (val == null || isNaN(val)) return 'R$ â';
+  if (val == null || isNaN(val)) return 'R$ -';
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(val));
 }
 
@@ -48,7 +48,7 @@ function GainBadge({ value, suffix = '' }) {
   );
 }
 
-// ââ Mini Bar Chart ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// -- Mini Bar Chart ----------------------------------------------------------
 function BarChart({ data, labels, series, colors }) {
   const maxVal = Math.max(...data.map(d => series.reduce((s, k) => s + (d[k] || 0), 0)));
   return (
@@ -74,7 +74,7 @@ function BarChart({ data, labels, series, colors }) {
   );
 }
 
-// ââ Donut âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// -- Donut -------------------------------------------------------------------
 function Donut({ acoes, fiis, rf }) {
   const total = acoes + fiis + rf;
   if (total === 0) return <div style={{ height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: 12 }}>Sem dados</div>;
@@ -95,7 +95,7 @@ function Donut({ acoes, fiis, rf }) {
         <text x={cx} y={cy + 4} textAnchor="middle" fontSize={9} fill="var(--text-secondary)">{Math.round(pa)}%</text>
       </svg>
       <div style={{ display: 'flex', gap: 8, fontSize: 10 }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--accent)' }} />AÃ§Ãµes</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--accent)' }} />A&#231;&#245;es</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--success)' }} />FIIs</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--warning)' }} />RF</span>
       </div>
@@ -103,14 +103,14 @@ function Donut({ acoes, fiis, rf }) {
   );
 }
 
-// ââ helpers âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// -- helpers -----------------------------------------------------------------
 function diasAteVencimento(vencimento) {
   if (!vencimento) return null;
   const diff = new Date(vencimento) - new Date();
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
-// ââ simulaÃ§Ã£o de histÃ³rico mensal ââââââââââââââââââââââââââââââââââââââââââââ
+// -- simula&#231;&#227;o de hist&#243;rico mensal --------------------------------------------
 function gerarHistoricoSimulado(rendaMesAtual, rendaMesAcoes, rendaMesFiis) {
   const meses = ['Nov', 'Dez', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out'];
   return meses.map((mes, i) => {
@@ -202,7 +202,7 @@ export default function DashboardPage() {
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', flexDirection: 'column', gap: 12 }}>
       <div className="spin" style={{ width: 32, height: 32, border: '3px solid var(--border)', borderTopColor: 'var(--accent)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-      <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Carregando dashboardâ¦</p>
+      <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Carregando dashboard...</p>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
@@ -233,14 +233,14 @@ export default function DashboardPage() {
     const pm = Number(f.preco_compra || 0);
     const pa = Number(f.preco_atual || 0);
     if (pm > 0 && pa > 0 && pa < pm * 0.95) {
-      alertas.push({ tipo: 'op', msg: `${f.ticker} abaixo do PM`, sub: `PM ${brl(pm)} Â· Atual ${brl(pa)}` });
+      alertas.push({ tipo: 'op', msg: `${f.ticker} abaixo do PM`, sub: `PM ${brl(pm)}   Atual ${brl(pa)}` });
     }
   });
   if (resumo.ativosRisco > 0) {
     alertas.push({ tipo: 'warn', msg: `${resumo.ativosRisco} ativo${resumo.ativosRisco > 1 ? 's' : ''} em zona de risco`, sub: 'Revise a carteira' });
   }
   if (resumo.ativosExcelentes > 0) {
-    alertas.push({ tipo: 'info', msg: `${resumo.ativosExcelentes} ativo${resumo.ativosExcelentes > 1 ? 's' : ''} com classificaÃ§Ã£o Excelente`, sub: 'Bom trabalho!' });
+    alertas.push({ tipo: 'info', msg: `${resumo.ativosExcelentes} ativo${resumo.ativosExcelentes > 1 ? 's' : ''} com classifica&#231;&#227;o Excelente`, sub: 'Bom trabalho!' });
   }
 
   const rendaAtiva = tabRenda === 'mes' ? renda.mes : tabRenda === 'ant' ? renda.ant : tabRenda === 'ano' ? renda.ano : renda.total;
@@ -260,7 +260,7 @@ export default function DashboardPage() {
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Dashboard</h1>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>
-            VisÃ£o geral da carteira Â· {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+            Vis&#227;o geral da carteira   {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
           </p>
         </div>
         <button
@@ -274,14 +274,14 @@ export default function DashboardPage() {
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
-      {/* ââ HERO KPIs âââââââââââââââââââââââââââââââââââââââââââââââââââ */}
+      {/* -- HERO KPIs --------------------------------------------------- */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 16 }}>
-        {/* PatrimÃ´nio */}
+        {/* Patrim&#244;nio */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
-          <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>PatrimÃ´nio Total</p>
+          <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>Patrim&#244;nio Total</p>
           <p style={{ margin: '6px 0 4px', fontSize: 26, fontWeight: 700 }}>{brl(resumo.patrimonioTotal)}</p>
           <GainBadge value={retornoPct} suffix="%" />
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 6 }}>retorno preÃ§o</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 6 }}>retorno pre&#231;o</span>
         </div>
 
         {/* Retorno total c/ dividendos */}
@@ -296,7 +296,7 @@ export default function DashboardPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>Renda Recebida</p>
             <div style={{ display: 'flex', gap: 2 }}>
-              {[['mes', 'MÃªs'], ['ant', 'Ant.'], ['ano', 'Ano'], ['total', 'Total']].map(([k, l]) => (
+              {[['mes', 'M&#234;s'], ['ant', 'Ant.'], ['ano', 'Ano'], ['total', 'Total']].map(([k, l]) => (
                 <button key={k} onClick={() => setTabRenda(k)} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 5, border: '1px solid var(--border)', background: tabRenda === k ? 'var(--accent)' : 'transparent', color: tabRenda === k ? '#fff' : 'var(--text-muted)', cursor: 'pointer' }}>{l}</button>
               ))}
             </div>
@@ -304,7 +304,7 @@ export default function DashboardPage() {
           <p style={{ margin: '0 0 8px', fontSize: 24, fontWeight: 700 }}>{brl(rendaAtiva.total)}</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4 }}>
             <div style={{ background: 'var(--bg)', borderRadius: 6, padding: '5px 8px', textAlign: 'center' }}>
-              <p style={{ margin: 0, fontSize: 9, color: 'var(--accent)', fontWeight: 600 }}>AÃÃES</p>
+              <p style={{ margin: 0, fontSize: 9, color: 'var(--accent)', fontWeight: 600 }}>A&#199;&#213;ES</p>
               <p style={{ margin: 0, fontSize: 11, fontWeight: 600 }}>{brl(rendaAtiva.acoes)}</p>
             </div>
             <div style={{ background: 'var(--bg)', borderRadius: 6, padding: '5px 8px', textAlign: 'center' }}>
@@ -318,30 +318,30 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Score mÃ©dio */}
+        {/* Score m&#233;dio */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
-          <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>Score MÃ©dio Carteira</p>
+          <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>Score M&#233;dio Carteira</p>
           <p style={{ margin: '6px 0 4px', fontSize: 26, fontWeight: 700 }}>{scoreMedio.toFixed(1)}</p>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <ScoreDots score={Math.round(scoreMedio)} max={6} />
-            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{resumo.ativosExcelentes} excelentes Â· {resumo.ativosRisco} em risco</span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{resumo.ativosExcelentes} excelentes   {resumo.ativosRisco} em risco</span>
           </div>
         </div>
       </div>
 
-      {/* ââ ASSET CARDS âââââââââââââââââââââââââââââââââââââââââââââââââ */}
+      {/* -- ASSET CARDS ------------------------------------------------- */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 16 }}>
-        {/* AÃ§Ãµes */}
+        {/* A&#231;&#245;es */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 18px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
             <div>
-              <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>AÃ§Ãµes</p>
+              <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>A&#231;&#245;es</p>
               <p style={{ margin: '4px 0 0', fontSize: 20, fontWeight: 700 }}>{brl(resumo.patrimonioAcoes)}</p>
             </div>
             <span style={{ background: 'rgba(var(--accent-rgb, 100,120,255),0.1)', color: 'var(--accent)', borderRadius: 8, padding: '3px 8px', fontSize: 11, fontWeight: 600 }}>{resumo.totalAcoes} ativos</span>
           </div>
           <div style={{ padding: '10px 0', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', marginBottom: 10 }}>
-            <p style={{ margin: '0 0 2px', fontSize: 11, color: 'var(--text-muted)' }}>Ganho de preÃ§o</p>
+            <p style={{ margin: '0 0 2px', fontSize: 11, color: 'var(--text-muted)' }}>Ganho de pre&#231;o</p>
             <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: (resumo.ganhoAcoes || 0) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
               {(resumo.ganhoAcoes || 0) >= 0 ? '+' : ''}{brl(resumo.ganhoAcoes)}
             </p>
@@ -360,7 +360,7 @@ export default function DashboardPage() {
             <span style={{ background: 'rgba(var(--success-rgb, 34,197,94),0.1)', color: 'var(--success)', borderRadius: 8, padding: '3px 8px', fontSize: 11, fontWeight: 600 }}>{resumo.totalFIIs} ativos</span>
           </div>
           <div style={{ padding: '10px 0', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', marginBottom: 10 }}>
-            <p style={{ margin: '0 0 2px', fontSize: 11, color: 'var(--text-muted)' }}>VariaÃ§Ã£o de preÃ§o</p>
+            <p style={{ margin: '0 0 2px', fontSize: 11, color: 'var(--text-muted)' }}>Varia&#231;&#227;o de pre&#231;o</p>
             <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: (resumo.ganhoFIIs || 0) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
               {(resumo.ganhoFIIs || 0) >= 0 ? '+' : ''}{brl(resumo.ganhoFIIs)}
             </p>
@@ -376,10 +376,10 @@ export default function DashboardPage() {
               <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>Renda Fixa</p>
               <p style={{ margin: '4px 0 0', fontSize: 20, fontWeight: 700 }}>{brl(resumo.patrimonioRendaFixa)}</p>
             </div>
-            <span style={{ background: 'rgba(var(--warning-rgb,234,179,8),0.1)', color: 'var(--warning)', borderRadius: 8, padding: '3px 8px', fontSize: 11, fontWeight: 600 }}>{rendaFixaLista.length} tÃ­tulos</span>
+            <span style={{ background: 'rgba(var(--warning-rgb,234,179,8),0.1)', color: 'var(--warning)', borderRadius: 8, padding: '3px 8px', fontSize: 11, fontWeight: 600 }}>{rendaFixaLista.length} t&#237;tulos</span>
           </div>
           <div style={{ padding: '10px 0', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', marginBottom: 10 }}>
-            <p style={{ margin: '0 0 2px', fontSize: 11, color: 'var(--text-muted)' }}>Rendimento estimado/mÃªs</p>
+            <p style={{ margin: '0 0 2px', fontSize: 11, color: 'var(--text-muted)' }}>Rendimento estimado/m&#234;s</p>
             <p style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--success)' }}>+{brl(renda.mes.rf)}</p>
           </div>
           <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
@@ -387,7 +387,7 @@ export default function DashboardPage() {
           </span>
         </div>
 
-        {/* Alertas rÃ¡pidos */}
+        {/* Alertas r&#225;pidos */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '16px 18px' }}>
           <p style={{ margin: '0 0 10px', fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>Alertas</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -407,17 +407,17 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ââ GRID PRINCIPAL 3 colunas ââââââââââââââââââââââââââââââââââââ */}
+      {/* -- GRID PRINCIPAL 3 colunas ------------------------------------ */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr 1fr', gap: 12, marginBottom: 12 }}>
 
-        {/* DistribuiÃ§Ã£o */}
+        {/* Distribui&#231;&#227;o */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
-          <p style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 600 }}>DistribuiÃ§Ã£o</p>
+          <p style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 600 }}>Distribui&#231;&#227;o</p>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
             <Donut acoes={resumo.patrimonioAcoes || 0} fiis={resumo.patrimonioFIIs || 0} rf={resumo.patrimonioRendaFixa || 0} />
           </div>
           {[
-            { label: 'AÃ§Ãµes', val: resumo.patrimonioAcoes, total: resumo.patrimonioTotal, color: 'var(--accent)' },
+            { label: 'A&#231;&#245;es', val: resumo.patrimonioAcoes, total: resumo.patrimonioTotal, color: 'var(--accent)' },
             { label: 'FIIs', val: resumo.patrimonioFIIs, total: resumo.patrimonioTotal, color: 'var(--success)' },
             { label: 'Renda Fixa', val: resumo.patrimonioRendaFixa, total: resumo.patrimonioTotal, color: 'var(--warning)' },
           ].map(({ label, val, total, color }) => (
@@ -431,12 +431,12 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* HistÃ³rico mensal + crescimento */}
+        {/* Hist&#243;rico mensal + crescimento */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>Renda Passiva â Ãltimos 12 meses</p>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>Renda Passiva - &#218;ltimos 12 meses</p>
             <div style={{ display: 'flex', gap: 10, fontSize: 10 }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--accent)' }} />AÃ§Ãµes</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--accent)' }} />A&#231;&#245;es</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--success)' }} />FIIs</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}><span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--warning)' }} />RF</span>
             </div>
@@ -449,7 +449,7 @@ export default function DashboardPage() {
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
             <div style={{ textAlign: 'center' }}>
-              <p style={{ margin: 0, fontSize: 10, color: 'var(--text-muted)' }}>MÃ©dia mensal</p>
+              <p style={{ margin: 0, fontSize: 10, color: 'var(--text-muted)' }}>M&#233;dia mensal</p>
               <p style={{ margin: '2px 0 0', fontSize: 14, fontWeight: 700 }}>{brl((renda.ano.total || 0) / new Date().getMonth() || 1)}</p>
             </div>
             <div style={{ textAlign: 'center' }}>
@@ -457,7 +457,7 @@ export default function DashboardPage() {
               <p style={{ margin: '2px 0 0', fontSize: 14, fontWeight: 700 }}>{brl((renda.mes.total || 0) * 12)}</p>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <p style={{ margin: 0, fontSize: 10, color: 'var(--text-muted)' }}>MÃªs atual</p>
+              <p style={{ margin: 0, fontSize: 10, color: 'var(--text-muted)' }}>M&#234;s atual</p>
               <p style={{ margin: '2px 0 0', fontSize: 14, fontWeight: 700, color: 'var(--success)' }}>{brl(renda.mes.total)}</p>
             </div>
           </div>
@@ -500,11 +500,11 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ââ RANKINGS ââââââââââââââââââââââââââââââââââââââââââââââââââââ */}
+      {/* -- RANKINGS ---------------------------------------------------- */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-        {/* Ranking AÃ§Ãµes */}
+        {/* Ranking A&#231;&#245;es */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
-          <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600 }}>Top AÃ§Ãµes â Carteira</p>
+          <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600 }}>Top A&#231;&#245;es - Carteira</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {rankingAcoes.slice(0, 6).map((a, i) => {
               const ganho = (Number(a.preco_atual || 0) - Number(a.preco_compra || 0)) * Number(a.quantidade || 0);
@@ -521,13 +521,13 @@ export default function DashboardPage() {
                 </div>
               );
             })}
-            {rankingAcoes.length === 0 && <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Nenhuma aÃ§Ã£o na carteira</p>}
+            {rankingAcoes.length === 0 && <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Nenhuma a&#231;&#227;o na carteira</p>}
           </div>
         </div>
 
         {/* Ranking FIIs */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
-          <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600 }}>Top FIIs â Carteira</p>
+          <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600 }}>Top FIIs - Carteira</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {rankingFIIs.slice(0, 6).map((f, i) => {
               const pm = Number(f.preco_compra || 0);
@@ -551,11 +551,11 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ââ RF VENCIMENTOS + RADAR ââââââââââââââââââââââââââââââââââââââ */}
+      {/* -- RF VENCIMENTOS + RADAR -------------------------------------- */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
         {/* RF Vencimentos */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
-          <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600 }}>Renda Fixa â Vencimentos</p>
+          <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600 }}>Renda Fixa - Vencimentos</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {rendaFixaLista.slice(0, 5).map((r, i) => {
               const dias = diasAteVencimento(r.vencimento);
@@ -569,19 +569,19 @@ export default function DashboardPage() {
                   <div style={{ textAlign: 'right' }}>
                     <p style={{ margin: 0, fontSize: 12, fontWeight: 600 }}>{brl(r.valor_investido)}</p>
                     <p style={{ margin: 0, fontSize: 10, color: urgente ? 'var(--danger)' : 'var(--text-muted)' }}>
-                      {dias != null ? (dias <= 0 ? 'Vencido' : `${dias}d`) : 'â'}
+                      {dias != null ? (dias <= 0 ? 'Vencido' : `${dias}d`) : '-'}
                     </p>
                   </div>
                 </div>
               );
             })}
-            {rendaFixaLista.length === 0 && <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Nenhum tÃ­tulo cadastrado</p>}
+            {rendaFixaLista.length === 0 && <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Nenhum t&#237;tulo cadastrado</p>}
           </div>
         </div>
 
         {/* Oportunidades */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
-          <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600, color: 'var(--success)' }}>â¡ Radar Oportunidades</p>
+          <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600, color: 'var(--success)' }}>&#9889; Radar Oportunidades</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             {oportunidades.slice(0, 6).map((a, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', borderRadius: 7, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)' }}>
@@ -601,7 +601,7 @@ export default function DashboardPage() {
 
         {/* Riscos */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
-          <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600, color: 'var(--danger)' }}>â  Radar Risco</p>
+          <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600, color: 'var(--danger)' }}>&#9888; Radar Risco</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             {riscos.slice(0, 6).map((a, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', borderRadius: 7, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
@@ -622,7 +622,7 @@ export default function DashboardPage() {
 
       {/* Footer */}
       <p style={{ textAlign: 'center', marginTop: 28, fontSize: 11, color: 'var(--text-muted)' }}>
-        Atualizado Ã s {dados.atualizadoEm ? new Date(dados.atualizadoEm).toLocaleTimeString('pt-BR') : 'â'} Â· Investimentos Pro 2.0
+        Atualizado &#224;s {dados.atualizadoEm ? new Date(dados.atualizadoEm).toLocaleTimeString('pt-BR') : '-'}   Investimentos Pro 2.0
       </p>
     </div>
   );
