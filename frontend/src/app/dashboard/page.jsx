@@ -440,25 +440,44 @@ export default function DashboardPage() {
       {/* -- GRID PRINCIPAL 3 colunas ------------------------------------ */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr 1fr', gap: 12, marginBottom: 12 }}>
 
-        {/* Distribuição */}
+        {/* Distribuição do patrimônio — barra horizontal */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
-          <p style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 600 }}>Distribuição</p>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
-            <Donut acoes={resumo.patrimonioAcoes || 0} fiis={resumo.patrimonioFIIs || 0} rf={resumo.patrimonioRendaFixa || 0} />
-          </div>
-          {[
-            { label: 'Ações', val: resumo.patrimonioAcoes, total: resumo.patrimonioTotal, color: 'var(--accent)' },
-            { label: 'FIIs', val: resumo.patrimonioFIIs, total: resumo.patrimonioTotal, color: 'var(--success)' },
-            { label: 'Renda Fixa', val: resumo.patrimonioRendaFixa, total: resumo.patrimonioTotal, color: 'var(--warning)' },
-          ].map(({ label, val, total, color }) => (
-            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
-                {label}
-              </span>
-              <span style={{ fontSize: 12, fontWeight: 600 }}>{total > 0 ? ((val / total) * 100).toFixed(1) : '0.0'}%</span>
-            </div>
-          ))}
+          <p style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 600 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block', marginRight: 6 }} />
+            Distribuição do patrimônio
+          </p>
+          {/* Barra horizontal total */}
+          {(() => {
+            const total = resumo.patrimonioTotal || 0;
+            const pAcoes = total > 0 ? (resumo.patrimonioAcoes || 0) / total * 100 : 0;
+            const pFIIs = total > 0 ? (resumo.patrimonioFIIs || 0) / total * 100 : 0;
+            const pRF = total > 0 ? (resumo.patrimonioRendaFixa || 0) / total * 100 : 0;
+            return (
+              <>
+                <div style={{ height: 8, borderRadius: 4, overflow: 'hidden', display: 'flex', marginBottom: 16 }}>
+                  <div style={{ width: `${pAcoes}%`, background: 'var(--accent)', transition: 'width 0.5s' }} />
+                  <div style={{ width: `${pFIIs}%`, background: 'var(--success)', transition: 'width 0.5s' }} />
+                  <div style={{ width: `${pRF}%`, background: 'var(--warning)', transition: 'width 0.5s' }} />
+                </div>
+                {[
+                  { label: 'Ações', val: resumo.patrimonioAcoes, pct: pAcoes, color: 'var(--accent)' },
+                  { label: 'FIIs', val: resumo.patrimonioFIIs, pct: pFIIs, color: 'var(--success)' },
+                  { label: 'Renda Fixa', val: resumo.patrimonioRendaFixa, pct: pRF, color: 'var(--warning)' },
+                ].map(({ label, val, pct: p, color }) => (
+                  <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                      {label}
+                    </span>
+                    <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color }}>{p.toFixed(2)}%</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{brl(val)}</span>
+                    </span>
+                  </div>
+                ))}
+              </>
+            );
+          })()}
         </div>
 
         {/* Histórico mensal + crescimento */}
@@ -605,7 +624,7 @@ export default function DashboardPage() {
               const mx = a.tipo === 'FII' ? 4 : 6;
               const pvp = a.pvp != null ? `P/VP ${Number(a.pvp).toFixed(2)}` : null;
               const dy = a.dy != null ? `DY ${Number(a.dy).toFixed(1)}%` : null;
-              const sub = [a.tipo, pvp, dy, `Score ${sc}/${mx}`].filter(Boolean).join(' ?· ');
+              const sub = [a.tipo, pvp, dy, `Score ${sc}/${mx}`].filter(Boolean).join(' · ');
               return (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)' }}>
                   <div>
@@ -637,7 +656,7 @@ export default function DashboardPage() {
                 const mx = a.tipo === 'FII' ? 4 : 6;
                 const pvp = a.pvp != null ? `P/VP ${Number(a.pvp).toFixed(2)}` : null;
                 const pl = a.pl != null ? `P/L ${Number(a.pl).toFixed(1)}` : null;
-                const sub = [a.tipo, pvp, pl, `Score ${sc}/${mx}`].filter(Boolean).join(' ?· ');
+                const sub = [a.tipo, pvp, pl, `Score ${sc}/${mx}`].filter(Boolean).join(' · ');
                 return (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
                     <div>
