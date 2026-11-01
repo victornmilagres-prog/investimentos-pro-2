@@ -530,24 +530,29 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* -- RANKINGS ---------------------------------------------------- */}
+      {/* -- TOP ACOES + TOP FIIS por score ------------------------------ */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-        {/* Ranking A&#231;&#245;es */}
+        {/* Top A&#231;&#245;es por score */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
-          <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600 }}>Top A&#231;&#245;es - Carteira</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--acao)', display: 'inline-block', marginRight: 6 }} />
+            Top A&#231;&#245;es por score
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             {rankingAcoes.slice(0, 6).map((a, i) => {
-              const ganho = (Number(a.preco_atual || 0) - Number(a.preco_compra || 0)) * Number(a.quantidade || 0);
+              const sc = Number(a.score || 0);
+              const mx = Number(a.max_score || 6);
               const ganhoP = Number(a.preco_compra) > 0 ? ((Number(a.preco_atual) - Number(a.preco_compra)) / Number(a.preco_compra)) * 100 : 0;
+              const decisao = sc >= mx * 0.75 ? 'Comprar' : sc >= mx * 0.5 ? 'Manter' : 'Aten&#231;&#227;o';
+              const decColor = sc >= mx * 0.75 ? 'var(--success)' : sc >= mx * 0.5 ? 'var(--accent)' : 'var(--warning)';
+              const decBg = sc >= mx * 0.75 ? 'rgba(34,197,94,0.1)' : sc >= mx * 0.5 ? 'rgba(59,130,246,0.1)' : 'rgba(245,158,11,0.1)';
               return (
-                <div key={a.ticker} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, background: 'var(--bg)', border: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', width: 16, textAlign: 'center' }}>{i + 1}</span>
-                  <span style={{ fontWeight: 700, fontSize: 13, flex: 1 }}>{a.ticker}</span>
-                  <ScoreDots score={Number(a.score || 0)} max={Number(a.max_score || 6)} />
-                  <div style={{ textAlign: 'right', minWidth: 80 }}>
-                    <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: ganho >= 0 ? 'var(--success)' : 'var(--danger)' }}>{ganho >= 0 ? '+' : ''}{brl(ganho)}</p>
-                    <p style={{ margin: 0, fontSize: 10, color: 'var(--text-muted)' }}>{pct(ganhoP)}</p>
-                  </div>
+                <div key={a.ticker} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: i < 5 ? '1px solid var(--border)' : 'none' }}>
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)', width: 12 }}>{i + 1}</span>
+                  <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--acao)', flex: 1 }}>{a.ticker}</span>
+                  <ScoreDots score={sc} max={mx} />
+                  <span style={{ fontSize: 10, fontWeight: 700, color: decColor, background: decBg, padding: '1px 7px', borderRadius: 10, minWidth: 52, textAlign: 'center' }}>{decisao}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: ganhoP >= 0 ? 'var(--success)' : 'var(--danger)', minWidth: 46, textAlign: 'right' }}>{ganhoP >= 0 ? '+' : ''}{ganhoP.toFixed(2).replace('.', ',')}%</span>
                 </div>
               );
             })}
@@ -555,24 +560,29 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Ranking FIIs */}
+        {/* Top FIIs por score */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
-          <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600 }}>Top FIIs - Carteira</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--fii)', display: 'inline-block', marginRight: 6 }} />
+            Top FIIs por score
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             {rankingFIIs.slice(0, 6).map((f, i) => {
+              const sc = Number(f.score || 0);
+              const mx = Number(f.max_score || 4);
               const pm = Number(f.preco_compra || 0);
               const pa = Number(f.preco_atual || 0);
-              const ganho = (pa - pm) * Number(f.quantidade || 0);
               const ganhoP = pm > 0 ? ((pa - pm) / pm) * 100 : 0;
+              const decisao = sc >= mx * 0.75 ? 'Comprar' : sc >= mx * 0.5 ? 'Manter' : 'Aten&#231;&#227;o';
+              const decColor = sc >= mx * 0.75 ? 'var(--success)' : sc >= mx * 0.5 ? 'var(--accent)' : 'var(--warning)';
+              const decBg = sc >= mx * 0.75 ? 'rgba(34,197,94,0.1)' : sc >= mx * 0.5 ? 'rgba(59,130,246,0.1)' : 'rgba(245,158,11,0.1)';
               return (
-                <div key={f.ticker} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, background: 'var(--bg)', border: '1px solid var(--border)' }}>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', width: 16, textAlign: 'center' }}>{i + 1}</span>
-                  <span style={{ fontWeight: 700, fontSize: 13, flex: 1 }}>{f.ticker}</span>
-                  <ScoreDots score={Number(f.score || 0)} max={Number(f.max_score || 4)} />
-                  <div style={{ textAlign: 'right', minWidth: 80 }}>
-                    <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: ganho >= 0 ? 'var(--success)' : 'var(--danger)' }}>{ganho >= 0 ? '+' : ''}{brl(ganho)}</p>
-                    <p style={{ margin: 0, fontSize: 10, color: 'var(--text-muted)' }}>{pct(ganhoP)}</p>
-                  </div>
+                <div key={f.ticker} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: i < 5 ? '1px solid var(--border)' : 'none' }}>
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)', width: 12 }}>{i + 1}</span>
+                  <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--fii)', flex: 1 }}>{f.ticker}</span>
+                  <ScoreDots score={sc} max={mx} />
+                  <span style={{ fontSize: 10, fontWeight: 700, color: decColor, background: decBg, padding: '1px 7px', borderRadius: 10, minWidth: 52, textAlign: 'center' }}>{decisao}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: ganhoP >= 0 ? 'var(--success)' : 'var(--danger)', minWidth: 46, textAlign: 'right' }}>{ganhoP >= 0 ? '+' : ''}{ganhoP.toFixed(2).replace('.', ',')}%</span>
                 </div>
               );
             })}
@@ -581,71 +591,112 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* -- RF VENCIMENTOS + RADAR -------------------------------------- */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-        {/* RF Vencimentos */}
+      {/* -- RADAR OPORTUNIDADES + RADAR RISCO + METAS ------------------- */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        {/* Radar de Oportunidades */}
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
-          <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600 }}>Renda Fixa - Vencimentos</p>
+          <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--success)', display: 'inline-block', marginRight: 6 }} />
+            Radar de oportunidades
+          </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {rendaFixaLista.slice(0, 5).map((r, i) => {
-              const dias = diasAteVencimento(r.vencimento);
-              const urgente = dias != null && dias <= 90 && dias >= 0;
+            {oportunidades.slice(0, 6).map((a, i) => {
+              const sc = Number(a.score || 0);
+              const mx = a.tipo === 'FII' ? 4 : 6;
+              const pvp = a.pvp != null ? `P/VP ${Number(a.pvp).toFixed(2)}` : null;
+              const dy = a.dy != null ? `DY ${Number(a.dy).toFixed(1)}%` : null;
+              const sub = [a.tipo, pvp, dy, `Score ${sc}/${mx}`].filter(Boolean).join(' ?&#xB7; ');
               return (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 10px', borderRadius: 7, background: urgente ? 'rgba(239,68,68,0.06)' : 'var(--bg)', border: `1px solid ${urgente ? 'rgba(239,68,68,0.2)' : 'var(--border)'}` }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)' }}>
                   <div>
-                    <p style={{ margin: 0, fontSize: 12, fontWeight: 600 }}>{r.nome}</p>
-                    <p style={{ margin: 0, fontSize: 10, color: 'var(--text-muted)' }}>{r.indexador || r.tipo}</p>
+                    <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--success)' }}>{a.ticker}</span>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 8 }}>{sub}</span>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <p style={{ margin: 0, fontSize: 12, fontWeight: 600 }}>{brl(r.valor_investido)}</p>
-                    <p style={{ margin: 0, fontSize: 10, color: urgente ? 'var(--danger)' : 'var(--text-muted)' }}>
-                      {dias != null ? (dias <= 0 ? 'Vencido' : `${dias}d`) : '-'}
-                    </p>
-                  </div>
+                  <span style={{ fontWeight: 700, fontSize: 12 }}>{brl(a.preco_atual)}</span>
                 </div>
               );
             })}
-            {rendaFixaLista.length === 0 && <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Nenhum t&#237;tulo cadastrado</p>}
-          </div>
-        </div>
-
-        {/* Oportunidades */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
-          <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600, color: 'var(--success)' }}>&#9889; Radar Oportunidades</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {oportunidades.slice(0, 6).map((a, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', borderRadius: 7, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontWeight: 700, fontSize: 12 }}>{a.ticker}</span>
-                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{a.tipo}</span>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ margin: 0, fontSize: 12, fontWeight: 600 }}>{brl(a.preco_atual)}</p>
-                  <ScoreDots score={Number(a.score || 0)} max={a.tipo === 'FII' ? 4 : 6} />
-                </div>
-              </div>
-            ))}
             {oportunidades.length === 0 && <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Nenhuma oportunidade identificada</p>}
           </div>
+          <p style={{ margin: '10px 0 0', fontSize: 10, color: 'var(--text-muted)' }}>
+            &#128161; Crit&#233;rios: P/VP &lt; 1 (FII) &middot; DY acima da m&#233;dia &middot; Score &#8805; 4
+          </p>
         </div>
 
-        {/* Riscos */}
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
-          <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600, color: 'var(--danger)' }}>&#9888; Radar Risco</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {riscos.slice(0, 6).map((a, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', borderRadius: 7, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontWeight: 700, fontSize: 12 }}>{a.ticker}</span>
-                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{a.tipo}</span>
+        {/* Radar de Risco + Metas de Aloca&#231;&#227;o */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* Radar Risco */}
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
+            <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--danger)', display: 'inline-block', marginRight: 6 }} />
+              Radar de risco
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {riscos.slice(0, 4).map((a, i) => {
+                const sc = Number(a.score || 0);
+                const mx = a.tipo === 'FII' ? 4 : 6;
+                const pvp = a.pvp != null ? `P/VP ${Number(a.pvp).toFixed(2)}` : null;
+                const pl = a.pl != null ? `P/L ${Number(a.pl).toFixed(1)}` : null;
+                const sub = [a.tipo, pvp, pl, `Score ${sc}/${mx}`].filter(Boolean).join(' ?&#xB7; ');
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                    <div>
+                      <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--danger)' }}>{a.ticker}</span>
+                      <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 8 }}>{sub}</span>
+                    </div>
+                    <span style={{ fontWeight: 700, fontSize: 12 }}>{brl(a.preco_atual)}</span>
+                  </div>
+                );
+              })}
+              {riscos.length === 0 && <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Nenhum ativo em risco</p>}
+            </div>
+            {riscos.length > 0 && (
+              <p style={{ margin: '8px 0 0', fontSize: 10, color: 'var(--text-muted)' }}>
+                &#9888;&#65039; Crit&#233;rios: P/VP &gt; 1,2 (FII) &middot; P/L &gt; 30 (a&#231;&#227;o) &middot; Score &#8804; 2
+              </p>
+            )}
+          </div>
+
+          {/* Metas de Aloca&#231;&#227;o */}
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '18px 20px' }}>
+            <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--warning)', display: 'inline-block', marginRight: 6 }} />
+              Metas de aloca&#231;&#227;o
+            </p>
+            {(() => {
+              const total = resumo.patrimonioTotal || 0;
+              const pctAcoes = total > 0 ? (resumo.patrimonioAcoes || 0) / total * 100 : 0;
+              const pctFiis = total > 0 ? (resumo.patrimonioFIIs || 0) / total * 100 : 0;
+              const pctRf = total > 0 ? (resumo.patrimonioRendaFixa || 0) / total * 100 : 0;
+              const metaAcoes = 30, metaFiis = 20, metaRf = 50;
+              const items = [
+                { label: 'A&#231;&#245;es', pct: pctAcoes, meta: metaAcoes, color: 'var(--acao)' },
+                { label: 'FIIs', pct: pctFiis, meta: metaFiis, color: 'var(--fii)' },
+                { label: 'Renda Fixa', pct: pctRf, meta: metaRf, color: 'var(--rf)' },
+              ];
+              const faltaAcoes = total * (metaAcoes - pctAcoes) / 100;
+              const faltaFiis = total * (metaFiis - pctFiis) / 100;
+              return (
+                <div>
+                  {items.map(it => (
+                    <div key={it.label} style={{ marginBottom: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3, fontSize: 11 }}>
+                        <span>{it.label}</span>
+                        <span style={{ color: 'var(--text-muted)' }}>{it.pct.toFixed(0)}% / meta {it.meta}%</span>
+                      </div>
+                      <div style={{ height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden', position: 'relative' }}>
+                        <div style={{ height: '100%', width: `${Math.min(it.pct / it.meta * 100, 100)}%`, background: it.color, borderRadius: 3 }} />
+                      </div>
+                    </div>
+                  ))}
+                  {(faltaAcoes > 0 || faltaFiis > 0) && (
+                    <div style={{ marginTop: 8, padding: '7px 10px', borderRadius: 7, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', fontSize: 10, color: 'var(--warning)', fontWeight: 600 }}>
+                      &#128202; Aportar mais em {[faltaAcoes > 0 && `A&#231;&#245;es (+${brl(faltaAcoes)})`, faltaFiis > 0 && `FIIs (+${brl(faltaFiis)})`].filter(Boolean).join(' e ')} para rebalancear
+                    </div>
+                  )}
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ margin: 0, fontSize: 12, fontWeight: 600 }}>{brl(a.preco_atual)}</p>
-                  <p style={{ margin: 0, fontSize: 10, color: 'var(--danger)' }}>{a.decisao}</p>
-                </div>
-              </div>
-            ))}
-            {riscos.length === 0 && <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Nenhum ativo em risco</p>}
+              );
+            })()}
           </div>
         </div>
       </div>
