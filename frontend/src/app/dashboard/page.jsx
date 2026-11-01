@@ -638,7 +638,7 @@ export default function DashboardPage() {
             {oportunidades.length === 0 && <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>Nenhuma oportunidade identificada</p>}
           </div>
           <p style={{ margin: '10px 0 0', fontSize: 10, color: 'var(--text-muted)' }}>
-            💡 Critérios: P/VP < 1 (FII) · DY acima da média · Score ≥ 4
+            💡 Critérios: P/VP {'<'} 1 (FII) · DY acima da média · Score ≥ 4
           </p>
         </div>
 
@@ -671,7 +671,7 @@ export default function DashboardPage() {
             </div>
             {riscos.length > 0 && (
               <p style={{ margin: '8px 0 0', fontSize: 10, color: 'var(--text-muted)' }}>
-                ⚠️ Critérios: P/VP > 1,2 (FII) · P/L > 30 (ação) · Score ≤ 2
+                {'⚠️'} Critérios: P/VP {'>'} 1,2 (FII) · P/L {'>'} 30 (ação) · Score ≤ 2
               </p>
             )}
           </div>
@@ -723,6 +723,4 @@ export default function DashboardPage() {
       {/* Footer */}
       <p style={{ textAlign: 'center', marginTop: 28, fontSize: 11, color: 'var(--text-muted)' }}>
         Atualizado às {dados.atualizadoEm ? new Date(dados.atualizadoEm).toLocaleTimeString('pt-BR') : '-'}   Investimentos Pro 2.0
-      </p>
-    </div>
-  )
+      </p
