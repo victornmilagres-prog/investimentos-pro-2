@@ -154,6 +154,12 @@ export default function DashboardPage() {
     return `${mainIdx} ${fmt.pct(avgTaxa)}`;
   })() : '—';
 
+  // ── dividendos recebidos (lançados nas abas Ações e FIIs) ────────────────
+  const divAcoes     = acoes.reduce((s, a) => s + Number(a.dividendos_ano  || 0), 0);
+  const divFIIs      = fiis.reduce ((s, f) => s + Number(f.dividendos_ano  || 0), 0);
+  const divFIIsGeral = fiis.reduce ((s, f) => s + Number(f.dividendos_geral|| 0), 0);
+  const divAcoesLiq  = divAcoes * 0.85; // IRRF 15%
+
   // ── DY médio FIIs e Ações ─────────────────────────────────────────────────
   const dyFIIs  = rankingFIIs.filter(f => f.dy_anual).length > 0
     ? (rankingFIIs.filter(f => f.dy_anual).reduce((s, f) => s + Number(f.dy_anual), 0) / rankingFIIs.filter(f => f.dy_anual).length).toFixed(1)
@@ -212,10 +218,10 @@ export default function DashboardPage() {
               valExtra: (
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
                   <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>total líq.</span>
-                  <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--success)', letterSpacing: '-0.5px', lineHeight: 1.1 }}>{fmt.brl(rfTotalLiq)}</span>
+                  <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--success)', letterSpacing: '-0.5px', lineHeight: 1.1 }}>{fmt.brl(rfTotalLiq + divFIIs + divAcoesLiq)}</span>
                 </div>
               ),
-              sub: `RF bruto: ${fmt.brl(rfTotalBruto)} · IR: -${fmt.brl(rfTotalIR)}`,
+              sub: `RF: ${fmt.brl(rfTotalLiq)} · FIIs: ${fmt.brl(divFIIs)} · Ações: ${fmt.brl(divAcoesLiq)}`,
               color: 'var(--success)',
             },
           ].map(({ lbl, val, valExtra, sub, color }, i, arr) => (
@@ -254,7 +260,7 @@ export default function DashboardPage() {
           {[
             ['Posição total',      fmt.brl(patriAcoes),                   'inherit'],
             [`${resumo.totalAcoes||0} ativos · ${fmt.pct(pctAcoes)} carteira`, '—', 'var(--accent)'],
-            ['Dividendos recebidos', '—',                                 'var(--success)'],
+            ['Dividendos recebidos', divAcoes > 0 ? fmt.brl(divAcoes) : '—', 'var(--success)'],
             ['DY médio a.a.',      dyAcoes ? `${dyAcoes}% a.a.` : '—',   'var(--accent)'],
             ['Retorno total',      `${pctRetAcoes >= 0 ? '+' : ''}${fmt.pct(pctRetAcoes)}`, pctRetAcoes >= 0 ? 'var(--success)' : 'var(--danger)'],
           ].map(([k, v, c]) => (
@@ -281,7 +287,7 @@ export default function DashboardPage() {
           {[
             ['Posição total',      fmt.brl(patriFIIs),                  'inherit'],
             [`${resumo.totalFIIs||0} fundos · ${fmt.pct(pctFIIs)} carteira`, '—', 'var(--success)'],
-            ['Dividendos recebidos', '—',                               'var(--success)'],
+            ['Dividendos recebidos', divFIIs > 0 ? fmt.brl(divFIIs) : '—', 'var(--success)'],
             ['DY médio a.a.',      dyFIIs ? `${dyFIIs}% a.a.` : '—',   'var(--success)'],
             ['Isentos IR',         '✓ 100%',                            'var(--success)'],
             ['Retorno total',      `${pctRetFIIs >= 0 ? '+' : ''}${fmt.pct(pctRetFIIs)}`, pctRetFIIs >= 0 ? 'var(--success)' : 'var(--danger)'],
@@ -409,24 +415,24 @@ export default function DashboardPage() {
               </div>
               <div style={{ background: 'var(--surface)', border: '1px solid var(--success)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
                 <p style={{ fontSize: 9, color: 'var(--success)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>FIIs</p>
-                <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--success)' }}>—</p>
+                <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--success)' }}>{divFIIs > 0 ? fmt.brl(divFIIs) : '—'}</p>
                 <p style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 1 }}>isento IR</p>
               </div>
               <div style={{ background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
                 <p style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>Ações</p>
-                <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--accent)' }}>—</p>
-                <p style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 1 }}>líq. —</p>
+                <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--accent)' }}>{divAcoes > 0 ? fmt.brl(divAcoes) : '—'}</p>
+                <p style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 1 }}>líq. {divAcoesLiq > 0 ? fmt.brl(divAcoesLiq) : '—'}</p>
               </div>
             </div>
             <p style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: 'var(--success)', textAlign: 'center' }}>
-              Total RF: {fmt.brl(rfTotalBruto)} recebido em 2026
+              Total: {fmt.brl(rfTotalBruto + divFIIs + divAcoes)} recebido em 2026
             </p>
           </div>
 
           {/* Total box */}
           <div style={{ background: 'var(--bg-success)', border: '1px solid var(--success)', borderRadius: 10, padding: '10px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 11, color: 'var(--success)', fontWeight: 600 }}>Total recebido (RF líq.)</span>
-            <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--success)' }}>{fmt.brl(rfTotalLiq)}</span>
+            <span style={{ fontSize: 11, color: 'var(--success)', fontWeight: 600 }}>Total recebido líquido</span>
+            <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--success)' }}>{fmt.brl(rfTotalLiq + divFIIs + divAcoesLiq)}</span>
           </div>
 
           {/* RF */}
@@ -473,8 +479,8 @@ export default function DashboardPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               <div style={S.tile()}>
                 <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Dividendos recebidos</p>
-                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--success)' }}>—</p>
-                <p style={{ fontSize: 9, color: 'var(--text-muted)' }}>Importe extrato B3</p>
+                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--success)' }}>{divFIIs > 0 ? fmt.brl(divFIIs) : '—'}</p>
+                {divFIIs === 0 && <p style={{ fontSize: 9, color: 'var(--text-muted)' }}>Lance na aba FIIs</p>}
               </div>
               <div style={S.tile()}>
                 <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>DY médio a.a.</p>
@@ -498,8 +504,8 @@ export default function DashboardPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
               <div style={S.tile()}>
                 <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Proventos brutos</p>
-                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>—</p>
-                <p style={{ fontSize: 9, color: 'var(--text-muted)' }}>Registre em Ações</p>
+                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>{divAcoes > 0 ? fmt.brl(divAcoes) : '—'}</p>
+                {divAcoes === 0 && <p style={{ fontSize: 9, color: 'var(--text-muted)' }}>Registre em Ações</p>}
               </div>
               <div style={S.tile()}>
                 <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>DY médio a.a.</p>
@@ -510,7 +516,7 @@ export default function DashboardPage() {
             </div>
             <div style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--success)', background: 'var(--bg-success)' }}>
               <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Líquido após IRRF 15%</p>
-              <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--success)' }}>—</p>
+              <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--success)' }}>{divAcoesLiq > 0 ? fmt.brl(divAcoesLiq) : '—'}</p>
             </div>
           </div>
         </div>
