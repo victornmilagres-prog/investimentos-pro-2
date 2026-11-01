@@ -460,10 +460,10 @@ export default function DashboardPage() {
                   <div style={{ width: `${pRF}%`, background: 'var(--warning)', transition: 'width 0.5s' }} />
                 </div>
                 {[
-                  { label: 'Ações', val: resumo.patrimonioAcoes, pct: pAcoes, color: 'var(--accent)' },
-                  { label: 'FIIs', val: resumo.patrimonioFIIs, pct: pFIIs, color: 'var(--success)' },
-                  { label: 'Renda Fixa', val: resumo.patrimonioRendaFixa, pct: pRF, color: 'var(--warning)' },
-                ].map(({ label, val, pct: p, color }) => (
+                  { label: 'Ações', val: resumo.patrimonioAcoes, perc: pAcoes, color: 'var(--accent)' },
+                  { label: 'FIIs', val: resumo.patrimonioFIIs, perc: pFIIs, color: 'var(--success)' },
+                  { label: 'Renda Fixa', val: resumo.patrimonioRendaFixa, perc: pRF, color: 'var(--warning)' },
+                ].map(({ label, val, perc: p, color }) => (
                   <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
                       <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
@@ -725,5 +725,4 @@ export default function DashboardPage() {
         Atualizado às {dados.atualizadoEm ? new Date(dados.atualizadoEm).toLocaleTimeString('pt-BR') : '-'}   Investimentos Pro 2.0
       </p>
     </div>
-  );
-}
+  )
