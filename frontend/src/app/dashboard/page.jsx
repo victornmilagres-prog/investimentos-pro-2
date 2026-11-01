@@ -161,12 +161,23 @@ export default function DashboardPage() {
   const divAcoesLiq  = divAcoes * 0.85; // IRRF 15%
 
   // ── DY médio FIIs e Ações ─────────────────────────────────────────────────
+  // FIIs: campo dy_anual; Ações: campo dy (nome real na tabela acoes_carteira)
   const dyFIIs  = rankingFIIs.filter(f => f.dy_anual).length > 0
     ? (rankingFIIs.filter(f => f.dy_anual).reduce((s, f) => s + Number(f.dy_anual), 0) / rankingFIIs.filter(f => f.dy_anual).length).toFixed(1)
     : null;
-  const dyAcoes = rankingAcoes.filter(a => a.dy_anual).length > 0
-    ? (rankingAcoes.filter(a => a.dy_anual).reduce((s, a) => s + Number(a.dy_anual), 0) / rankingAcoes.filter(a => a.dy_anual).length).toFixed(1)
+  const dyAcoes = rankingAcoes.filter(a => a.dy).length > 0
+    ? (rankingAcoes.filter(a => a.dy).reduce((s, a) => s + Number(a.dy), 0) / rankingAcoes.filter(a => a.dy).length).toFixed(1)
     : null;
+
+  // ── Valores por tab de período ────────────────────────────────────────────
+  const mesAtual = new Date().getMonth() + 1; // 1–12
+  const rfTab         = tabRenda === 'mes' ? rfTotalLiq / mesAtual : rfTotalLiq;
+  const divFIIsTab    = tabRenda === 'mes' ? divFIIs    / mesAtual
+                      : tabRenda === 'ano' ? divFIIs
+                      : divFIIsGeral;
+  const divAcoesTab   = tabRenda === 'mes' ? divAcoes   / mesAtual : divAcoes; // acoes só tem dividendos_ano
+  const divAcoesLiqTab = divAcoesTab * 0.85;
+  const totalLiqTab   = rfTab + divFIIsTab + divAcoesLiqTab;
 
   const now = new Date();
   const dataHora = now.toLocaleDateString('pt-BR') + ' · ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -404,35 +415,37 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          {/* 2026 acumulado box */}
+          {/* Acumulado box — título muda com a tab */}
           <div style={{ background: 'linear-gradient(135deg,var(--bg-accent),var(--bg-success))', border: '1px solid var(--accent)', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
-            <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--accent)', marginBottom: 8 }}>📅 2026 acumulado até agora</p>
+            <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--accent)', marginBottom: 8 }}>
+              {tabRenda === 'mes' ? `📅 Média mensal estimada (${mesAtual} meses)` : tabRenda === 'ano' ? '📅 2026 acumulado até agora' : '📅 Desde o início (total geral)'}
+            </p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
               <div style={{ background: 'var(--surface)', border: '1px solid var(--warning)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
                 <p style={{ fontSize: 9, color: 'var(--warning)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>Renda Fixa</p>
-                <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--warning)' }}>{fmt.brl(rfTotalBruto)}</p>
-                <p style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 1 }}>líq. {fmt.brl(rfTotalLiq)}</p>
+                <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--warning)' }}>{fmt.brl(rfTab)}</p>
+                <p style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 1 }}>líquido</p>
               </div>
               <div style={{ background: 'var(--surface)', border: '1px solid var(--success)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
                 <p style={{ fontSize: 9, color: 'var(--success)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>FIIs</p>
-                <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--success)' }}>{divFIIs > 0 ? fmt.brl(divFIIs) : '—'}</p>
+                <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--success)' }}>{divFIIsTab > 0 ? fmt.brl(divFIIsTab) : '—'}</p>
                 <p style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 1 }}>isento IR</p>
               </div>
               <div style={{ background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
                 <p style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>Ações</p>
-                <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--accent)' }}>{divAcoes > 0 ? fmt.brl(divAcoes) : '—'}</p>
-                <p style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 1 }}>líq. {divAcoesLiq > 0 ? fmt.brl(divAcoesLiq) : '—'}</p>
+                <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--accent)' }}>{divAcoesTab > 0 ? fmt.brl(divAcoesTab) : '—'}</p>
+                <p style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 1 }}>líq. {divAcoesLiqTab > 0 ? fmt.brl(divAcoesLiqTab) : '—'}</p>
               </div>
             </div>
             <p style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: 'var(--success)', textAlign: 'center' }}>
-              Total: {fmt.brl(rfTotalBruto + divFIIs + divAcoes)} recebido em 2026
+              Total líquido: {fmt.brl(totalLiqTab)}
             </p>
           </div>
 
           {/* Total box */}
           <div style={{ background: 'var(--bg-success)', border: '1px solid var(--success)', borderRadius: 10, padding: '10px 14px', marginBottom: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 11, color: 'var(--success)', fontWeight: 600 }}>Total recebido líquido</span>
-            <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--success)' }}>{fmt.brl(rfTotalLiq + divFIIs + divAcoesLiq)}</span>
+            <span style={{ fontSize: 18, fontWeight: 800, color: 'var(--success)' }}>{fmt.brl(totalLiqTab)}</span>
           </div>
 
           {/* RF */}
@@ -479,7 +492,7 @@ export default function DashboardPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               <div style={S.tile()}>
                 <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Dividendos recebidos</p>
-                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--success)' }}>{divFIIs > 0 ? fmt.brl(divFIIs) : '—'}</p>
+                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--success)' }}>{divFIIsTab > 0 ? fmt.brl(divFIIsTab) : '—'}</p>
                 {divFIIs === 0 && <p style={{ fontSize: 9, color: 'var(--text-muted)' }}>Lance na aba FIIs</p>}
               </div>
               <div style={S.tile()}>
@@ -504,7 +517,7 @@ export default function DashboardPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
               <div style={S.tile()}>
                 <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Proventos brutos</p>
-                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>{divAcoes > 0 ? fmt.brl(divAcoes) : '—'}</p>
+                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>{divAcoesTab > 0 ? fmt.brl(divAcoesTab) : '—'}</p>
                 {divAcoes === 0 && <p style={{ fontSize: 9, color: 'var(--text-muted)' }}>Registre em Ações</p>}
               </div>
               <div style={S.tile()}>
@@ -516,7 +529,7 @@ export default function DashboardPage() {
             </div>
             <div style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--success)', background: 'var(--bg-success)' }}>
               <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Líquido após IRRF 15%</p>
-              <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--success)' }}>{divAcoesLiq > 0 ? fmt.brl(divAcoesLiq) : '—'}</p>
+              <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--success)' }}>{divAcoesLiqTab > 0 ? fmt.brl(divAcoesLiqTab) : '—'}</p>
             </div>
           </div>
         </div>
@@ -572,8 +585,8 @@ export default function DashboardPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
             <div style={{ padding: '10px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, textAlign: 'center' }}>
               <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Média mensal (RF)</p>
-              <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--success)' }}>{fmt.brl(rfTotalLiq / 12)}</p>
-              <p style={{ fontSize: 9, color: 'var(--text-muted)' }}>RF líq. ÷ 12 meses</p>
+              <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--success)' }}>{fmt.brl(rfTotalLiq / mesAtual)}</p>
+              <p style={{ fontSize: 9, color: 'var(--text-muted)' }}>RF líq. ÷ {mesAtual} meses</p>
             </div>
             <div style={{ padding: '10px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, textAlign: 'center' }}>
               <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Aplicações ativas</p>
@@ -583,9 +596,9 @@ export default function DashboardPage() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
             {[
-              ['RF média/mês', fmt.brl(rfTotalLiq / 12), 'var(--warning)'],
-              ['FII média/mês', '—', 'var(--success)'],
-              ['Ações média/mês', '—', 'var(--accent)'],
+              ['RF média/mês',     fmt.brl(rfTotalLiq   / mesAtual), 'var(--warning)'],
+              ['FII média/mês',    divFIIs    > 0 ? fmt.brl(divFIIs    / mesAtual) : '—', 'var(--success)'],
+              ['Ações média/mês',  divAcoesLiq > 0 ? fmt.brl(divAcoesLiq / mesAtual) : '—', 'var(--accent)'],
             ].map(([lbl, val, c]) => (
               <div key={lbl} style={{ background: 'var(--bg)', border: `1px solid ${c}`, borderRadius: 7, padding: 8, textAlign: 'center' }}>
                 <p style={{ fontSize: 9, color: c, fontWeight: 700, marginBottom: 2 }}>{lbl}</p>
@@ -600,7 +613,7 @@ export default function DashboardPage() {
           {[
             ['2024 (ano completo)', null,        0,  'var(--accent)'],
             ['2025 (ano completo)', null,        0,  'var(--accent)'],
-            ['2026 (até out)',      rfTotalLiq,  60, 'var(--success)'],
+            ['2026 (até out)',      rfTotalLiq + divFIIs + divAcoesLiq,  60, 'var(--success)'],
           ].map(([lbl, val, pct, c]) => (
             <div key={lbl} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, marginBottom: 6 }}>
               <span style={{ color: c === 'var(--success)' ? c : 'var(--text-muted)', fontWeight: c === 'var(--success)' ? 700 : 400, minWidth: 130 }}>{lbl}</span>
