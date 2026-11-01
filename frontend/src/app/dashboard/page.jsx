@@ -45,7 +45,6 @@ export default function DashboardPage() {
   const [rf,          setRf]          = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [atualizando, setAtualizando] = useState(false);
-  const [tabRenda,    setTabRenda]    = useState('rf');
 
   const carregar = async () => {
     try {
@@ -345,81 +344,100 @@ export default function DashboardPage() {
 
         {/* RENDA PASSIVA */}
         <div style={S.card}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={S.dot('var(--success)')} />Renda passiva / rendimentos
+          <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={S.dot('var(--success)')} />Renda passiva recebida
           </p>
 
-          {/* Tabs */}
-          <div style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
-            {[['rf', 'Renda Fixa'], ['acoes', 'Ações'], ['fiis', 'FIIs']].map(([k, lbl]) => (
-              <button key={k} onClick={() => setTabRenda(k)} style={{
-                padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                border: '1px solid var(--border)',
-                background: tabRenda === k ? 'var(--accent)' : 'transparent',
-                color: tabRenda === k ? '#fff' : 'var(--text-muted)',
-              }}>{lbl}</button>
-            ))}
-          </div>
-
-          {tabRenda === 'rf' && (
-            <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 12 }}>
-                {[
-                  ['Rendimento bruto',  fmt.brl(rfTotalBruto), 'var(--warning)'],
-                  ['Líquido (após IR)', fmt.brl(rfTotalLiq),   'var(--success)'],
-                  ['IR regressivo',     fmt.brl(rfTotalIR),    'var(--danger)'],
-                  ['Rendimento % a.a.', `~${fmt.pct(rfLiqPct)}`, 'var(--success)'],
-                ].map(([lbl, val, c]) => (
-                  <div key={lbl} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)' }}>
-                    <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>{lbl}</p>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: c }}>{val}</p>
-                  </div>
-                ))}
-              </div>
-              {rf.slice(0, 4).map((r, i) => (
-                <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: i < 3 ? '1px solid var(--border)' : 'none' }}>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.nome}</span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--success)', whiteSpace: 'nowrap' }}>+{fmt.brl(r.rendLiquido||0)}</span>
+          {/* ── Renda Fixa ── */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, color: 'var(--warning)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <span style={S.dot('var(--warning)')} />Renda Fixa
+              </span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+              {[
+                ['Rendimento recebido', fmt.brl(rfTotalBruto), 'var(--warning)'],
+                ['Líquido (após IR)',   fmt.brl(rfTotalLiq),   'var(--success)'],
+              ].map(([lbl, val, c]) => (
+                <div key={lbl} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)' }}>
+                  <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>{lbl}</p>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: c }}>{val}</p>
                 </div>
               ))}
-            </>
-          )}
-
-          {tabRenda === 'acoes' && (
-            <div style={{ padding: '12px', border: '1.5px dashed var(--border)', borderRadius: 8, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.7 }}>
-              <p style={{ fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>📥 Para ver dividendos de Ações:</p>
-              <p>Acesse <strong>Carteira Ações → Dividendos</strong> para registrar os proventos recebidos e eles aparecerão aqui.</p>
-              {rankingAcoes.length > 0 && (
-                <div style={{ marginTop: 10 }}>
-                  <p style={{ fontWeight: 700, marginBottom: 6 }}>Ações na carteira:</p>
-                  {rankingAcoes.slice(0, 4).map(a => (
-                    <div key={a.ticker} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid var(--border)' }}>
-                      <span style={{ fontWeight: 700, color: 'var(--accent)' }}>{a.ticker}</span>
-                      <span>{a.preco_atual ? fmt.brl(a.preco_atual) : '—'}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
-          )}
-
-          {tabRenda === 'fiis' && (
-            <div style={{ padding: '12px', border: '1.5px dashed var(--border)', borderRadius: 8, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.7 }}>
-              <p style={{ fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>📥 Para ver dividendos de FIIs:</p>
-              <p>Acesse <strong>Carteira FII → Importar B3</strong> para importar o extrato e os proventos aparecerão aqui.</p>
-              {rankingFIIs.length > 0 && (
-                <div style={{ marginTop: 10 }}>
-                  <p style={{ fontWeight: 700, marginBottom: 6 }}>FIIs na carteira:</p>
-                  {rankingFIIs.slice(0, 4).map(f => (
-                    <div key={f.ticker} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid var(--border)' }}>
-                      <span style={{ fontWeight: 700, color: 'var(--success)' }}>{f.ticker}</span>
-                      <span>{f.preco_atual ? fmt.brl(f.preco_atual) : '—'}</span>
-                    </div>
-                  ))}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              {[
+                ['Taxa média bruta a.a.', rfTaxaMedia,             'var(--warning)'],
+                ['Rendimento líq. a.a.', `~${fmt.pct(rfLiqPct)}`, 'var(--success)'],
+              ].map(([lbl, val, c]) => (
+                <div key={lbl} style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)' }}>
+                  <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>{lbl}</p>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: c }}>{val}</p>
                 </div>
-              )}
+              ))}
             </div>
-          )}
+          </div>
+
+          <div style={{ height: 1, background: 'var(--border)', margin: '10px 0' }} />
+
+          {/* ── FIIs ── */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, color: 'var(--success)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <span style={S.dot('var(--success)')} />FIIs
+              </span>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>isentos IR</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+              <div style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)' }}>
+                <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Dividendos recebidos</p>
+                <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--success)' }}>
+                  {rankingFIIs.length > 0 ? '—' : '—'}
+                </p>
+                <p style={{ fontSize: 9, color: 'var(--text-muted)' }}>Importe extrato B3</p>
+              </div>
+              <div style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)' }}>
+                <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>DY médio a.a.</p>
+                <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--success)' }}>
+                  {rankingFIIs.length > 0
+                    ? `${(rankingFIIs.filter(f => f.dy_anual).reduce((s, f) => s + Number(f.dy_anual), 0) / (rankingFIIs.filter(f => f.dy_anual).length || 1)).toFixed(1)}% a.a.`
+                    : '—'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ height: 1, background: 'var(--border)', margin: '10px 0' }} />
+
+          {/* ── Ações ── */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <span style={S.dot('var(--accent)')} />Ações
+              </span>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>IRRF 15%</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
+              <div style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)' }}>
+                <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Proventos brutos</p>
+                <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>—</p>
+                <p style={{ fontSize: 9, color: 'var(--text-muted)' }}>Registre em Ações</p>
+              </div>
+              <div style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)' }}>
+                <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>DY médio a.a.</p>
+                <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)' }}>
+                  {rankingAcoes.length > 0
+                    ? `${(rankingAcoes.filter(a => a.dy_anual).reduce((s, a) => s + Number(a.dy_anual), 0) / (rankingAcoes.filter(a => a.dy_anual).length || 1)).toFixed(1)}% a.a.`
+                    : '—'}
+                </p>
+              </div>
+            </div>
+            <div style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--success)', background: 'var(--bg-success)' }}>
+              <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Líquido após IRRF 15%</p>
+              <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--success)' }}>—</p>
+            </div>
+          </div>
         </div>
 
         {/* GRÁFICO + BENCHMARK */}
