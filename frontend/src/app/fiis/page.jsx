@@ -1619,13 +1619,20 @@ export default function FIIsPage() {
   const [modalB3, setModalB3]         = useState(false);
   const [busca, setBusca]             = useState('');
 
-  const [activeTab, setActiveTab] = useState('carteira');
+  const [activeTab, setActiveTab]         = useState('carteira');
+  const [fiisVendidos, setFiisVendidos]   = useState([]);
   const { anosDisponiveis, anoFiltro, setAnoFiltro, resumoAno, resumoGeral, carregarDados } = useDividendosFII(fiis);
   const cotacoes = useCotacoesLive(fiis);
 
   const carregar = async () => {
-    try { const r = await api.get('/fiis'); setFiis(r.data); }
-    finally { setLoading(false); }
+    try {
+      const [r, rv] = await Promise.all([
+        api.get('/fiis'),
+        api.get('/fiis/vendidos').catch(() => ({ data: [] })),
+      ]);
+      setFiis(r.data);
+      setFiisVendidos(rv.data || []);
+    } finally { setLoading(false); }
   };
 
   useEffect(() => { carregar(); }, []);
@@ -1697,10 +1704,14 @@ export default function FIIsPage() {
         <FIIsForm onAdicionado={carregar}/>
       </Suspense>
 
-      {/* Tabs: Carteira / Ranking */}
-      {fiis.length > 0 && (
+      {/* Tabs: Carteira / Ranking / FIIs Vendidos */}
+      {(fiis.length > 0 || fiisVendidos.length > 0) && (
         <div style={{display:'flex',gap:4,marginBottom:20,borderBottom:'2px solid #E8ECF0',paddingBottom:0}}>
-          {[{id:'carteira',label:'📋 Carteira'},{id:'ranking',label:'🏆 Ranking'}].map(tab=>(
+          {[
+            {id:'carteira', label:'📋 Carteira'},
+            {id:'ranking',  label:'🏆 Ranking'},
+            {id:'vendidos', label:`📦 FIIs Vendidos${fiisVendidos.length > 0 ? ` (${fiisVendidos.length})` : ''}`},
+          ].map(tab=>(
             <button key={tab.id} onClick={()=>setActiveTab(tab.id)}
               style={{padding:'8px 18px',border:'none',borderBottom:`2px solid ${activeTab===tab.id?'#2563EB':'transparent'}`,
                 background:'none',cursor:'pointer',fontSize:13,fontWeight:activeTab===tab.id?700:500,
@@ -1752,6 +1763,59 @@ export default function FIIsPage() {
 
       {activeTab === 'ranking' && fiis.length > 0 && (
         <TabRanking fiis={fiis} cotacoes={cotacoes} resumoGeral={resumoGeral} />
+      )}
+
+      {activeTab === 'vendidos' && (
+        <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:14,padding:'20px 24px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:16}}>
+            <span style={{fontSize:14,fontWeight:700,color:'#1A1A2E'}}>📦 FIIs Vendidos</span>
+            <span style={{fontSize:12,color:'#8896A8'}}>— dividendos recebidos mantidos na contabilização</span>
+          </div>
+          {fiisVendidos.length === 0 ? (
+            <div style={{textAlign:'center',padding:'32px 0',color:'#8896A8'}}>
+              <p style={{fontSize:14,fontWeight:500,marginBottom:4}}>Nenhum FII vendido ainda.</p>
+              <p style={{fontSize:12}}>Quando você vender toda a posição de um FII, ele aparecerá aqui.</p>
+            </div>
+          ) : (
+            <div style={{overflowX:'auto'}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                <thead>
+                  <tr style={{borderBottom:'2px solid #E8ECF0'}}>
+                    {['Ticker','Nome','PM (R$)','Preço Venda','Data Venda','Div. Recebidos','Resultado G/P'].map(h=>(
+                      <th key={h} style={{padding:'8px 12px',textAlign:'left',fontWeight:700,color:'#8896A8',fontSize:11,textTransform:'uppercase',letterSpacing:'0.04em',whiteSpace:'nowrap'}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {fiisVendidos.map((f,i)=>{
+                    const pm        = Number(f.preco_compra || 0);
+                    const pv        = Number(f.preco_venda  || 0);
+                    const resultado = pv > 0 && pm > 0 ? pv - pm : null;
+                    const pctRes    = pm > 0 && resultado != null ? (resultado / pm) * 100 : null;
+                    const divTotal  = Number(f.dividendos_geral || f.dividendos_ano || 0);
+                    return (
+                      <tr key={f.ticker} style={{borderBottom:'1px solid #F0F2F5',background:i%2===0?'transparent':'#FAFBFC'}}>
+                        <td style={{padding:'10px 12px',fontWeight:700,color:'#1A1A2E'}}>{f.ticker}</td>
+                        <td style={{padding:'10px 12px',color:'#4A5568',maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.nome_fundo || '—'}</td>
+                        <td style={{padding:'10px 12px',color:'#4A5568'}}>{pm > 0 ? fmt.brl(pm) : '—'}</td>
+                        <td style={{padding:'10px 12px',fontWeight:600,color:pv > 0 ? '#1A1A2E' : '#8896A8'}}>{pv > 0 ? fmt.brl(pv) : '—'}</td>
+                        <td style={{padding:'10px 12px',color:'#4A5568'}}>{f.data_venda ? new Date(f.data_venda).toLocaleDateString('pt-BR') : '—'}</td>
+                        <td style={{padding:'10px 12px',fontWeight:600,color:divTotal > 0 ? '#16A34A' : '#8896A8'}}>{divTotal > 0 ? fmt.brl(divTotal) : '—'}</td>
+                        <td style={{padding:'10px 12px'}}>
+                          {resultado != null ? (
+                            <span style={{fontWeight:700,color:resultado >= 0 ? '#16A34A' : '#DC2626'}}>
+                              {resultado >= 0 ? '+' : ''}{fmt.brl(resultado)} ({pctRes >= 0 ? '+' : ''}{fmt.pct(pctRes)})
+                            </span>
+                          ) : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Modais */}

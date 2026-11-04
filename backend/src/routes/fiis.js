@@ -6,11 +6,18 @@ const { buscarFII, calcularPesos } = require('../services/brapiService');
 const router = express.Router();
 router.use(auth);
 
-// GET /api/fiis
+// Migração inline — adiciona colunas de venda se não existirem
+pool.query(`
+  ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS vendido BOOLEAN DEFAULT FALSE;
+  ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS data_venda DATE;
+  ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS preco_venda NUMERIC(10,2);
+`).catch(e => console.error('[fiis migration]', e.message));
+
+// GET /api/fiis — retorna apenas ativos (não vendidos)
 router.get('/', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT * FROM fiis_carteira WHERE usuario_id=$1 ORDER BY ticker',
+      'SELECT * FROM fiis_carteira WHERE usuario_id=$1 AND (vendido IS NOT TRUE) ORDER BY ticker',
       [req.userId]
     );
     res.json(calcularPesos(result.rows));
@@ -123,7 +130,7 @@ router.delete('/:ticker', async (req, res) => {
 // POST /api/fiis/atualizar-todos
 router.post('/atualizar-todos', async (req, res) => {
   try {
-    const fiis = await pool.query('SELECT ticker FROM fiis_carteira WHERE usuario_id=$1', [req.userId]);
+    const fiis = await pool.query('SELECT ticker FROM fiis_carteira WHERE usuario_id=$1 AND (vendido IS NOT TRUE)', [req.userId]);
     const resultados = [];
     for (const fii of fiis.rows) {
       try {
@@ -214,10 +221,19 @@ router.post('/vender', async (req, res) => {
     const pmVenda    = Number(fiiInfo.rows[0]?.preco_compra || 0);
     const resultadoVenda = precoAtual > 0 ? parseFloat(((precoAtual - pmVenda) * Number(quantidade)).toFixed(2)) : null;
     const totalVenda = parseFloat((precoAtual * Number(quantidade)).toFixed(2));
-    await pool.query(
-      'UPDATE fiis_carteira SET quantidade=$1, updated_at=NOW() WHERE usuario_id=$2 AND ticker=$3',
-      [novaQtd, req.userId, ticker.toUpperCase()]
-    );
+    if (novaQtd === 0) {
+      // Posição totalmente encerrada — marca como vendido (mantém dividendos)
+      await pool.query(
+        `UPDATE fiis_carteira SET quantidade=0, vendido=TRUE, data_venda=CURRENT_DATE,
+         preco_venda=$1, updated_at=NOW() WHERE usuario_id=$2 AND ticker=$3`,
+        [precoAtual || null, req.userId, ticker.toUpperCase()]
+      );
+    } else {
+      await pool.query(
+        'UPDATE fiis_carteira SET quantidade=$1, updated_at=NOW() WHERE usuario_id=$2 AND ticker=$3',
+        [novaQtd, req.userId, ticker.toUpperCase()]
+      );
+    }
     // Histórico
     await pool.query(
       `INSERT INTO historico_operacoes (usuario_id, categoria, ticker, tipo, quantidade, preco_unitario, total, resultado, data_operacao)
@@ -402,7 +418,7 @@ async function recalcularDividendosGeral(usuarioId, ticker) {
 }
 
 async function recalcularPesosFII(usuarioId) {
-  const fiis = await pool.query('SELECT id, classificacao FROM fiis_carteira WHERE usuario_id=$1', [usuarioId]);
+  const fiis = await pool.query('SELECT id, classificacao FROM fiis_carteira WHERE usuario_id=$1 AND (vendido IS NOT TRUE)', [usuarioId]);
   const pesoBase = (cl) => cl === 'EXCELENTE' ? 5 : cl === 'BOM' ? 3 : cl === 'ATENÇÃO' ? 1 : 0;
   const total = fiis.rows.reduce((s, f) => s + pesoBase(f.classificacao), 0);
   for (const f of fiis.rows) {
@@ -442,6 +458,24 @@ router.get('/cotacoes-live', async (req, res) => {
   } catch (err) {
     console.error('[cotacoes-live]', err.message);
     res.status(500).json({ error: 'Erro ao buscar cotações ao vivo.' });
+  }
+});
+
+// GET /api/fiis/vendidos
+router.get('/vendidos', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT ticker, nome_fundo, preco_compra, preco_venda, data_venda,
+              dividendos_ano, dividendos_geral, quantidade
+       FROM fiis_carteira
+       WHERE usuario_id=$1 AND vendido = TRUE
+       ORDER BY data_venda DESC, ticker`,
+      [req.userId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[fiis/vendidos]', err.message);
+    res.status(500).json({ error: 'Erro ao buscar FIIs vendidos.' });
   }
 });
 
