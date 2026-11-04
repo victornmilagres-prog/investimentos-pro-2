@@ -11,7 +11,14 @@ pool.query(`
   ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS vendido BOOLEAN DEFAULT FALSE;
   ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS data_venda DATE;
   ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS preco_venda NUMERIC(10,2);
-`).catch(e => console.error('[fiis migration]', e.message));
+`).then(() =>
+  // Corrige FIIs vendidos antes do feature: quantidade=0 mas sem flag vendido
+  pool.query(`
+    UPDATE fiis_carteira
+    SET vendido = TRUE, data_venda = COALESCE(data_venda, CURRENT_DATE)
+    WHERE quantidade = 0 AND (vendido IS NULL OR vendido = FALSE)
+  `).then(r => { if (r.rowCount > 0) console.log('[fiis migration] Marcados', r.rowCount, 'FII(s) vendidos retroativamente'); })
+).catch(e => console.error('[fiis migration]', e.message));
 
 // GET /api/fiis — retorna apenas ativos (não vendidos)
 router.get('/', async (req, res) => {
