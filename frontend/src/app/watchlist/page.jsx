@@ -215,7 +215,7 @@ function AlertaPrecoAlvo({ item }) {
 function RadarCard({ item, onRemover, onAddCarteira, onToggleFavorito, onUpdateItem }) {
   const isAcao = (item.tipo||'').toUpperCase()==='ACAO' || (item.tipo||'').toUpperCase()==='AÇÃO';
   const criterios = isAcao ? CRITERIOS_ACAO : CRITERIOS_FII;
-  const maxScore  = item.max_score || (isAcao ? 6 : 4);
+  const maxScore  = parseInt(item.max_score) || (isAcao ? 6 : 4);
   const scoreNum  = typeof item.score==='string' ? parseInt(item.score) : (item.score??0);
   const fillPct   = (scoreNum/maxScore)*100;
   const varPos    = (item.variacao_dia??0) >= 0;

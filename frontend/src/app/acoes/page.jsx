@@ -662,8 +662,8 @@ function AcaoCard({ a, onRemover, onSalvar, onAbrirProvento, resumoAno, resumoGe
   const [preco, setPreco] = useState(String(a.preco_compra ?? ''));
 
   const perf     = calcPerformance(a.preco_atual, a.preco_compra, a.quantidade);
-  const maxScore = a.max_score || 6;
-  const scoreNum = typeof a.score === 'string' ? parseInt(a.score) : (a.score ?? 0);
+  const maxScore = parseInt(a.max_score) || 6;
+  const scoreNum = parseInt(a.score) || 0;
   const fillPct  = (scoreNum / maxScore) * 100;
 
   const salvar = async () => { await onSalvar(a.ticker, qtd, preco); setEditando(false); };
@@ -917,7 +917,7 @@ function Dashboard({ acoes, anoFiltro, setAnoFiltro, anosDisponiveis, resumoAno 
           </div>
           <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:12,padding:'16px 18px'}}>
             <p style={{fontSize:11,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:6}}>Score médio</p>
-            <p style={{fontSize:20,fontWeight:800,color:'#2563EB',margin:0}}>{scoreMedio} / {acoes[0]?.max_score||6}</p>
+            <p style={{fontSize:20,fontWeight:800,color:'#2563EB',margin:0}}>{scoreMedio} / {parseInt(acoes[0]?.max_score)||6}</p>
             <p style={{fontSize:11,color:'#8896A8',marginTop:3}}>{acoes.filter(a=>(typeof a.score==='string'?parseInt(a.score):a.score)>=4).length} MANTER · {acoes.filter(a=>(typeof a.score==='string'?parseInt(a.score):a.score)===3).length} ATENÇÃO</p>
           </div>
         </div>

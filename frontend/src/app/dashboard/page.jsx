@@ -379,7 +379,7 @@ export default function DashboardPage() {
             <div>
               <p style={{ fontWeight: 700, color: 'var(--success)', marginBottom: 2 }}>{a.ticker} — oportunidade identificada</p>
               <p style={{ color: 'var(--text-muted)' }}>
-                {[a.pvp && `P/VP ${Number(a.pvp).toFixed(2)}`, a.dy_anual && `DY ${Number(a.dy_anual).toFixed(1)}%`, a.score && `Score ${a.score}/${a.max_score||4}`].filter(Boolean).join(' · ')} · {a.preco_atual ? fmt.brl(a.preco_atual) : ''}
+                {[a.pvp && `P/VP ${Number(a.pvp).toFixed(2)}`, a.dy_anual && `DY ${Number(a.dy_anual).toFixed(1)}%`, a.score && `Score ${a.score}/${parseInt(a.max_score)||4}`].filter(Boolean).join(' · ')} · {a.preco_atual ? fmt.brl(a.preco_atual) : ''}
               </p>
             </div>
           </div>
@@ -762,7 +762,7 @@ export default function DashboardPage() {
               <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--success)', minWidth: 52 }}>{a.ticker}</span>
               <div style={{ flex: 1 }}>
                 <p style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                  {a.tipo === 'FII' ? 'FII' : 'Ação'}{[a.pvp && ` · P/VP ${Number(a.pvp).toFixed(2)}`, a.dy_anual && ` · DY ${Number(a.dy_anual).toFixed(1)}%`, a.score && ` · Score ${a.score}/${a.max_score||4}`].filter(Boolean).join('')}
+                  {a.tipo === 'FII' ? 'FII' : 'Ação'}{[a.pvp && ` · P/VP ${Number(a.pvp).toFixed(2)}`, a.dy_anual && ` · DY ${Number(a.dy_anual).toFixed(1)}%`, a.score && ` · Score ${a.score}/${parseInt(a.max_score)||4}`].filter(Boolean).join('')}
                 </p>
               </div>
               <span style={{ fontSize: 12, fontWeight: 600 }}>{a.preco_atual ? fmt.brl(a.preco_atual) : ''}</span>
@@ -780,7 +780,7 @@ export default function DashboardPage() {
               <span style={{ fontSize: 13, fontWeight: 800, color: 'var(--danger)', minWidth: 52 }}>{a.ticker}</span>
               <div style={{ flex: 1 }}>
                 <p style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                  {a.tipo === 'FII' ? 'FII' : 'Ação'}{[a.pvp && ` · P/VP ${Number(a.pvp).toFixed(2)}`, a.pl && ` · P/L ${Number(a.pl).toFixed(1)}`, a.score && ` · Score ${a.score}/${a.max_score||5}`].filter(Boolean).join('')}
+                  {a.tipo === 'FII' ? 'FII' : 'Ação'}{[a.pvp && ` · P/VP ${Number(a.pvp).toFixed(2)}`, a.pl && ` · P/L ${Number(a.pl).toFixed(1)}`, a.score && ` · Score ${a.score}/${parseInt(a.max_score)||5}`].filter(Boolean).join('')}
                 </p>
               </div>
               <span style={{ fontSize: 12, fontWeight: 600 }}>{a.preco_atual ? fmt.brl(a.preco_atual) : ''}</span>
