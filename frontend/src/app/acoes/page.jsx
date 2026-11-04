@@ -936,6 +936,98 @@ function Dashboard({ acoes, anoFiltro, setAnoFiltro, anosDisponiveis, resumoAno 
   );
 }
 
+// ─── RANKING ──────────────────────────────────────────────────────────────
+function TabRankingAcoes({ acoes }) {
+  const [sortKey, setSortKey] = useState('score');
+  const [sortDir, setSortDir] = useState('desc');
+
+  const toggleSort = key => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('desc'); }
+  };
+
+  const Th = ({ k, children }) => (
+    <th onClick={() => toggleSort(k)}
+      style={{padding:'8px 12px',textAlign:'left',fontWeight:700,
+        color:sortKey===k?'#2563EB':'#8896A8',fontSize:11,textTransform:'uppercase',
+        letterSpacing:'0.04em',whiteSpace:'nowrap',cursor:'pointer',userSelect:'none'}}>
+      {children}{sortKey===k?(sortDir==='asc'?' ↑':' ↓'):''}
+    </th>
+  );
+
+  const sorted = [...acoes].sort((a, b) => {
+    if (sortKey === 'ticker') {
+      const cmp = String(a.ticker).localeCompare(String(b.ticker));
+      return sortDir === 'asc' ? cmp : -cmp;
+    }
+    const toN = v => { const n = parseFloat(v); return isNaN(n) ? (sortDir==='desc'?-Infinity:Infinity) : n; };
+    return sortDir === 'asc' ? toN(a[sortKey]) - toN(b[sortKey]) : toN(b[sortKey]) - toN(a[sortKey]);
+  });
+
+  return (
+    <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:14,overflow:'hidden'}}>
+      <div style={{overflowX:'auto'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+          <thead>
+            <tr style={{borderBottom:'2px solid #E8ECF0',background:'#FAFBFC'}}>
+              <th style={{padding:'8px 12px',textAlign:'left',fontWeight:700,color:'#8896A8',fontSize:11,textTransform:'uppercase',letterSpacing:'0.04em'}}>#</th>
+              <Th k="ticker">Ticker</Th>
+              <Th k="nome_empresa">Nome</Th>
+              <Th k="preco_atual">Preço</Th>
+              <Th k="variacao_dia">Var. Dia</Th>
+              <Th k="pl">P/L</Th>
+              <Th k="pvp">P/VP</Th>
+              <Th k="dy">DY a.a.</Th>
+              <Th k="margem_liquida">Marg. Líq.</Th>
+              <Th k="roe">ROE</Th>
+              <Th k="score">Score</Th>
+              <th style={{padding:'8px 12px',textAlign:'left',fontWeight:700,color:'#8896A8',fontSize:11,textTransform:'uppercase',letterSpacing:'0.04em'}}>Decisão</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((a, i) => {
+              const sc  = parseInt(a.score) || 0;
+              const mx  = parseInt(a.max_score) || 6;
+              const pct = mx > 0 ? sc / mx : 0;
+              const badgeColor = pct >= 0.75 ? '#16A34A' : pct >= 0.5 ? '#D97706' : '#DC2626';
+              const vd  = Number(a.variacao_dia || 0);
+              const dec = (a.decisao || a.classificacao || '—').toUpperCase();
+              const decColor = dec === 'COMPRAR' ? '#16A34A' : dec === 'VENDER' ? '#DC2626' : '#D97706';
+              return (
+                <tr key={a.ticker} style={{borderBottom:'1px solid #F0F2F5',transition:'background 0.1s'}}
+                  onMouseEnter={e=>e.currentTarget.style.background='#F8FAFF'}
+                  onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                  <td style={{padding:'10px 12px',color:'#8896A8',fontSize:12}}>{i+1}</td>
+                  <td style={{padding:'10px 12px',fontWeight:700,color:'#1A1A2E'}}>{a.ticker}</td>
+                  <td style={{padding:'10px 12px',color:'#4A5568',maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.nome_empresa||'—'}</td>
+                  <td style={{padding:'10px 12px',fontWeight:600,color:'#1A1A2E'}}>{a.preco_atual?fmt.brl(a.preco_atual):'—'}</td>
+                  <td style={{padding:'10px 12px',fontWeight:600,color:vd>0?'#16A34A':vd<0?'#DC2626':'#4A5568'}}>
+                    {a.variacao_dia!=null?`${vd>0?'+':''}${vd.toFixed(2)}%`:'—'}
+                  </td>
+                  <td style={{padding:'10px 12px',color:'#4A5568'}}>{a.pl?Number(a.pl).toFixed(1):'—'}</td>
+                  <td style={{padding:'10px 12px',color:'#4A5568'}}>{a.pvp?Number(a.pvp).toFixed(2):'—'}</td>
+                  <td style={{padding:'10px 12px',color:'#4A5568'}}>{a.dy?`${Number(a.dy).toFixed(1)}%`:'—'}</td>
+                  <td style={{padding:'10px 12px',color:'#4A5568'}}>{a.margem_liquida!=null?`${Number(a.margem_liquida).toFixed(1)}%`:'—'}</td>
+                  <td style={{padding:'10px 12px',color:'#4A5568'}}>{a.roe!=null?`${Number(a.roe).toFixed(1)}%`:'—'}</td>
+                  <td style={{padding:'10px 12px'}}>
+                    <span style={{display:'inline-block',padding:'2px 8px',borderRadius:20,
+                      background:`${badgeColor}18`,color:badgeColor,fontWeight:700,fontSize:12,border:`1px solid ${badgeColor}30`}}>
+                      {sc}/{mx}
+                    </span>
+                  </td>
+                  <td style={{padding:'10px 12px'}}>
+                    <span style={{fontSize:12,fontWeight:700,color:decColor}}>{dec}</span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ─── PÁGINA ───────────────────────────────────────────────────────────────
 const BuscaAcoes = ({ valor, onChange }) => (
   <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:10,padding:'10px 14px',display:'flex',alignItems:'center',gap:8,marginBottom:16}}>
@@ -1039,11 +1131,12 @@ export default function AcoesPage() {
         <AcoesForm onAdicionado={carregar}/>
       </Suspense>
 
-      {/* Tabs: Carteira / Ações Vendidas */}
+      {/* Tabs: Carteira / Ranking / Ações Vendidas */}
       {(acoes.length > 0 || acoesVendidas.length > 0) && (
         <div style={{display:'flex',gap:4,marginBottom:20,borderBottom:'2px solid #E8ECF0',paddingBottom:0}}>
           {[
             {id:'carteira',  label:'📋 Carteira'},
+            {id:'ranking',   label:'🏆 Ranking'},
             {id:'vendidas',  label:`📦 Ações Vendidas${acoesVendidas.length > 0 ? ` (${acoesVendidas.length})` : ''}`},
           ].map(tab=>(
             <button key={tab.id} onClick={()=>setActiveTab(tab.id)}
@@ -1095,6 +1188,10 @@ export default function AcoesPage() {
           </div>
         )}
       </>}
+
+      {activeTab === 'ranking' && (
+        <TabRankingAcoes acoes={acoes} />
+      )}
 
       {activeTab === 'vendidas' && (
         <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:14,padding:'20px 24px'}}>
