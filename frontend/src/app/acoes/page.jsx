@@ -951,18 +951,26 @@ const BuscaAcoes = ({ valor, onChange }) => (
 );
 
 export default function AcoesPage() {
-  const [acoes, setAcoes]             = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [atualizando, setAtualizando] = useState(false);
-  const [modalCompra, setModalCompra] = useState(null);
-  const [modalProv, setModalProv]     = useState(false);
-  const [busca, setBusca]             = useState('');
+  const [acoes, setAcoes]                   = useState([]);
+  const [acoesVendidas, setAcoesVendidas]   = useState([]);
+  const [loading, setLoading]               = useState(true);
+  const [atualizando, setAtualizando]       = useState(false);
+  const [modalCompra, setModalCompra]       = useState(null);
+  const [modalProv, setModalProv]           = useState(false);
+  const [busca, setBusca]                   = useState('');
+  const [activeTab, setActiveTab]           = useState('carteira');
 
   const { anosDisponiveis, anoFiltro, setAnoFiltro, resumoAno, resumoGeral, carregarDados } = useProventosExtras(acoes);
 
   const carregar = async () => {
-    try { const r = await api.get('/acoes'); setAcoes(r.data); }
-    finally { setLoading(false); }
+    try {
+      const [r, rv] = await Promise.all([
+        api.get('/acoes'),
+        api.get('/acoes/vendidas').catch(() => ({ data: [] })),
+      ]);
+      setAcoes(r.data);
+      setAcoesVendidas(rv.data || []);
+    } finally { setLoading(false); }
   };
 
   useEffect(() => { carregar(); }, []);
@@ -1031,41 +1039,113 @@ export default function AcoesPage() {
         <AcoesForm onAdicionado={carregar}/>
       </Suspense>
 
-      <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:12,padding:'12px 20px',marginBottom:8,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-        <span style={{fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginRight:4}}>Critérios de avaliação (Score /6)</span>
-        {['P/L < 15','P/VP < 1,5','Margem Liq. > 10%','ROE > 10%','Dívida/EBIT < 2x','DY ≥ 6%'].map(c=>(
-          <span key={c} style={{fontSize:12,fontWeight:500,padding:'3px 10px',borderRadius:20,background:'#F0F2F5',color:'#4A5568',border:'1px solid #E8ECF0'}}>{c}</span>
-        ))}
-      </div>
-
-      <div style={{display:'flex',alignItems:'center',gap:16,fontSize:11,color:'#8896A8',marginBottom:16}}>
-        {[{c:'#16A34A',l:'Aprovado'},{c:'#DC2626',l:'Reprovado'},{c:'#D97706',l:'Sem dado'}].map(({c,l})=>(
-          <span key={l}><span style={{display:'inline-block',width:7,height:7,borderRadius:'50%',background:c,marginRight:4}}/>{l}</span>
-        ))}
-      </div>
-
-      {acoes.length > 0 && <BuscaAcoes valor={busca} onChange={setBusca} />}
-
-      {acoes.length > 0 ? (
-        <div className="grid-cards">
-          {acoes.filter(a => {
-            const q = busca.toLowerCase();
-            return !q || a.ticker.toLowerCase().includes(q) || (a.nome_empresa || '').toLowerCase().includes(q);
-          }).map(a=>(
-            <AcaoCard key={a.ticker} a={a}
-              onRemover={remover}
-              onSalvar={salvarEdicao}
-              onAbrirProvento={()=>setModalProv(true)}
-              resumoAno={resumoAno}
-              resumoGeral={resumoGeral}
-            />
+      {/* Tabs: Carteira / Ações Vendidas */}
+      {(acoes.length > 0 || acoesVendidas.length > 0) && (
+        <div style={{display:'flex',gap:4,marginBottom:20,borderBottom:'2px solid #E8ECF0',paddingBottom:0}}>
+          {[
+            {id:'carteira',  label:'📋 Carteira'},
+            {id:'vendidas',  label:`📦 Ações Vendidas${acoesVendidas.length > 0 ? ` (${acoesVendidas.length})` : ''}`},
+          ].map(tab=>(
+            <button key={tab.id} onClick={()=>setActiveTab(tab.id)}
+              style={{padding:'8px 18px',border:'none',borderBottom:`2px solid ${activeTab===tab.id?'#2563EB':'transparent'}`,
+                background:'none',cursor:'pointer',fontSize:13,fontWeight:activeTab===tab.id?700:500,
+                color:activeTab===tab.id?'#2563EB':'#8896A8',marginBottom:-2,transition:'all 0.15s'}}>
+              {tab.label}
+            </button>
           ))}
         </div>
-      ) : (
-        <div style={{background:'#FFF',border:'1px solid #E8ECF0',borderRadius:14,padding:40,textAlign:'center'}}>
-          <TrendingUp size={40} style={{color:'#D0D8E0',margin:'0 auto 12px'}}/>
-          <p style={{color:'#4A5568',fontWeight:500,marginBottom:4}}>Nenhuma ação adicionada</p>
-          <p style={{color:'#8896A8',fontSize:13}}>Digite um ticker acima para buscar e avaliar uma ação.</p>
+      )}
+
+      {activeTab === 'carteira' && <>
+        <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:12,padding:'12px 20px',marginBottom:8,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+          <span style={{fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginRight:4}}>Critérios de avaliação (Score /6)</span>
+          {['P/L < 15','P/VP < 1,5','Margem Liq. > 10%','ROE > 10%','Dívida/EBIT < 2x','DY ≥ 6%'].map(c=>(
+            <span key={c} style={{fontSize:12,fontWeight:500,padding:'3px 10px',borderRadius:20,background:'#F0F2F5',color:'#4A5568',border:'1px solid #E8ECF0'}}>{c}</span>
+          ))}
+        </div>
+
+        <div style={{display:'flex',alignItems:'center',gap:16,fontSize:11,color:'#8896A8',marginBottom:16}}>
+          {[{c:'#16A34A',l:'Aprovado'},{c:'#DC2626',l:'Reprovado'},{c:'#D97706',l:'Sem dado'}].map(({c,l})=>(
+            <span key={l}><span style={{display:'inline-block',width:7,height:7,borderRadius:'50%',background:c,marginRight:4}}/>{l}</span>
+          ))}
+        </div>
+
+        {acoes.length > 0 && <BuscaAcoes valor={busca} onChange={setBusca} />}
+
+        {acoes.length > 0 ? (
+          <div className="grid-cards">
+            {acoes.filter(a => {
+              const q = busca.toLowerCase();
+              return !q || a.ticker.toLowerCase().includes(q) || (a.nome_empresa || '').toLowerCase().includes(q);
+            }).map(a=>(
+              <AcaoCard key={a.ticker} a={a}
+                onRemover={remover}
+                onSalvar={salvarEdicao}
+                onAbrirProvento={()=>setModalProv(true)}
+                resumoAno={resumoAno}
+                resumoGeral={resumoGeral}
+              />
+            ))}
+          </div>
+        ) : (
+          <div style={{background:'#FFF',border:'1px solid #E8ECF0',borderRadius:14,padding:40,textAlign:'center'}}>
+            <TrendingUp size={40} style={{color:'#D0D8E0',margin:'0 auto 12px'}}/>
+            <p style={{color:'#4A5568',fontWeight:500,marginBottom:4}}>Nenhuma ação adicionada</p>
+            <p style={{color:'#8896A8',fontSize:13}}>Digite um ticker acima para buscar e avaliar uma ação.</p>
+          </div>
+        )}
+      </>}
+
+      {activeTab === 'vendidas' && (
+        <div style={{background:'#FFFFFF',border:'1px solid #E8ECF0',borderRadius:14,padding:'20px 24px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:16}}>
+            <span style={{fontSize:14,fontWeight:700,color:'#1A1A2E'}}>📦 Ações Vendidas</span>
+            <span style={{fontSize:12,color:'#8896A8'}}>— proventos recebidos mantidos na contabilização</span>
+          </div>
+          {acoesVendidas.length === 0 ? (
+            <div style={{textAlign:'center',padding:'32px 0',color:'#8896A8'}}>
+              <p style={{fontSize:14,fontWeight:500,marginBottom:4}}>Nenhuma ação vendida ainda.</p>
+              <p style={{fontSize:12}}>Quando você vender toda a posição de uma ação, ela aparecerá aqui.</p>
+            </div>
+          ) : (
+            <div style={{overflowX:'auto'}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                <thead>
+                  <tr style={{borderBottom:'2px solid #E8ECF0'}}>
+                    {['Ticker','Nome','PM (R$)','Preço Venda','Data Venda','Proventos Recebidos','Resultado G/P'].map(h=>(
+                      <th key={h} style={{padding:'8px 12px',textAlign:'left',fontWeight:700,color:'#8896A8',fontSize:11,textTransform:'uppercase',letterSpacing:'0.04em',whiteSpace:'nowrap'}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {acoesVendidas.map((a,i)=>{
+                    const pm        = Number(a.preco_compra || 0);
+                    const pv        = Number(a.preco_venda  || 0);
+                    const resultado = pv > 0 && pm > 0 ? pv - pm : null;
+                    const pctRes    = pm > 0 && resultado != null ? (resultado / pm) * 100 : null;
+                    const provTotal = Number(a.dividendos_ano || 0);
+                    return (
+                      <tr key={a.ticker} style={{borderBottom:'1px solid #F0F2F5',background:i%2===0?'transparent':'#FAFBFC'}}>
+                        <td style={{padding:'10px 12px',fontWeight:700,color:'#1A1A2E'}}>{a.ticker}</td>
+                        <td style={{padding:'10px 12px',color:'#4A5568',maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.nome_empresa || '—'}</td>
+                        <td style={{padding:'10px 12px',color:'#4A5568'}}>{pm > 0 ? fmt.brl(pm) : '—'}</td>
+                        <td style={{padding:'10px 12px',fontWeight:600,color:pv > 0 ? '#1A1A2E' : '#8896A8'}}>{pv > 0 ? fmt.brl(pv) : '—'}</td>
+                        <td style={{padding:'10px 12px',color:'#4A5568'}}>{a.data_venda ? new Date(a.data_venda).toLocaleDateString('pt-BR') : '—'}</td>
+                        <td style={{padding:'10px 12px',fontWeight:600,color:provTotal > 0 ? '#16A34A' : '#8896A8'}}>{provTotal > 0 ? fmt.brl(provTotal) : '—'}</td>
+                        <td style={{padding:'10px 12px'}}>
+                          {resultado != null ? (
+                            <span style={{fontWeight:700,color:resultado >= 0 ? '#16A34A' : '#DC2626'}}>
+                              {resultado >= 0 ? '+' : ''}{fmt.brl(resultado)} ({pctRes >= 0 ? '+' : ''}{fmt.pct(pctRes)})
+                            </span>
+                          ) : '—'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

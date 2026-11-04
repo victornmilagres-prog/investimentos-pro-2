@@ -6,11 +6,25 @@ const { buscarAcao, calcularPesos } = require('../services/brapiService');
 const router = express.Router();
 router.use(auth);
 
-// GET /api/acoes
+// Migração inline — adiciona colunas de venda se não existirem
+pool.query(`
+  ALTER TABLE acoes_carteira ADD COLUMN IF NOT EXISTS vendido BOOLEAN DEFAULT FALSE;
+  ALTER TABLE acoes_carteira ADD COLUMN IF NOT EXISTS data_venda DATE;
+  ALTER TABLE acoes_carteira ADD COLUMN IF NOT EXISTS preco_venda NUMERIC(10,2);
+`).then(() =>
+  // Corrige ações vendidas antes do feature: quantidade=0 mas sem flag vendido
+  pool.query(`
+    UPDATE acoes_carteira
+    SET vendido = TRUE, data_venda = COALESCE(data_venda, CURRENT_DATE)
+    WHERE quantidade = 0 AND (vendido IS NULL OR vendido = FALSE)
+  `).then(r => { if (r.rowCount > 0) console.log('[acoes migration] Marcadas', r.rowCount, 'ação(ões) vendida(s) retroativamente'); })
+).catch(e => console.error('[acoes migration]', e.message));
+
+// GET /api/acoes — retorna apenas ativos (não vendidos)
 router.get('/', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT * FROM acoes_carteira WHERE usuario_id = $1 ORDER BY ticker',
+      'SELECT * FROM acoes_carteira WHERE usuario_id = $1 AND (vendido IS NOT TRUE) ORDER BY ticker',
       [req.userId]
     );
     const ativos = calcularPesos(result.rows);
@@ -164,10 +178,19 @@ router.post('/vender', async (req, res) => {
     const pmVenda    = Number(atual.rows[0].preco_compra || 0);
     const resultado  = precoAtual > 0 ? parseFloat(((precoAtual - pmVenda) * Number(quantidade)).toFixed(2)) : null;
     const totalVenda = parseFloat((precoAtual * Number(quantidade)).toFixed(2));
-    await pool.query(
-      'UPDATE acoes_carteira SET quantidade=$1, updated_at=NOW() WHERE usuario_id=$2 AND ticker=$3',
-      [novaQtd, req.userId, ticker.toUpperCase()]
-    );
+    if (novaQtd === 0) {
+      // Posição totalmente encerrada — marca como vendido (mantém proventos)
+      await pool.query(
+        `UPDATE acoes_carteira SET quantidade=0, vendido=TRUE, data_venda=CURRENT_DATE,
+         preco_venda=$1, updated_at=NOW() WHERE usuario_id=$2 AND ticker=$3`,
+        [precoAtual || null, req.userId, ticker.toUpperCase()]
+      );
+    } else {
+      await pool.query(
+        'UPDATE acoes_carteira SET quantidade=$1, updated_at=NOW() WHERE usuario_id=$2 AND ticker=$3',
+        [novaQtd, req.userId, ticker.toUpperCase()]
+      );
+    }
     // Histórico
     await pool.query(
       `INSERT INTO historico_operacoes (usuario_id, categoria, ticker, tipo, quantidade, preco_unitario, total, resultado, data_operacao)
@@ -180,10 +203,28 @@ router.post('/vender', async (req, res) => {
   }
 });
 
+// GET /api/acoes/vendidas
+router.get('/vendidas', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT ticker, nome_empresa, preco_compra, preco_venda, data_venda,
+              dividendos_ano, quantidade
+       FROM acoes_carteira
+       WHERE usuario_id=$1 AND vendido = TRUE
+       ORDER BY data_venda DESC, ticker`,
+      [req.userId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[acoes/vendidas]', err.message);
+    res.status(500).json({ error: 'Erro ao buscar ações vendidas.' });
+  }
+});
+
 // POST /api/acoes/atualizar-todos
 router.post('/atualizar-todos', async (req, res) => {
   try {
-    const acoes = await pool.query('SELECT ticker FROM acoes_carteira WHERE usuario_id=$1', [req.userId]);
+    const acoes = await pool.query('SELECT ticker FROM acoes_carteira WHERE usuario_id=$1 AND (vendido IS NOT TRUE)', [req.userId]);
     const resultados = [];
     for (const acao of acoes.rows) {
       try {
@@ -493,7 +534,7 @@ async function recalcularProventos(usuarioId, ticker, ano) {
 
 async function recalcularPesos(usuarioId) {
   const acoes = await pool.query(
-    'SELECT id, classificacao FROM acoes_carteira WHERE usuario_id=$1',
+    'SELECT id, classificacao FROM acoes_carteira WHERE usuario_id=$1 AND (vendido IS NOT TRUE)',
     [usuarioId]
   );
   const pesoBase = (cl) => cl === 'EXCELENTE' ? 5 : cl === 'BOM' ? 3 : cl === 'ATENÇÃO' ? 1 : 0;
