@@ -468,7 +468,7 @@ function RadarCard({ item, onRemover, onAddCarteira, onToggleFavorito, onUpdateI
 }
 
 /* ── Barra global de alertas ── */
-function BarraAlertas({ itens }) {
+function BarraAlertas({ itens, onComprar }) {
   const alertas = itens.filter(i => {
     const preco = Number(i.preco_atual);
     const alvo  = Number(i.preco_alvo);
@@ -497,14 +497,16 @@ function BarraAlertas({ itens }) {
           {alertas.map(a => `${a.ticker} → ${fmt.brl(Number(a.preco_atual))}`).join('  ·  ')}
         </p>
       </div>
-      <span style={{
+      <button onClick={() => onComprar(alertas[0])} style={{
         background: '#16A34A',
         color: '#FFFFFF',
         fontSize: 11,
         fontWeight: 700,
         padding: '4px 10px',
         borderRadius: 20,
-      }}>COMPRAR AGORA?</span>
+        border: 'none',
+        cursor: 'pointer',
+      }}>COMPRAR AGORA?</button>
     </div>
   );
 }
@@ -666,7 +668,7 @@ export default function WatchlistPage() {
       `}</style>
 
       {/* Barra global de alertas */}
-      <BarraAlertas itens={itens} />
+      <BarraAlertas itens={itens} onComprar={item => setModalCompra(item)} />
 
       <div className="page-header" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:4}}>
         <div>
