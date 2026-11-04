@@ -163,6 +163,74 @@ router.post('/comprar', async (req, res) => {
   }
 });
 
+// ─── POST /api/acoes/comprar-radar ───────────────────────────────────────
+// Upsert: atualiza PM se já existe, insere do zero via Brapi se não existe
+router.post('/comprar-radar', async (req, res) => {
+  const { ticker, quantidade, preco } = req.body;
+  if (!ticker || !quantidade || !preco) return res.status(400).json({ error: 'ticker, quantidade e preco obrigatórios.' });
+  try {
+    const atual = await pool.query(
+      'SELECT quantidade, preco_compra FROM acoes_carteira WHERE usuario_id=$1 AND ticker=$2',
+      [req.userId, ticker.toUpperCase()]
+    );
+    if (atual.rows.length) {
+      const { quantidade: qtdAtual, preco_compra: pmAtual } = atual.rows[0];
+      const novaQtd = Number(qtdAtual) + Number(quantidade);
+      const novoPM  = Number(qtdAtual) > 0
+        ? ((Number(qtdAtual) * Number(pmAtual)) + (Number(quantidade) * Number(preco))) / novaQtd
+        : Number(preco);
+      await pool.query(
+        'UPDATE acoes_carteira SET quantidade=$1, preco_compra=$2, vendido=FALSE, updated_at=NOW() WHERE usuario_id=$3 AND ticker=$4',
+        [novaQtd, parseFloat(novoPM.toFixed(4)), req.userId, ticker.toUpperCase()]
+      );
+      await pool.query(
+        `INSERT INTO historico_operacoes (usuario_id, categoria, ticker, tipo, quantidade, preco_unitario, total, data_operacao)
+         VALUES ($1,'acao',$2,'compra',$3,$4,$5,CURRENT_DATE)`,
+        [req.userId, ticker.toUpperCase(), Number(quantidade), Number(preco), parseFloat((Number(quantidade)*Number(preco)).toFixed(2))]
+      ).catch(e => console.error('[hist acao radar]', e.message));
+      await recalcularPesos(req.userId);
+      res.json({ message: 'Compra registrada.', novaQtd, novoPM });
+    } else {
+      const ajuste = await pool.query(
+        'SELECT divida_liquida_ebit FROM ajustes_manuais_acoes WHERE usuario_id=$1 AND ticker=$2',
+        [req.userId, ticker.toUpperCase()]
+      );
+      const dividaManual = ajuste.rows[0]?.divida_liquida_ebit ?? null;
+      const dados = await buscarAcao(ticker, dividaManual);
+      await pool.query(`
+        INSERT INTO acoes_carteira (
+          usuario_id, ticker, quantidade, preco_compra,
+          score, max_score, classificacao, decisao, preco_atual, preco_graham, status_graham,
+          pl, pvp, margem_liquida, roe, divida_ebit, dy,
+          variacao_dia, variacao_dia_reais, preco_abertura, preco_minimo, preco_maximo,
+          observacoes, ultima_atualizacao,
+          nome_empresa, preco_bazin, status_bazin,
+          dividendos_ano, dividendos_lancamentos, proventos_breakdown
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,0,0,'{}')
+      `, [
+        req.userId, dados.ticker, Number(quantidade), Number(preco),
+        dados.score, dados.maxScore, dados.classificacao, dados.decisao,
+        dados.preco, dados.precoGraham, dados.statusGraham,
+        dados.pl, dados.pvp, dados.margemLiquida, dados.roe, dados.dividaEbit, dados.dy,
+        dados.variacaoDia, dados.variacaoDiaReais, dados.precoAbertura, dados.precoMinimo, dados.precoMaximo,
+        dados.observacoes, dados.ultimaAtualizacao,
+        dados.nomeEmpresa, dados.precoBazin, dados.statusBazin
+      ]);
+      await pool.query(
+        `INSERT INTO historico_operacoes (usuario_id, categoria, ticker, tipo, quantidade, preco_unitario, total, data_operacao)
+         VALUES ($1,'acao',$2,'compra',$3,$4,$5,CURRENT_DATE)`,
+        [req.userId, ticker.toUpperCase(), Number(quantidade), Number(preco), parseFloat((Number(quantidade)*Number(preco)).toFixed(2))]
+      ).catch(e => console.error('[hist acao radar]', e.message));
+      await recalcularPesos(req.userId);
+      res.status(201).json({ message: 'Ação adicionada à carteira.' });
+    }
+  } catch (err) {
+    console.error('[acoes comprar-radar]', err);
+    if (err.message?.includes('não encontrada')) return res.status(404).json({ error: err.message });
+    res.status(500).json({ error: 'Erro ao processar compra.' });
+  }
+});
+
 // ─── POST /api/acoes/vender ───────────────────────────────────────────────
 router.post('/vender', async (req, res) => {
   const { ticker, quantidade } = req.body;

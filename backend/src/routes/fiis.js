@@ -208,6 +208,73 @@ router.post('/comprar', async (req, res) => {
   }
 });
 
+// ─── POST /api/fiis/comprar-radar ────────────────────────────────────────
+// Upsert: atualiza PM se já existe, insere do zero via Brapi se não existe
+router.post('/comprar-radar', async (req, res) => {
+  const { ticker, quantidade, preco } = req.body;
+  if (!ticker || !quantidade || !preco) return res.status(400).json({ error: 'ticker, quantidade e preco obrigatórios.' });
+  try {
+    const atual = await pool.query(
+      'SELECT quantidade, preco_compra FROM fiis_carteira WHERE usuario_id=$1 AND ticker=$2',
+      [req.userId, ticker.toUpperCase()]
+    );
+    if (atual.rows.length) {
+      const { quantidade: qtdAtual, preco_compra: pmAtual } = atual.rows[0];
+      const novaQtd = Number(qtdAtual) + Number(quantidade);
+      const novoPM  = Number(qtdAtual) > 0
+        ? ((Number(qtdAtual) * Number(pmAtual)) + (Number(quantidade) * Number(preco))) / novaQtd
+        : Number(preco);
+      await pool.query(
+        'UPDATE fiis_carteira SET quantidade=$1, preco_compra=$2, vendido=FALSE, updated_at=NOW() WHERE usuario_id=$3 AND ticker=$4',
+        [novaQtd, parseFloat(novoPM.toFixed(4)), req.userId, ticker.toUpperCase()]
+      );
+      await pool.query(
+        `INSERT INTO historico_operacoes (usuario_id, categoria, ticker, tipo, quantidade, preco_unitario, total, data_operacao)
+         VALUES ($1,'fii',$2,'compra',$3,$4,$5,CURRENT_DATE)`,
+        [req.userId, ticker.toUpperCase(), Number(quantidade), Number(preco), parseFloat((Number(quantidade)*Number(preco)).toFixed(2))]
+      ).catch(e => console.error('[hist fii radar]', e.message));
+      await recalcularPesosFII(req.userId);
+      res.json({ message: 'Compra registrada.', novaQtd, novoPM });
+    } else {
+      const ajuste = await pool.query(
+        'SELECT * FROM ajustes_manuais_fiis WHERE usuario_id=$1 AND ticker=$2',
+        [req.userId, ticker.toUpperCase()]
+      );
+      const dados = await buscarFII(ticker, ajuste.rows[0] || {});
+      const dyMensal = dados.dyMensal > 0 ? dados.dyMensal : (dados.dyAnual > 0 ? dados.dyAnual / 12 : 0);
+      await pool.query(`
+        INSERT INTO fiis_carteira (
+          usuario_id, ticker, quantidade, preco_compra,
+          score, classificacao, decisao, preco_atual,
+          dy_mensal, dy_anual, pvp, volume_financeiro, patrimonio_liquido,
+          variacao_dia, variacao_dia_reais, preco_abertura, preco_minimo, preco_maximo,
+          observacoes, ultima_atualizacao,
+          nome_fundo, administradora, tipo_fundo, vpa, preco_justo, status_justo, setor_fundo,
+          dividendos_ano, dividendos_lancamentos, dividendos_breakdown,
+          dividendos_geral, dividendos_geral_lancamentos
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,0,0,'{}',0,0)
+      `, [
+        req.userId, dados.ticker, Number(quantidade), Number(preco),
+        dados.score, dados.classificacao, dados.decisao, dados.preco,
+        dyMensal, dados.dyAnual, dados.pvp, dados.volumeFinanceiro, dados.patrimonioLiquido,
+        dados.variacaoDia, dados.variacaoDiaReais, dados.precoAbertura, dados.precoMinimo, dados.precoMaximo,
+        dados.observacoes, dados.ultimaAtualizacao,
+        dados.nomeFundo, dados.administradora, dados.segmento || dados.tipoFundo, dados.vpa, dados.precoJusto, dados.statusJusto, dados.setor
+      ]);
+      await pool.query(
+        `INSERT INTO historico_operacoes (usuario_id, categoria, ticker, tipo, quantidade, preco_unitario, total, data_operacao)
+         VALUES ($1,'fii',$2,'compra',$3,$4,$5,CURRENT_DATE)`,
+        [req.userId, ticker.toUpperCase(), Number(quantidade), Number(preco), parseFloat((Number(quantidade)*Number(preco)).toFixed(2))]
+      ).catch(e => console.error('[hist fii radar]', e.message));
+      await recalcularPesosFII(req.userId);
+      res.status(201).json({ message: 'FII adicionado à carteira.' });
+    }
+  } catch (err) {
+    console.error('[fiis comprar-radar]', err);
+    res.status(500).json({ error: 'Erro ao processar compra.' });
+  }
+});
+
 // ─── POST /api/fiis/vender ────────────────────────────────────────────────
 router.post('/vender', async (req, res) => {
   const { ticker, quantidade } = req.body;

@@ -1,7 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { Plus, RefreshCw, Eye, Trash2 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { fmt } from '@/lib/utils';
 
@@ -510,6 +509,86 @@ function BarraAlertas({ itens }) {
   );
 }
 
+/* ── Modal Compra do Radar ── */
+function ModalCompraRadar({ item, onFechar, onConfirmar }) {
+  const isAcao = (item.tipo||'').toUpperCase()==='ACAO'||(item.tipo||'').toUpperCase()==='AÇÃO';
+  const [qtd, setQtd]       = useState('');
+  const [preco, setPreco]   = useState(item.preco_atual ? String(Number(item.preco_atual).toFixed(2)) : '');
+  const [erro, setErro]     = useState('');
+  const [salvando, setSalvando] = useState(false);
+
+  const confirmar = async () => {
+    setErro('');
+    const q = Number(qtd);
+    const p = Number(preco);
+    if (!q || q <= 0) { setErro('Quantidade deve ser maior que zero.'); return; }
+    if (!p || p <= 0) { setErro('Preço deve ser maior que zero.'); return; }
+    setSalvando(true);
+    try {
+      await onConfirmar({ ticker: item.ticker, tipo: item.tipo, quantidade: q, preco: p });
+    } catch(e) {
+      setErro(e.response?.data?.error || 'Erro ao confirmar compra.');
+      setSalvando(false);
+    }
+  };
+
+  const st = {
+    overlay: { position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200 },
+    modal:   { background:'#fff',borderRadius:14,padding:28,width:420,boxShadow:'0 20px 60px rgba(0,0,0,0.2)',maxHeight:'90vh',overflowY:'auto' },
+    lbl:     { fontSize:12,color:'#8896A8',fontWeight:500,display:'block',marginBottom:5 },
+    inp:     { width:'100%',padding:'9px 12px',border:'1px solid #E8ECF0',borderRadius:7,fontSize:13,outline:'none',color:'#1A1A2E',boxSizing:'border-box' },
+    footer:  { display:'flex',gap:10,justifyContent:'flex-end',marginTop:20 },
+  };
+
+  return (
+    <div style={st.overlay} onClick={e => { if(e.target===e.currentTarget) onFechar(); }}>
+      <div style={st.modal}>
+        <p style={{fontSize:16,fontWeight:700,color:'#1A1A2E',marginBottom:20}}>
+          Comprar {item.ticker}
+        </p>
+        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+          <div style={{display:'flex',gap:12}}>
+            <div style={{flex:1}}>
+              <label style={st.lbl}>Ticker</label>
+              <input style={{...st.inp,background:'#F8F9FA',color:'#8896A8'}} value={item.ticker} disabled/>
+            </div>
+            <div style={{flex:1}}>
+              <label style={st.lbl}>Tipo</label>
+              <input style={{...st.inp,background:'#F8F9FA',color:'#8896A8'}} value={isAcao?'Ação':'FII'} disabled/>
+            </div>
+          </div>
+          <div>
+            <label style={st.lbl}>Quantidade *</label>
+            <input style={st.inp} type="number" min="1" step="1" placeholder="Ex: 100"
+              value={qtd} onChange={e=>setQtd(e.target.value)} autoFocus/>
+          </div>
+          <div>
+            <label style={st.lbl}>Preço de compra (R$) *</label>
+            <input style={st.inp} type="number" min="0.01" step="0.01" placeholder="Ex: 10.50"
+              value={preco} onChange={e=>setPreco(e.target.value)}/>
+          </div>
+          {Number(qtd) > 0 && Number(preco) > 0 && (
+            <div style={{background:'#F0FDF4',border:'1px solid #BBF7D0',borderRadius:8,padding:'8px 12px',fontSize:13,color:'#065F46'}}>
+              Total estimado: <strong>{fmt.brl(Number(qtd)*Number(preco))}</strong>
+            </div>
+          )}
+          {erro && <p style={{fontSize:13,color:'#DC2626',margin:0}}>{erro}</p>}
+        </div>
+        <div style={st.footer}>
+          <button onClick={onFechar}
+            style={{padding:'9px 18px',border:'1px solid #E8ECF0',borderRadius:7,background:'#fff',color:'#4A5568',fontSize:13,cursor:'pointer'}}>
+            Cancelar
+          </button>
+          <button onClick={confirmar} disabled={salvando}
+            style={{padding:'9px 20px',background:salvando?'#93C5FD':'#2563EB',border:'none',borderRadius:7,color:'#fff',fontSize:13,fontWeight:600,cursor:salvando?'default':'pointer'}}>
+            {salvando ? 'Comprando…' : '✓ Confirmar Compra'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function WatchlistPage() {
   const [itens, setItens]             = useState([]);
   const [loading, setLoading]         = useState(true);
@@ -518,7 +597,7 @@ export default function WatchlistPage() {
   const [erro, setErro]               = useState('');
   const [abaRadar, setAbaRadar]       = useState('acoes');
   const [busca, setBusca]             = useState('');
-  const router = useRouter();
+  const [modalCompra, setModalCompra] = useState(null);
 
   const carregar = async () => {
     try { const r = await api.get('/watchlist'); setItens(r.data); }
@@ -559,9 +638,16 @@ export default function WatchlistPage() {
     setItens(prev => prev.map(i => i.id === id ? { ...i, ...campos } : i));
   };
 
-  const addCarteira = (item) => {
-    const isAcao=(item.tipo||'').toUpperCase()==='ACAO'||(item.tipo||'').toUpperCase()==='AÇÃO';
-    router.push(`${isAcao?'/acoes':'/fiis'}?ticker=${item.ticker}`);
+  const addCarteira = (item) => setModalCompra(item);
+
+  const confirmarCompra = async ({ ticker, tipo, quantidade, preco }) => {
+    const isAcao = (tipo||'').toUpperCase()==='ACAO'||(tipo||'').toUpperCase()==='AÇÃO';
+    const rota = isAcao ? '/acoes/comprar-radar' : '/fiis/comprar-radar';
+    await api.post(rota, { ticker, quantidade, preco });
+    await api.delete(`/watchlist/${ticker}`);
+    setModalCompra(null);
+    await carregar();
+    alert(`${ticker} adicionado à carteira de ${isAcao ? 'Ações' : 'FIIs'}!`);
   };
 
   if(loading) return (
@@ -690,6 +776,14 @@ export default function WatchlistPage() {
           <p style={{color:'#4A5568',fontWeight:500,marginBottom:4}}>Radar vazio</p>
           <p style={{color:'#8896A8',fontSize:13}}>Adicione ativos que você quer acompanhar antes de investir.</p>
         </div>
+      )}
+
+      {modalCompra && (
+        <ModalCompraRadar
+          item={modalCompra}
+          onFechar={() => setModalCompra(null)}
+          onConfirmar={confirmarCompra}
+        />
       )}
     </div>
   );
