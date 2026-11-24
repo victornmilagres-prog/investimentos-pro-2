@@ -7,16 +7,22 @@ async function importB3(){
   try{
     await pool.query(`CREATE TABLE IF NOT EXISTS fiis_proventos(id SERIAL PRIMARY KEY,usuario_id INTEGER NOT NULL,ticker VARCHAR(20) NOT NULL,tipo VARCHAR(20) NOT NULL DEFAULT 'Rendimento',mes_referencia DATE NOT NULL,valor_por_cota NUMERIC(10,4) NOT NULL,quantidade INTEGER NOT NULL,total NUMERIC(12,2) GENERATED ALWAYS AS (valor_por_cota*quantidade) STORED,data_pagamento DATE,created_at TIMESTAMP DEFAULT NOW())`);
     await pool.query(`CREATE TABLE IF NOT EXISTS acoes_proventos(id SERIAL PRIMARY KEY,usuario_id INTEGER NOT NULL,ticker VARCHAR(20) NOT NULL,tipo VARCHAR(20) NOT NULL DEFAULT 'Dividendo',mes_referencia DATE NOT NULL,valor_por_cota NUMERIC(10,4) NOT NULL,quantidade INTEGER NOT NULL,total NUMERIC(12,2) GENERATED ALWAYS AS (valor_por_cota*quantidade) STORED,data_pagamento DATE,created_at TIMESTAMP DEFAULT NOW())`);
+    await pool.query(`ALTER TABLE acoes_carteira ADD COLUMN IF NOT EXISTS vendida BOOLEAN DEFAULT FALSE`);
+    await pool.query(`ALTER TABLE acoes_carteira ADD COLUMN IF NOT EXISTS preco_venda NUMERIC(10,4) DEFAULT 0`);
+    await pool.query(`ALTER TABLE acoes_carteira ADD COLUMN IF NOT EXISTS data_venda DATE`);
+    await pool.query(`ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS vendida BOOLEAN DEFAULT FALSE`);
+    await pool.query(`ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS preco_venda NUMERIC(10,4) DEFAULT 0`);
+    await pool.query(`ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS data_venda DATE`);
   }catch(e){console.error("[importB3 tables]",e.message);}
   let ok=0,er=0;
   for(const v of VENDAS){
     try{
-      await pool.query("INSERT INTO "+v.tb+" (usuario_id,ticker,quantidade,preco_compra,vendida,preco_venda,data_venda,peso_base,peso_sugerido) SELECT id,$2,$3,COALESCE((SELECT preco_compra FROM "+v.tb+" WHERE usuario_id=id AND ticker=$2 LIMIT 1),0),true,$4,$5,0,0 FROM usuarios WHERE email=$1 AND NOT EXISTS (SELECT 1 FROM "+v.tb+" WHERE usuario_id=(SELECT id FROM usuarios WHERE email=$1) AND ticker=$2)",[EMAIL,v.t,v.qtd,v.pv,v.dv]);ok++;
+      await pool.query("INSERT INTO "+v.tb+" (usuario_id,ticker,quantidade,preco_compra,vendida,preco_venda,data_venda,peso_base,peso_sugerido) SELECT id,$2::VARCHAR,$3,COALESCE((SELECT preco_compra FROM "+v.tb+" WHERE usuario_id=id AND ticker=$2::VARCHAR LIMIT 1),0),true,$4,$5,0,0 FROM usuarios WHERE email=$1 AND NOT EXISTS (SELECT 1 FROM "+v.tb+" WHERE usuario_id=(SELECT id FROM usuarios WHERE email=$1) AND ticker=$2::VARCHAR)",[EMAIL,v.t,v.qtd,v.pv,v.dv]);ok++;
     }catch(e){er++;console.error("[importB3 venda]",v.t,e.message);}
   }
   for(const p of PROVENTOS){
     try{
-      await pool.query("INSERT INTO "+p.tb+" (usuario_id,ticker,tipo,mes_referencia,valor_por_cota,quantidade,data_pagamento) SELECT id,$2,$3,$4,$5,$6,$7 FROM usuarios WHERE email=$1 AND NOT EXISTS (SELECT 1 FROM "+p.tb+" WHERE usuario_id=(SELECT id FROM usuarios WHERE email=$1) AND ticker=$2 AND mes_referencia=$4)",[EMAIL,p.t,p.tipo,p.mr,p.vpc,p.qtd,p.dp]);ok++;
+      await pool.query("INSERT INTO "+p.tb+" (usuario_id,ticker,tipo,mes_referencia,valor_por_cota,quantidade,data_pagamento) SELECT id,$2::VARCHAR,$3,$4::DATE,$5,$6,$7 FROM usuarios WHERE email=$1 AND NOT EXISTS (SELECT 1 FROM "+p.tb+" WHERE usuario_id=(SELECT id FROM usuarios WHERE email=$1) AND ticker=$2::VARCHAR AND mes_referencia=$4::DATE)",[EMAIL,p.t,p.tipo,p.mr,p.vpc,p.qtd,p.dp]);ok++;
     }catch(e){er++;console.error("[importB3 prov]",p.t,e.message);}
   }
   console.log("[importB3] Done:",ok,"ok,",er,"erros");
