@@ -36,9 +36,11 @@ export default function ProventosView({ proventos, ano, setAno, onLancar, onExcl
 
   const toggle = key => setExpanded(e => ({ ...e, [key]: !e[key] }));
 
-  const anos = anoAtual > ano
-    ? [ano - 1, ano, ano + 1].filter(y => y <= anoAtual)
-    : [ano - 1, ano];
+  const anos = useMemo(() => {
+    const set = new Set(proventos.map(p => Number(p.mes_referencia.slice(0, 4))));
+    set.add(anoAtual);
+    return Array.from(set).sort((a, b) => a - b);
+  }, [proventos, anoAtual]);
 
   return (
     <div>
