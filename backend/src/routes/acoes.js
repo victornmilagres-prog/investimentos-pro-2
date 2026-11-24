@@ -642,6 +642,19 @@ pool.query(`
   `).then(r => { if (r.rowCount > 0) console.log('[acoes migration] Migrados', r.rowCount, 'proventos para acoes_proventos'); })
 ).catch(e => console.error('[acoes_proventos migration]', e.message));
 
+// GET /api/acoes/proventos-registro/anos
+router.get('/proventos-registro/anos', async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT DISTINCT EXTRACT(YEAR FROM mes_referencia)::int AS ano FROM acoes_proventos WHERE usuario_id=$1 ORDER BY ano`,
+      [req.userId]
+    );
+    res.json(r.rows.map(row => row.ano));
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar anos' });
+  }
+});
+
 // GET /api/acoes/proventos-registro?ano=2026
 router.get('/proventos-registro', async (req, res) => {
   try {

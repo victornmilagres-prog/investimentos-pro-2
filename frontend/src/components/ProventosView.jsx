@@ -5,7 +5,7 @@ const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Ag
 
 const fmtBrl = v => `R$ ${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export default function ProventosView({ proventos, ano, setAno, onLancar, onExcluir, tipo }) {
+export default function ProventosView({ proventos, ano, setAno, onLancar, onExcluir, tipo, anosDisponiveis }) {
   const [expanded, setExpanded] = useState({});
 
   const mesAtual = new Date().getMonth();
@@ -37,10 +37,11 @@ export default function ProventosView({ proventos, ano, setAno, onLancar, onExcl
   const toggle = key => setExpanded(e => ({ ...e, [key]: !e[key] }));
 
   const anos = useMemo(() => {
-    const set = new Set(proventos.map(p => Number(p.mes_referencia.slice(0, 4))));
+    const base = anosDisponiveis && anosDisponiveis.length > 0 ? [...anosDisponiveis] : [];
+    const set = new Set(base);
     set.add(anoAtual);
     return Array.from(set).sort((a, b) => a - b);
-  }, [proventos, anoAtual]);
+  }, [anosDisponiveis, anoAtual]);
 
   return (
     <div>

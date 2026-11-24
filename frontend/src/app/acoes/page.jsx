@@ -1053,11 +1053,12 @@ export default function AcoesPage() {
   const [busca, setBusca]                   = useState('');
   const [activeTab, setActiveTab]           = useState('carteira');
 
-  const [proventos,     setProventos]       = useState([]);
-  const [proventosAno,  setProventosAno]    = useState(new Date().getFullYear());
-  const [modalProvento, setModalProvento]   = useState(false);
-  const [formProvento,  setFormProvento]    = useState({ ticker:'', tipo:'Dividendo', mes_referencia:'', valor_por_cota:'', quantidade:'', data_pagamento:'' });
-  const [salvandoProv,  setSalvandoProv]    = useState(false);
+  const [proventos,          setProventos]          = useState([]);
+  const [proventosAno,       setProventosAno]       = useState(new Date().getFullYear());
+  const [proventosAnos,      setProventosAnos]      = useState([]);
+  const [modalProvento,      setModalProvento]      = useState(false);
+  const [formProvento,       setFormProvento]       = useState({ ticker:'', tipo:'Dividendo', mes_referencia:'', valor_por_cota:'', quantidade:'', data_pagamento:'' });
+  const [salvandoProv,       setSalvandoProv]       = useState(false);
 
   const { anosDisponiveis, anoFiltro, setAnoFiltro, resumoAno, resumoGeral, carregarDados } = useProventosExtras(acoes);
 
@@ -1074,11 +1075,20 @@ export default function AcoesPage() {
 
   useEffect(() => { carregar(); }, []);
 
+  const fetchProventosAnos = async () => {
+    const r = await api.get('/acoes/proventos-registro/anos');
+    setProventosAnos(r.data);
+  };
   const fetchProventos = async (ano) => {
     const r = await api.get(`/acoes/proventos-registro?ano=${ano}`);
     setProventos(r.data);
   };
-  useEffect(() => { if (activeTab === 'proventos') fetchProventos(proventosAno); }, [activeTab, proventosAno]);
+  useEffect(() => {
+    if (activeTab === 'proventos') {
+      fetchProventosAnos();
+      fetchProventos(proventosAno);
+    }
+  }, [activeTab, proventosAno]);
 
   const salvarProvento = async () => {
     if (!formProvento.ticker || !formProvento.mes_referencia || !formProvento.valor_por_cota || !formProvento.quantidade) return;
@@ -1232,6 +1242,7 @@ export default function AcoesPage() {
           onLancar={() => setModalProvento(true)}
           onExcluir={excluirProvento}
           tipo="Ações"
+          anosDisponiveis={proventosAnos}
         />
       )}
 

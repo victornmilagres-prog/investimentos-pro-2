@@ -619,6 +619,19 @@ pool.query(`
   `).then(r => { if (r.rowCount > 0) console.log('[fiis migration] Migrados', r.rowCount, 'proventos para fiis_proventos'); })
 ).catch(e => console.error('[fiis_proventos migration]', e.message));
 
+// GET /api/fiis/proventos/anos
+router.get('/proventos/anos', async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT DISTINCT EXTRACT(YEAR FROM mes_referencia)::int AS ano FROM fiis_proventos WHERE usuario_id=$1 ORDER BY ano`,
+      [req.userId]
+    );
+    res.json(r.rows.map(row => row.ano));
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao buscar anos' });
+  }
+});
+
 // GET /api/fiis/proventos?ano=2026
 router.get('/proventos', async (req, res) => {
   try {

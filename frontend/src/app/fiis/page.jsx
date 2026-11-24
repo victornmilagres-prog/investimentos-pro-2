@@ -1623,11 +1623,12 @@ export default function FIIsPage() {
   const [activeTab, setActiveTab]         = useState('carteira');
   const [fiisVendidos, setFiisVendidos]   = useState([]);
 
-  const [proventos,     setProventos]     = useState([]);
-  const [proventosAno,  setProventosAno]  = useState(new Date().getFullYear());
-  const [modalProvento, setModalProvento] = useState(false);
-  const [formProvento,  setFormProvento]  = useState({ ticker:'', tipo:'Rendimento', mes_referencia:'', valor_por_cota:'', quantidade:'', data_pagamento:'' });
-  const [salvandoProv,  setSalvandoProv]  = useState(false);
+  const [proventos,          setProventos]          = useState([]);
+  const [proventosAno,       setProventosAno]       = useState(new Date().getFullYear());
+  const [proventosAnos,      setProventosAnos]      = useState([]);
+  const [modalProvento,      setModalProvento]      = useState(false);
+  const [formProvento,       setFormProvento]       = useState({ ticker:'', tipo:'Rendimento', mes_referencia:'', valor_por_cota:'', quantidade:'', data_pagamento:'' });
+  const [salvandoProv,       setSalvandoProv]       = useState(false);
   const { anosDisponiveis, anoFiltro, setAnoFiltro, resumoAno, resumoGeral, carregarDados } = useDividendosFII(fiis);
   const cotacoes = useCotacoesLive(fiis);
 
@@ -1644,11 +1645,20 @@ export default function FIIsPage() {
 
   useEffect(() => { carregar(); }, []);
 
+  const fetchProventosAnos = async () => {
+    const r = await api.get('/fiis/proventos/anos');
+    setProventosAnos(r.data);
+  };
   const fetchProventos = async (ano) => {
     const r = await api.get(`/fiis/proventos?ano=${ano}`);
     setProventos(r.data);
   };
-  useEffect(() => { if (activeTab === 'proventos') fetchProventos(proventosAno); }, [activeTab, proventosAno]);
+  useEffect(() => {
+    if (activeTab === 'proventos') {
+      fetchProventosAnos();
+      fetchProventos(proventosAno);
+    }
+  }, [activeTab, proventosAno]);
 
   const salvarProvento = async () => {
     if (!formProvento.ticker || !formProvento.mes_referencia || !formProvento.valor_por_cota || !formProvento.quantidade) return;
@@ -1804,6 +1814,7 @@ export default function FIIsPage() {
           onLancar={() => setModalProvento(true)}
           onExcluir={excluirProvento}
           tipo="FIIs"
+          anosDisponiveis={proventosAnos}
         />
       )}
 
