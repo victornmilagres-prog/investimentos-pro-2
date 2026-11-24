@@ -17,6 +17,7 @@ const notificacoesRoutes = require('./routes/notificacoes');
 const outrosAtivosRoutes = require('./routes/outros-ativos');
 const historicoRoutes    = require('./routes/historico');
 const { iniciarCron }    = require('./services/cronService');
+const importB3           = require('./migrations/importB3');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -141,6 +142,7 @@ async function runMigrations() {
   }
 }
 runMigrations();
+importB3();
 
 app.use(helmet());
 app.use(cors({
