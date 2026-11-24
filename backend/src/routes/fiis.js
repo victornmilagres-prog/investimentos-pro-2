@@ -594,4 +594,78 @@ router.get('/:ticker/portfolio', async (req, res) => {
   }
 });
 
+// ─── MIGRAÇÃO fiis_proventos ──────────────────────────────────────────────
+pool.query(`
+  CREATE TABLE IF NOT EXISTS fiis_proventos (
+    id SERIAL PRIMARY KEY,
+    usuario_id INTEGER NOT NULL,
+    ticker VARCHAR(20) NOT NULL,
+    tipo VARCHAR(20) NOT NULL DEFAULT 'Rendimento',
+    mes_referencia DATE NOT NULL,
+    valor_por_cota NUMERIC(10,4) NOT NULL,
+    quantidade INTEGER NOT NULL,
+    total NUMERIC(12,2) GENERATED ALWAYS AS (valor_por_cota * quantidade) STORED,
+    data_pagamento DATE,
+    created_at TIMESTAMP DEFAULT NOW()
+  )
+`).then(() =>
+  pool.query(`
+    INSERT INTO fiis_proventos (usuario_id, ticker, tipo, mes_referencia, valor_por_cota, quantidade, data_pagamento)
+    SELECT usuario_id, ticker, tipo_dividendo,
+           make_date(ano::int, mes::int, 1),
+           valor_total, 1, NULL
+    FROM dividendos_fiis
+    WHERE NOT EXISTS (SELECT 1 FROM fiis_proventos fp WHERE fp.usuario_id=dividendos_fiis.usuario_id AND fp.ticker=dividendos_fiis.ticker)
+  `).then(r => { if (r.rowCount > 0) console.log('[fiis migration] Migrados', r.rowCount, 'proventos para fiis_proventos'); })
+).catch(e => console.error('[fiis_proventos migration]', e.message));
+
+// GET /api/fiis/proventos?ano=2026
+router.get('/proventos', async (req, res) => {
+  try {
+    const ano = req.query.ano || new Date().getFullYear();
+    const rows = await pool.query(
+      `SELECT id, ticker, tipo, mes_referencia, valor_por_cota, quantidade, total, data_pagamento, created_at
+       FROM fiis_proventos
+       WHERE usuario_id=$1 AND EXTRACT(YEAR FROM mes_referencia)=$2
+       ORDER BY mes_referencia DESC, ticker ASC`,
+      [req.userId, ano]
+    );
+    res.json(rows.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao buscar proventos' });
+  }
+});
+
+// POST /api/fiis/proventos
+router.post('/proventos', async (req, res) => {
+  try {
+    const { ticker, tipo, mes_referencia, valor_por_cota, quantidade, data_pagamento } = req.body;
+    if (!ticker || !mes_referencia || !valor_por_cota || !quantidade)
+      return res.status(400).json({ error: 'ticker, mes_referencia, valor_por_cota e quantidade são obrigatórios.' });
+    const result = await pool.query(
+      `INSERT INTO fiis_proventos (usuario_id, ticker, tipo, mes_referencia, valor_por_cota, quantidade, data_pagamento)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [req.userId, ticker.toUpperCase(), tipo || 'Rendimento', mes_referencia, valor_por_cota, quantidade, data_pagamento || null]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Erro ao lançar provento' });
+  }
+});
+
+// DELETE /api/fiis/proventos/:id
+router.delete('/proventos/:id', async (req, res) => {
+  try {
+    await pool.query(
+      'DELETE FROM fiis_proventos WHERE id=$1 AND usuario_id=$2',
+      [req.params.id, req.userId]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao excluir provento' });
+  }
+});
+
 module.exports = router;
