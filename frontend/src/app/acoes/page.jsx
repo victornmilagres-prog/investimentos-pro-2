@@ -1274,9 +1274,9 @@ export default function AcoesPage() {
                     const qtd         = Number(a.quantidade   || 0);
                     const totalCompra = pm > 0 && qtd > 0 ? pm * qtd : null;
                     const totalVenda  = pv > 0 && qtd > 0 ? pv * qtd : null;
-                    const resultado   = totalVenda != null && totalCompra != null ? totalVenda - totalCompra : null;
-                    const pctRes      = totalCompra != null && totalCompra > 0 && resultado != null ? (resultado / totalCompra) * 100 : null;
                     const provTotal   = Number(a.dividendos_ano || 0);
+                    const resultado   = totalVenda != null && totalCompra != null ? (totalVenda - totalCompra) + provTotal : null;
+                    const pctRes      = totalCompra != null && totalCompra > 0 && resultado != null ? (resultado / totalCompra) * 100 : null;
                     return (
                       <tr key={a.ticker} style={{borderBottom:'1px solid #F0F2F5',background:i%2===0?'transparent':'#FAFBFC'}}>
                         <td style={{padding:'10px 12px',fontWeight:700,color:'#1A1A2E'}}>{a.ticker}</td>
