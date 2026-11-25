@@ -169,7 +169,14 @@ dashboardRouter.use(auth);
 
 dashboardRouter.get('/', async (req, res) => {
   try {
-    const [acoes, fiis, rendaFixa, watchlist] = await Promise.all([pool.query('SELECT * FROM acoes_carteira WHERE usuario_id=$1', [req.userId]), pool.query('SELECT * FROM fiis_carteira WHERE usuario_id=$1', [req.userId]), pool.query('SELECT * FROM renda_fixa WHERE usuario_id=$1', [req.userId]), pool.query('SELECT * FROM watchlist WHERE usuario_id=$1', [req.userId])]);
+    const [acoes, fiis, rendaFixa, watchlist, acoesTodas, fiisTodas] = await Promise.all([
+      pool.query('SELECT * FROM acoes_carteira WHERE usuario_id=$1 AND (vendido IS NOT TRUE)', [req.userId]),
+      pool.query('SELECT * FROM fiis_carteira WHERE usuario_id=$1 AND (vendido IS NOT TRUE)', [req.userId]),
+      pool.query('SELECT * FROM renda_fixa WHERE usuario_id=$1', [req.userId]),
+      pool.query('SELECT * FROM watchlist WHERE usuario_id=$1', [req.userId]),
+      pool.query('SELECT dividendos_ano FROM acoes_carteira WHERE usuario_id=$1', [req.userId]),
+      pool.query('SELECT dividendos_geral FROM fiis_carteira WHERE usuario_id=$1', [req.userId])
+    ]);
     const calcPatrimonio = (rows, campoPreco) => rows.reduce((s, r) => s + (Number(r.quantidade || 0) * Number(r[campoPreco] || 0)), 0);
     const patrimonioAcoes = calcPatrimonio(acoes.rows, 'preco_atual');
     const patrimonioFIIs = calcPatrimonio(fiis.rows, 'preco_atual');
@@ -180,10 +187,12 @@ dashboardRouter.get('/', async (req, res) => {
     const custoFIIs = calcCusto(fiis.rows);
     const ganhoAcoes = patrimonioAcoes - custoAcoes;
     const ganhoFIIs = patrimonioFIIs - custoFIIs;
+    const totalDivAcoes = acoesTodas.rows.reduce((s, r) => s + Number(r.dividendos_ano || 0), 0);
+    const totalDivFIIs = fiisTodas.rows.reduce((s, r) => s + Number(r.dividendos_geral || 0), 0);
     const todosAtivos = [...acoes.rows.map(a => ({ ...a, tipo: 'ACAO' })), ...fiis.rows.map(f => ({ ...f, tipo: 'FII' }))];
     const oportunidades = todosAtivos.filter(a => a.decisao === 'COMPRAR/ACUMULAR').sort((a, b) => Number(b.peso_sugerido) - Number(a.peso_sugerido)).slice(0, 10);
     const riscos = todosAtivos.filter(a => a.decisao === 'EVITAR/REVER' || a.classificacao === 'RISCO').slice(0, 10);
-    res.json({ resumo: { patrimonioTotal, patrimonioAcoes, patrimonioFIIs, patrimonioRendaFixa, ganhoAcoes, ganhoFIIs, totalAtivos: todosAtivos.length, totalAcoes: acoes.rows.length, totalFIIs: fiis.rows.length, ativosExcelentes: todosAtivos.filter(a => a.classificacao === 'EXCELENTE').length, ativosRisco: todosAtivos.filter(a => a.classificacao === 'RISCO').length, totalWatchlist: watchlist.rows.length }, rankingAcoes: acoes.rows.sort((a, b) => Number(b.peso_sugerido) - Number(a.peso_sugerido)).slice(0, 10), rankingFIIs: fiis.rows.sort((a, b) => Number(b.peso_sugerido) - Number(a.peso_sugerido)).slice(0, 10), oportunidades, riscos, atualizadoEm: new Date() });
+    res.json({ resumo: { patrimonioTotal, patrimonioAcoes, patrimonioFIIs, patrimonioRendaFixa, ganhoAcoes, ganhoFIIs, totalDivAcoes, totalDivFIIs, totalAtivos: todosAtivos.length, totalAcoes: acoes.rows.length, totalFIIs: fiis.rows.length, ativosExcelentes: todosAtivos.filter(a => a.classificacao === 'EXCELENTE').length, ativosRisco: todosAtivos.filter(a => a.classificacao === 'RISCO').length, totalWatchlist: watchlist.rows.length }, rankingAcoes: acoes.rows.sort((a, b) => Number(b.peso_sugerido) - Number(a.peso_sugerido)).slice(0, 10), rankingFIIs: fiis.rows.sort((a, b) => Number(b.peso_sugerido) - Number(a.peso_sugerido)).slice(0, 10), oportunidades, riscos, atualizadoEm: new Date() });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao carregar dashboard.' });

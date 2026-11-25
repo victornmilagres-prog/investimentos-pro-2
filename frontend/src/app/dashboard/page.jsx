@@ -154,10 +154,17 @@ export default function DashboardPage() {
     return `${mainIdx} ${fmt.pct(avgTaxa)}`;
   })() : '—';
 
-  // ── dividendos recebidos (lançados nas abas Ações e FIIs) ────────────────
-  const divAcoes     = acoes.reduce((s, a) => s + Number(a.dividendos_ano  || 0), 0);
-  const divFIIs      = fiis.reduce ((s, f) => s + Number(f.dividendos_ano  || 0), 0);
-  const divFIIsGeral = fiis.reduce ((s, f) => s + Number(f.dividendos_geral|| 0), 0);
+  // ── dividendos recebidos — inclui posições ativas E vendidas ────────────
+  // usa totalDivAcoes/totalDivFIIs do backend (todas as posições, inclusive vendidas)
+  const divAcoes     = resumo.totalDivAcoes != null
+    ? Number(resumo.totalDivAcoes)
+    : acoes.reduce((s, a) => s + Number(a.dividendos_ano  || 0), 0);
+  const divFIIs      = resumo.totalDivFIIs  != null
+    ? Number(resumo.totalDivFIIs)
+    : fiis.reduce ((s, f) => s + Number(f.dividendos_ano  || 0), 0);
+  const divFIIsGeral = resumo.totalDivFIIs  != null
+    ? Number(resumo.totalDivFIIs)
+    : fiis.reduce ((s, f) => s + Number(f.dividendos_geral|| 0), 0);
   const divAcoesLiq  = divAcoes * 0.85; // IRRF 15%
 
   // ── DY médio FIIs e Ações ─────────────────────────────────────────────────
