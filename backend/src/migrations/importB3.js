@@ -2235,7 +2235,7 @@ const PROVENTOS = [
     "tipo": "Dividendo",
     "mr": "2024-05-01",
     "vpc": 0.28,
-    "qtd": 4.8,
+    "qtd": 5,
     "dp": "2024-05-27"
   },
   {

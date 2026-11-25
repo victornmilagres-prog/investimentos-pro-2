@@ -539,11 +539,17 @@ router.get('/cotacoes-live', async (req, res) => {
 router.get('/vendidos', async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT ticker, nome_fundo, preco_compra, preco_venda, data_venda,
-              dividendos_ano, dividendos_geral, quantidade
-       FROM fiis_carteira
-       WHERE usuario_id=$1 AND vendido = TRUE
-       ORDER BY data_venda DESC, ticker`,
+      `SELECT fc.ticker, fc.nome_fundo, fc.preco_compra, fc.preco_venda, fc.data_venda,
+              fc.dividendos_ano, fc.quantidade,
+              COALESCE(
+                (SELECT SUM(fp.valor_por_cota * fp.quantidade)
+                 FROM fiis_proventos fp
+                 WHERE fp.usuario_id = fc.usuario_id AND fp.ticker = fc.ticker),
+                fc.dividendos_geral, 0
+              ) AS dividendos_geral
+       FROM fiis_carteira fc
+       WHERE fc.usuario_id=$1 AND fc.vendido = TRUE
+       ORDER BY fc.data_venda DESC, fc.ticker`,
       [req.userId]
     );
     res.json(result.rows);

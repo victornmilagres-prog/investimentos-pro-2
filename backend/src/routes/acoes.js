@@ -275,11 +275,17 @@ router.post('/vender', async (req, res) => {
 router.get('/vendidas', async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT ticker, nome_empresa, preco_compra, preco_venda, data_venda,
-              dividendos_ano, quantidade
-       FROM acoes_carteira
-       WHERE usuario_id=$1 AND vendido = TRUE
-       ORDER BY data_venda DESC, ticker`,
+      `SELECT ac.ticker, ac.nome_empresa, ac.preco_compra, ac.preco_venda, ac.data_venda,
+              ac.quantidade,
+              COALESCE(
+                (SELECT SUM(ap.valor_por_cota * ap.quantidade)
+                 FROM acoes_proventos ap
+                 WHERE ap.usuario_id = ac.usuario_id AND ap.ticker = ac.ticker),
+                ac.dividendos_ano, 0
+              ) AS dividendos_ano
+       FROM acoes_carteira ac
+       WHERE ac.usuario_id=$1 AND ac.vendido = TRUE
+       ORDER BY ac.data_venda DESC, ac.ticker`,
       [req.userId]
     );
     res.json(result.rows);
