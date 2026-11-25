@@ -169,13 +169,29 @@ dashboardRouter.use(auth);
 
 dashboardRouter.get('/', async (req, res) => {
   try {
-    const [acoes, fiis, rendaFixa, watchlist, acoesTodas, fiisTodas] = await Promise.all([
+    const anoAtual = new Date().getFullYear();
+    const [acoes, fiis, rendaFixa, watchlist, divQ] = await Promise.all([
       pool.query('SELECT * FROM acoes_carteira WHERE usuario_id=$1 AND (vendido IS NOT TRUE)', [req.userId]),
       pool.query('SELECT * FROM fiis_carteira WHERE usuario_id=$1 AND (vendido IS NOT TRUE)', [req.userId]),
       pool.query('SELECT * FROM renda_fixa WHERE usuario_id=$1', [req.userId]),
       pool.query('SELECT * FROM watchlist WHERE usuario_id=$1', [req.userId]),
-      pool.query('SELECT dividendos_ano FROM acoes_carteira WHERE usuario_id=$1', [req.userId]),
-      pool.query('SELECT dividendos_ano, dividendos_geral FROM fiis_carteira WHERE usuario_id=$1', [req.userId])
+      pool.query(`
+        SELECT
+          -- Ações Ano: posições ativas (dividendos_ano) + acoes_proventos do ano atual (vendidas)
+          (SELECT COALESCE(SUM(ac.dividendos_ano),0) FROM acoes_carteira ac WHERE ac.usuario_id=$1 AND ac.vendido IS NOT TRUE)
+          + COALESCE((SELECT SUM(ap.valor_por_cota * ap.quantidade) FROM acoes_proventos ap WHERE ap.usuario_id=$1 AND EXTRACT(YEAR FROM ap.mes_referencia)=$2),0)
+          AS div_acoes_ano,
+
+          -- FIIs Ano: posições ativas (dividendos_ano) + fiis_proventos do ano atual (vendidas)
+          (SELECT COALESCE(SUM(fc.dividendos_ano),0) FROM fiis_carteira fc WHERE fc.usuario_id=$1 AND fc.vendido IS NOT TRUE)
+          + COALESCE((SELECT SUM(fp.valor_por_cota * fp.quantidade) FROM fiis_proventos fp WHERE fp.usuario_id=$1 AND EXTRACT(YEAR FROM fp.mes_referencia)=$2),0)
+          AS div_fiis_ano,
+
+          -- FIIs Geral (desde início): posições ativas (dividendos_geral) + TODOS fiis_proventos (vendidas)
+          (SELECT COALESCE(SUM(fc.dividendos_geral),0) FROM fiis_carteira fc WHERE fc.usuario_id=$1 AND fc.vendido IS NOT TRUE)
+          + COALESCE((SELECT SUM(fp.valor_por_cota * fp.quantidade) FROM fiis_proventos fp WHERE fp.usuario_id=$1),0)
+          AS div_fiis_geral
+      `, [req.userId, anoAtual])
     ]);
     const calcPatrimonio = (rows, campoPreco) => rows.reduce((s, r) => s + (Number(r.quantidade || 0) * Number(r[campoPreco] || 0)), 0);
     const patrimonioAcoes = calcPatrimonio(acoes.rows, 'preco_atual');
@@ -187,9 +203,10 @@ dashboardRouter.get('/', async (req, res) => {
     const custoFIIs = calcCusto(fiis.rows);
     const ganhoAcoes = patrimonioAcoes - custoAcoes;
     const ganhoFIIs = patrimonioFIIs - custoFIIs;
-    const totalDivAcoes    = acoesTodas.rows.reduce((s, r) => s + Number(r.dividendos_ano   || 0), 0);
-    const totalDivFIIsAno  = fiisTodas.rows.reduce ((s, r) => s + Number(r.dividendos_ano   || 0), 0);
-    const totalDivFIIsGeral= fiisTodas.rows.reduce ((s, r) => s + Number(r.dividendos_geral || 0), 0);
+    const { div_acoes_ano, div_fiis_ano, div_fiis_geral } = divQ.rows[0];
+    const totalDivAcoes     = Number(div_acoes_ano  || 0);
+    const totalDivFIIsAno   = Number(div_fiis_ano   || 0);
+    const totalDivFIIsGeral = Number(div_fiis_geral || 0);
     const todosAtivos = [...acoes.rows.map(a => ({ ...a, tipo: 'ACAO' })), ...fiis.rows.map(f => ({ ...f, tipo: 'FII' }))];
     const oportunidades = todosAtivos.filter(a => a.decisao === 'COMPRAR/ACUMULAR').sort((a, b) => Number(b.peso_sugerido) - Number(a.peso_sugerido)).slice(0, 10);
     const riscos = todosAtivos.filter(a => a.decisao === 'EVITAR/REVER' || a.classificacao === 'RISCO').slice(0, 10);
