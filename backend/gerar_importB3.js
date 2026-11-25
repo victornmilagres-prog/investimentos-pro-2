@@ -230,16 +230,17 @@ async function importB3() {
         "AND NOT EXISTS (SELECT 1 FROM "+v.tb+" WHERE usuario_id=(SELECT id FROM usuarios WHERE email=$1) AND ticker=$2::VARCHAR)",
         [EMAIL, v.t, v.qtd, v.pm, v.pv, v.dv, v.nome]
       );
-      // UPDATE caso já exista mas com PM zero ou nome em branco
+      // UPDATE campos faltantes para registros pré-existentes
+      const nc = v.tb==='fiis_carteira'?'nome_fundo':'nome_empresa';
       await pool.query(
-        "UPDATE "+v.tb+" SET preco_compra=CASE WHEN preco_compra=0 THEN $3 ELSE preco_compra END, "+
-        (v.tb==='fiis_carteira'?'nome_fundo':'nome_empresa')+"=CASE WHEN ("+
-        (v.tb==='fiis_carteira'?'nome_fundo':'nome_empresa')+
-        " IS NULL OR "+
-        (v.tb==='fiis_carteira'?'nome_fundo':'nome_empresa')+
-        "='') THEN $4 ELSE "+(v.tb==='fiis_carteira'?'nome_fundo':'nome_empresa')+" END "+
+        "UPDATE "+v.tb+" SET "+
+        "preco_compra=CASE WHEN preco_compra=0 OR preco_compra IS NULL THEN $3 ELSE preco_compra END, "+
+        "quantidade=CASE WHEN quantidade=0 OR quantidade IS NULL THEN $4 ELSE quantidade END, "+
+        "preco_venda=CASE WHEN preco_venda=0 OR preco_venda IS NULL THEN $5 ELSE preco_venda END, "+
+        "data_venda=CASE WHEN data_venda IS NULL THEN $6::DATE ELSE data_venda END, "+
+        nc+"=CASE WHEN ("+nc+" IS NULL OR "+nc+"='') THEN $7 ELSE "+nc+" END "+
         "WHERE usuario_id=(SELECT id FROM usuarios WHERE email=$1) AND ticker=$2::VARCHAR AND vendido=TRUE",
-        [EMAIL, v.t, v.pm, v.nome]
+        [EMAIL, v.t, v.pm, v.qtd, v.pv, v.dv, v.nome]
       );
       ok++;
     } catch(e) { er++; console.error('[importB3 venda]', v.t, e.message); }
