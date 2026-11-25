@@ -4532,18 +4532,18 @@ async function importB3() {
     } catch(e) { er++; console.error('[importB3 prov]', p.t, e.message); }
   }
 
-  // Atualizar dividendos_geral (FIIs) e dividendos_ano (ações) nas carteiras vendidas
+  // Atualizar dividendos_geral (FIIs) e dividendos_ano (ações) nas carteiras vendidas (sempre, sem condição de valor atual)
   for (const [ticker, { tbCart, total }] of Object.entries(TOTAIS)) {
     try {
       const divCol = tbCart === 'fiis_carteira' ? 'dividendos_geral' : 'dividendos_ano';
-      await pool.query(
+      const r = await pool.query(
         "UPDATE "+tbCart+" SET "+divCol+"=$3 "+
-        "WHERE usuario_id=(SELECT id FROM usuarios WHERE email=$1) AND ticker=$2::VARCHAR AND vendido=TRUE "+
-        "AND ("+divCol+" IS NULL OR "+divCol+"=0)",
+        "WHERE usuario_id=(SELECT id FROM usuarios WHERE email=$1) AND ticker=$2::VARCHAR",
         [EMAIL, ticker, total]
       );
+      console.log('[importB3 div]', ticker, divCol+'='+total, '| rows:', r.rowCount);
       ok++;
-    } catch(e) { er++; console.error('[importB3 div]', ticker, e.message); }
+    } catch(e) { er++; console.error('[importB3 div ERR]', ticker, e.message); }
   }
 
   console.log('[importB3] Done:', ok, 'ok,', er, 'erros');
