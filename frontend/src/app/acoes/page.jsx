@@ -1354,7 +1354,7 @@ export default function AcoesPage() {
           onFechar={()=>setModalCompra(null)} onSalvar={salvarOperacao}/>
       )}
       {modalProv && (
-        <ModalProventos acoes={acoes}
+        <ModalProventos acoes={[...acoes, ...acoesVendidas]}
           onFechar={()=>setModalProv(false)} onSalvar={salvarProventos}/>
       )}
     </div>

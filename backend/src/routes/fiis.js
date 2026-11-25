@@ -327,21 +327,59 @@ router.post('/dividendos', async (req, res) => {
     return res.status(400).json({ error: 'Nenhum lançamento informado.' });
   try {
     const anoAtual = new Date().getFullYear();
+    // Descobrir quais tickers são vendidos para redirecionar para fiis_proventos
+    const tickers = [...new Set(lancamentos.map(l => l.ticker.toUpperCase()))];
+    const vendidosRes = await pool.query(
+      `SELECT ticker FROM fiis_carteira WHERE usuario_id=$1 AND ticker = ANY($2) AND vendido = TRUE`,
+      [req.userId, tickers]
+    );
+    const vendidosSet = new Set(vendidosRes.rows.map(r => r.ticker));
+
     for (const lanc of lancamentos) {
-      const { ticker, tipo_dividendo = 'Rendimento', valor_por_cota, quantidade, valor_total_override, mes, ano } = lanc;
+      const { ticker, tipo_dividendo = 'Rendimento', valor_por_cota, quantidade, valor_total_override, mes, ano, data_pagamento } = lanc;
       if (!ticker || !valor_por_cota || !mes || !ano) continue;
+      const tk = ticker.toUpperCase();
       const valorTotal = valor_total_override != null
         ? Number(valor_total_override)
         : Number(valor_por_cota) * Number(quantidade || 0);
+
+      if (vendidosSet.has(tk)) {
+        // FII vendido → salva em fiis_proventos
+        const mesRef = `${ano}-${String(mes).padStart(2,'0')}-01`;
+        const qtd = quantidade ? Math.round(Number(quantidade)) : 1;
+        const tipo = tipo_dividendo.includes('JCP') ? 'JCP' : tipo_dividendo.includes('Dividendo') ? 'Dividendo' : 'Rendimento';
+        await pool.query(
+          `INSERT INTO fiis_proventos (usuario_id, ticker, tipo, mes_referencia, valor_por_cota, quantidade, data_pagamento)
+           VALUES ($1,$2,$3,$4::DATE,$5,$6,$7)
+           ON CONFLICT (usuario_id, ticker, mes_referencia) DO UPDATE SET
+             valor_por_cota=EXCLUDED.valor_por_cota, quantidade=EXCLUDED.quantidade, data_pagamento=EXCLUDED.data_pagamento`,
+          [req.userId, tk, tipo, mesRef, Number(valor_por_cota), qtd, data_pagamento || null]
+        ).catch(async () => {
+          // Se não há constraint unique, usa INSERT sem ON CONFLICT
+          const exists = await pool.query(
+            'SELECT 1 FROM fiis_proventos WHERE usuario_id=$1 AND ticker=$2 AND mes_referencia=$3',
+            [req.userId, tk, mesRef]
+          );
+          if (!exists.rows.length) {
+            await pool.query(
+              `INSERT INTO fiis_proventos (usuario_id, ticker, tipo, mes_referencia, valor_por_cota, quantidade, data_pagamento)
+               VALUES ($1,$2,$3,$4::DATE,$5,$6,$7)`,
+              [req.userId, tk, tipo, mesRef, Number(valor_por_cota), qtd, data_pagamento || null]
+            );
+          }
+        });
+        continue; // não passa pelo fluxo normal de dividendos_fiis
+      }
+
       await pool.query(`
         INSERT INTO dividendos_fiis (usuario_id, ticker, tipo_dividendo, valor_por_cota, valor_total, mes, ano, created_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
         ON CONFLICT (usuario_id, ticker, mes, ano, tipo_dividendo, valor_por_cota) DO UPDATE SET
           valor_total = EXCLUDED.valor_total, created_at = NOW()
-      `, [req.userId, ticker.toUpperCase(), tipo_dividendo, Number(valor_por_cota), valorTotal, mes, ano]);
+      `, [req.userId, tk, tipo_dividendo, Number(valor_por_cota), valorTotal, mes, ano]);
     }
-    const tickers = [...new Set(lancamentos.map(l => l.ticker.toUpperCase()))];
-    for (const ticker of tickers) {
+    const tickersAtivos = tickers.filter(t => !vendidosSet.has(t));
+    for (const ticker of tickersAtivos) {
       await recalcularDividendosAno(req.userId, ticker, anoAtual);
       await recalcularDividendosGeral(req.userId, ticker);
     }

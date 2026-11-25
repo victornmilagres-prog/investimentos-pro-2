@@ -1927,11 +1927,11 @@ export default function FIIsPage() {
           onFechar={()=>setModalCompra(null)} onSalvar={salvarOperacao}/>
       )}
       {modalDiv && (
-        <ModalDividendosFII fiis={fiis}
+        <ModalDividendosFII fiis={[...fiis, ...fiisVendidos]}
           onFechar={()=>setModalDiv(false)} onSalvar={salvarDividendos}/>
       )}
       {modalB3 && (
-        <ModalImportarB3 fiis={fiis}
+        <ModalImportarB3 fiis={[...fiis, ...fiisVendidos]}
           onFechar={()=>setModalB3(false)} onSalvar={salvarDividendos}/>
       )}
     </div>
