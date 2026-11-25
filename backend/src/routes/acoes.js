@@ -6,6 +6,12 @@ const { buscarAcao, calcularPesos } = require('../services/brapiService');
 const router = express.Router();
 router.use(auth);
 
+// Auto-migrate: adiciona colunas de proventos se não existirem
+pool.query(`
+  ALTER TABLE dividendos_acoes ADD COLUMN IF NOT EXISTS quantidade INTEGER;
+  ALTER TABLE dividendos_acoes ADD COLUMN IF NOT EXISTS data_pagamento DATE;
+`).catch(e => console.error('[acoes migrate proventos]', e.message));
+
 // Migração inline — adiciona colunas de venda se não existirem
 pool.query(`
   ALTER TABLE acoes_carteira ADD COLUMN IF NOT EXISTS vendido BOOLEAN DEFAULT FALSE;
@@ -349,17 +355,19 @@ router.post('/proventos', async (req, res) => {
   try {
     const anoAtual = new Date().getFullYear();
     for (const lanc of lancamentos) {
-      const { ticker, tipo_provento = 'Dividendo', valor_por_acao, quantidade, valor_total_override, mes, ano } = lanc;
+      const { ticker, tipo_provento = 'Dividendo', valor_por_acao, quantidade, valor_total_override, mes, ano, data_pagamento } = lanc;
       if (!ticker || !valor_por_acao || !mes || !ano) continue;
       const valorTotal = valor_total_override != null
         ? Number(valor_total_override)
         : Number(valor_por_acao) * Number(quantidade || 0);
+      const qtd = quantidade != null ? Number(quantidade) : (Number(valor_por_acao) > 0 ? Math.round(valorTotal / Number(valor_por_acao)) : 0);
       await pool.query(`
-        INSERT INTO dividendos_acoes (usuario_id, ticker, tipo_provento, valor_por_acao, valor_total, mes, ano, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+        INSERT INTO dividendos_acoes (usuario_id, ticker, tipo_provento, valor_por_acao, valor_total, quantidade, data_pagamento, mes, ano, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
         ON CONFLICT (usuario_id, ticker, mes, ano, tipo_provento, valor_por_acao) DO UPDATE SET
-          valor_total = EXCLUDED.valor_total, created_at = NOW()
-      `, [req.userId, ticker.toUpperCase(), tipo_provento, Number(valor_por_acao), valorTotal, mes, ano]);
+          valor_total = EXCLUDED.valor_total, quantidade = EXCLUDED.quantidade,
+          data_pagamento = EXCLUDED.data_pagamento, created_at = NOW()
+      `, [req.userId, ticker.toUpperCase(), tipo_provento, Number(valor_por_acao), valorTotal, qtd, data_pagamento || null, mes, ano]);
     }
     const tickers = [...new Set(lancamentos.map(l => l.ticker.toUpperCase()))];
     for (const ticker of tickers) {
@@ -461,7 +469,9 @@ router.get('/proventos', async (req, res) => {
   if (!mes || !ano) return res.status(400).json({ error: 'mes e ano obrigatórios.' });
   try {
     const r = await pool.query(
-      `SELECT ticker, tipo_provento, valor_por_acao, valor_total, mes, ano
+      `SELECT ticker, tipo_provento, valor_por_acao, valor_total,
+              COALESCE(quantidade, CASE WHEN valor_por_acao > 0 THEN ROUND(valor_total / valor_por_acao) ELSE 0 END) AS quantidade,
+              data_pagamento, mes, ano
        FROM dividendos_acoes
        WHERE usuario_id=$1 AND mes=$2 AND ano=$3
        ORDER BY ticker, tipo_provento`,
@@ -591,6 +601,26 @@ router.delete('/dividendos/:ticker/:mes/:ano', async (req, res) => {
     res.json({ message: 'Lançamento removido.' });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao remover lançamento.' });
+  }
+});
+
+// DELETE /api/acoes/proventos/limpar — apaga TODOS os proventos do usuário
+router.delete('/proventos/limpar', async (req, res) => {
+  try {
+    const r = await pool.query(
+      `DELETE FROM dividendos_acoes WHERE usuario_id=$1 RETURNING ticker`,
+      [req.userId]
+    );
+    const tickers = [...new Set(r.rows.map(row => row.ticker))];
+    const anoAtual = new Date().getFullYear();
+    for (const ticker of tickers) {
+      await recalcularProventosAno(req.userId, ticker, anoAtual);
+      await recalcularProventosGeral(req.userId, ticker);
+    }
+    res.json({ message: `${r.rowCount} lançamentos removidos.`, removidos: r.rowCount });
+  } catch (err) {
+    console.error('[proventos limpar]', err);
+    res.status(500).json({ error: 'Erro ao limpar proventos.' });
   }
 });
 

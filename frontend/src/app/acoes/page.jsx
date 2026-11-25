@@ -454,6 +454,18 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
     } catch {}
   };
 
+  const [limpando, setLimpando] = useState(false);
+  const limparTudo = async () => {
+    if (!window.confirm('Excluir TODOS os proventos de ações lançados? Esta ação não pode ser desfeita.')) return;
+    setLimpando(true);
+    try {
+      const r = await api.delete('/acoes/proventos/limpar');
+      setExistentes([]);
+      setFeedback(`✅ ${r.data.removidos} lançamentos removidos. Pronto para reimportar da B3.`);
+    } catch { setFeedback('⚠ Erro ao limpar. Tente novamente.'); }
+    finally { setLimpando(false); }
+  };
+
   const st = {
     overlay: { position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:200 },
     modal:   { background:'#fff',borderRadius:14,padding:28,width:540,boxShadow:'0 20px 60px rgba(0,0,0,0.2)',maxHeight:'92vh',overflowY:'auto' },
@@ -555,21 +567,44 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
         {/* Lançamentos existentes no mês selecionado */}
         {existentes.length > 0 && (
           <div style={{marginBottom:14}}>
-            <p style={{fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:8}}>
-              Já lançados em {meses[mesFiltro]}/{anoFiltro}
-            </p>
-            <div style={{display:'flex',flexDirection:'column',gap:6}}>
-              {existentes.map((item,i)=>(
-                <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'#F8F9FA',border:'1px solid #E8ECF0',borderRadius:8,padding:'8px 12px'}}>
-                  <div style={{display:'flex',gap:10,alignItems:'center'}}>
-                    <span style={{fontWeight:700,fontSize:13}}>{item.ticker}</span>
-                    <span style={{fontSize:11,background:'#FEF3C7',color:'#92400E',padding:'2px 8px',borderRadius:20}}>{item.tipo_provento}</span>
-                    <span style={{fontSize:13,color:'#1A1A2E'}}>{fmt.brl(Number(item.valor_total))}</span>
-                    <span style={{fontSize:11,color:'#8896A8'}}>R$ {Number(item.valor_por_acao).toFixed(4)}/ação</span>
-                  </div>
-                  <button onClick={()=>excluirExistente(item)} style={{background:'#fff5f5',color:'#fc8181',border:'1px solid #fed7d7',borderRadius:5,padding:'3px 8px',fontSize:11,cursor:'pointer'}}>🗑</button>
-                </div>
-              ))}
+            <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+              <p style={{fontSize:11,fontWeight:700,color:'#8896A8',textTransform:'uppercase',letterSpacing:'0.05em'}}>Lançados em {meses[mesFiltro]}/{anoFiltro}</p>
+              <span style={{fontSize:10,fontWeight:700,background:'#D1FAE5',color:'#065F46',padding:'2px 8px',borderRadius:20,letterSpacing:'0.05em'}}>LANÇADO</span>
+            </div>
+            <div style={{border:'1px solid #E8ECF0',borderRadius:8,overflow:'hidden'}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                <thead>
+                  <tr style={{background:'#F8FAFC'}}>
+                    <th style={{padding:'6px 10px',textAlign:'left',fontWeight:700,color:'#8896A8',textTransform:'uppercase',fontSize:10,letterSpacing:'0.05em'}}>Ativo</th>
+                    <th style={{padding:'6px 10px',textAlign:'left',fontWeight:700,color:'#8896A8',textTransform:'uppercase',fontSize:10,letterSpacing:'0.05em'}}>Tipo</th>
+                    <th style={{padding:'6px 10px',textAlign:'right',fontWeight:700,color:'#8896A8',textTransform:'uppercase',fontSize:10,letterSpacing:'0.05em'}}>Div/Ação</th>
+                    <th style={{padding:'6px 10px',textAlign:'right',fontWeight:700,color:'#8896A8',textTransform:'uppercase',fontSize:10,letterSpacing:'0.05em'}}>Ações</th>
+                    <th style={{padding:'6px 10px',textAlign:'right',fontWeight:700,color:'#8896A8',textTransform:'uppercase',fontSize:10,letterSpacing:'0.05em'}}>Total</th>
+                    <th style={{padding:'6px 10px',textAlign:'center',fontWeight:700,color:'#8896A8',textTransform:'uppercase',fontSize:10,letterSpacing:'0.05em'}}>Data Pgto</th>
+                    <th style={{padding:'6px 10px'}}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {existentes.map((item,i)=>(
+                    <tr key={i} style={{borderTop:'1px solid #F0F2F5',background:i%2===0?'#fff':'#FAFBFC'}}>
+                      <td style={{padding:'7px 10px',fontWeight:700,color:'#1A1A2E'}}>{item.ticker}</td>
+                      <td style={{padding:'7px 10px'}}><span style={{fontSize:10,background:'#FEF3C7',color:'#92400E',padding:'2px 7px',borderRadius:20}}>{item.tipo_provento}</span></td>
+                      <td style={{padding:'7px 10px',textAlign:'right',color:'#4A5568'}}>R$ {Number(item.valor_por_acao).toFixed(4)}</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',fontWeight:600,color:'#2563EB'}}>{item.quantidade ?? Math.round((item.valor_total||0)/Math.max(item.valor_por_acao,0.0001))}</td>
+                      <td style={{padding:'7px 10px',textAlign:'right',fontWeight:700,color:'#065F46'}}>{fmt.brl(item.valor_total)}</td>
+                      <td style={{padding:'7px 10px',textAlign:'center',color:'#8896A8',fontSize:11}}>{item.data_pagamento ? new Date(item.data_pagamento).toLocaleDateString('pt-BR') : '—'}</td>
+                      <td style={{padding:'7px 10px',textAlign:'center'}}><button onClick={()=>excluirExistente(item)} style={{background:'#fff5f5',color:'#fc8181',border:'1px solid #fed7d7',borderRadius:5,padding:'2px 7px',fontSize:11,cursor:'pointer'}}>🗑</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{borderTop:'2px solid #E8ECF0',background:'#F8FAFC'}}>
+                    <td colSpan={4} style={{padding:'6px 10px',fontSize:11,fontWeight:700,color:'#8896A8',textAlign:'right'}}>Total lançado:</td>
+                    <td style={{padding:'6px 10px',textAlign:'right',fontWeight:800,color:'#065F46',fontSize:13}}>{fmt.brl(existentes.reduce((s,x)=>s+(x.valor_total||0),0))}</td>
+                    <td colSpan={2}/>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </div>
         )}
@@ -644,12 +679,26 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
           <div><p style={{fontSize:11,color:'#8896A8',marginBottom:3}}>Lançamentos selecionados</p><p style={{fontSize:15,fontWeight:700}}>{linhasSelecionadas.length}</p></div>
         </div>
 
-        <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
-          <button onClick={onFechar} style={{padding:'9px 20px',borderRadius:7,fontSize:13,fontWeight:600,border:'none',cursor:'pointer',background:'#EDF2F7',color:'#8896A8'}}>Cancelar</button>
-          <button onClick={confirmar} disabled={salvando||linhasSelecionadas.length===0}
-            style={{padding:'9px 20px',borderRadius:7,fontSize:13,fontWeight:600,border:'none',cursor:'pointer',background:'#D4A017',color:'#fff',opacity:linhasSelecionadas.length===0?0.5:1}}>
-            {salvando?'Salvando...':'Lançar proventos'}
+        {feedbackImport && (
+          <div style={{marginBottom:12,padding:'10px 14px',borderRadius:8,
+            background:feedbackImport.startsWith('✅')?'#F0FDF4':'#FFFBEB',
+            border:`1px solid ${feedbackImport.startsWith('✅')?'#86EFAC':'#FCD34D'}`}}>
+            <p style={{fontSize:13,fontWeight:600,color:feedbackImport.startsWith('✅')?'#16A34A':'#92400E'}}>{feedbackImport}</p>
+          </div>
+        )}
+
+        <div style={{display:'flex',gap:10,justifyContent:'space-between',alignItems:'center'}}>
+          <button onClick={limparTudo} disabled={limpando}
+            style={{padding:'9px 16px',borderRadius:7,fontSize:12,fontWeight:600,border:'1px solid #fed7d7',cursor:'pointer',background:'#fff5f5',color:'#c53030',opacity:limpando?0.5:1}}>
+            {limpando?'Limpando...':'🗑 Limpar todos os proventos de ações'}
           </button>
+          <div style={{display:'flex',gap:10}}>
+            <button onClick={onFechar} style={{padding:'9px 20px',borderRadius:7,fontSize:13,fontWeight:600,border:'none',cursor:'pointer',background:'#EDF2F7',color:'#8896A8'}}>Cancelar</button>
+            <button onClick={confirmar} disabled={salvando||linhasSelecionadas.length===0}
+              style={{padding:'9px 20px',borderRadius:7,fontSize:13,fontWeight:600,border:'none',cursor:'pointer',background:'#D4A017',color:'#fff',opacity:linhasSelecionadas.length===0?0.5:1}}>
+              {salvando?'Salvando...':'Lançar proventos'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
