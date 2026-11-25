@@ -607,17 +607,25 @@ router.delete('/dividendos/:ticker/:mes/:ano', async (req, res) => {
 // DELETE /api/acoes/proventos/limpar — apaga TODOS os proventos do usuário
 router.delete('/proventos/limpar', async (req, res) => {
   try {
-    const r = await pool.query(
+    const r1 = await pool.query(
       `DELETE FROM dividendos_acoes WHERE usuario_id=$1 RETURNING ticker`,
       [req.userId]
     );
-    const tickers = [...new Set(r.rows.map(row => row.ticker))];
-    const anoAtual = new Date().getFullYear();
-    for (const ticker of tickers) {
-      await recalcularProventosAno(req.userId, ticker, anoAtual);
-      await recalcularProventosGeral(req.userId, ticker);
-    }
-    res.json({ message: `${r.rowCount} lançamentos removidos.`, removidos: r.rowCount });
+    const r2 = await pool.query(
+      `DELETE FROM acoes_proventos WHERE usuario_id=$1 RETURNING ticker`,
+      [req.userId]
+    );
+    // Zera todos os campos de provento em acoes_carteira (ativos e vendidos)
+    await pool.query(
+      `UPDATE acoes_carteira SET
+         dividendos_ano=0, dividendos_lancamentos=0,
+         proventos_breakdown='{}', proventos_geral=0,
+         proventos_geral_lancamentos=0, updated_at=NOW()
+       WHERE usuario_id=$1`,
+      [req.userId]
+    );
+    const removidos = r1.rowCount + r2.rowCount;
+    res.json({ message: `${removidos} lançamentos removidos.`, removidos });
   } catch (err) {
     console.error('[proventos limpar]', err);
     res.status(500).json({ error: 'Erro ao limpar proventos.' });

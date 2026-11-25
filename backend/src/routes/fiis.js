@@ -507,17 +507,25 @@ router.delete('/dividendos/:ticker/:tipo/:mes/:ano', async (req, res) => {
 // DELETE /api/fiis/dividendos/limpar — apaga TODOS os dividendos do usuário
 router.delete('/dividendos/limpar', async (req, res) => {
   try {
-    const r = await pool.query(
+    const r1 = await pool.query(
       `DELETE FROM dividendos_fiis WHERE usuario_id=$1 RETURNING ticker`,
       [req.userId]
     );
-    const tickers = [...new Set(r.rows.map(row => row.ticker))];
-    const anoAtual = new Date().getFullYear();
-    for (const ticker of tickers) {
-      await recalcularDividendosAno(req.userId, ticker, anoAtual);
-      await recalcularDividendosGeral(req.userId, ticker);
-    }
-    res.json({ message: `${r.rowCount} lançamentos removidos.`, removidos: r.rowCount });
+    const r2 = await pool.query(
+      `DELETE FROM fiis_proventos WHERE usuario_id=$1 RETURNING ticker`,
+      [req.userId]
+    );
+    // Zera todos os campos de dividendo em fiis_carteira (ativos e vendidos)
+    await pool.query(
+      `UPDATE fiis_carteira SET
+         dividendos_ano=0, dividendos_lancamentos=0,
+         dividendos_breakdown='{}', dividendos_geral=0,
+         dividendos_geral_lancamentos=0, updated_at=NOW()
+       WHERE usuario_id=$1`,
+      [req.userId]
+    );
+    const removidos = r1.rowCount + r2.rowCount;
+    res.json({ message: `${removidos} lançamentos removidos.`, removidos });
   } catch (err) {
     console.error('[dividendos limpar]', err);
     res.status(500).json({ error: 'Erro ao limpar dividendos.' });
