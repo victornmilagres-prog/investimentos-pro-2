@@ -177,14 +177,11 @@ export default function DashboardPage() {
     : null;
 
   // ── Valores por tab de período ────────────────────────────────────────────
-  const mesAtual = new Date().getMonth() + 1; // 1–12
-  const rfTab         = tabRenda === 'mes' ? rfTotalLiq / mesAtual : rfTotalLiq;
-  const divFIIsTab    = tabRenda === 'mes' ? divFIIs    / mesAtual
-                      : tabRenda === 'ano' ? divFIIs
-                      : divFIIsGeral;
-  const divAcoesTab   = tabRenda === 'mes' ? divAcoes   / mesAtual : divAcoes; // acoes só tem dividendos_ano
+  const rfTab          = rfTotalLiq;
+  const divFIIsTab     = tabRenda === 'ano' ? divFIIs : divFIIsGeral;
+  const divAcoesTab    = divAcoes;
   const divAcoesLiqTab = divAcoesTab * 0.85;
-  const totalLiqTab   = rfTab + divFIIsTab + divAcoesLiqTab;
+  const totalLiqTab    = rfTab + divFIIsTab + divAcoesLiqTab;
 
   const now = new Date();
   const dataHora = now.toLocaleDateString('pt-BR') + ' · ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -411,7 +408,7 @@ export default function DashboardPage() {
 
           {/* Tabs */}
           <div style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
-            {[['mes','Mês ant.'],['ano','Ano 2026'],['total','Desde início']].map(([k,l]) => (
+            {[['ano','Ano 2026'],['total','Desde início']].map(([k,l]) => (
               <button key={k} onClick={() => setTabRenda(k)} style={{
                 padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: 'pointer',
                 border: `1px solid ${tabRenda === k ? 'var(--accent)' : 'var(--border)'}`,
@@ -425,7 +422,7 @@ export default function DashboardPage() {
           {/* Acumulado box — título muda com a tab */}
           <div style={{ background: 'linear-gradient(135deg,var(--bg-accent),var(--bg-success))', border: '1px solid var(--accent)', borderRadius: 10, padding: '12px 14px', marginBottom: 14 }}>
             <p style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--accent)', marginBottom: 8 }}>
-              {tabRenda === 'mes' ? `📅 Média mensal estimada (${mesAtual} meses)` : tabRenda === 'ano' ? '📅 2026 acumulado até agora' : '📅 Desde o início (total geral)'}
+              {tabRenda === 'ano' ? '📅 2026 acumulado até agora' : '📅 Desde o início (total geral)'}
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
               <div style={{ background: 'var(--surface)', border: '1px solid var(--warning)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
@@ -541,100 +538,106 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ── COL 2: GRÁFICO + BENCHMARK + MÉDIA MENSAL + CRESCIMENTO ── */}
+        {/* ── COL 2: BENCHMARK + MÉDIA MENSAL + DISTRIBUIÇÃO RENDA ── */}
         <div style={S.card}>
-          {secTitle('var(--accent)', 'Renda recebida — últimos 12 meses')}
-
-          {/* Bar chart placeholder */}
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 70, marginBottom: 6 }}>
-            {['N','D','J','F','M','A','M','J','J','A','S','O'].map((mes, i) => {
-              const rfH = i < 11 ? 20 + (i * 3) : 60;
-              return (
-                <div key={`${mes}-${i}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                  <div style={{ width: '100%', height: rfH, borderRadius: '3px 3px 0 0', background: i === 11 ? 'var(--warning)' : 'var(--border)', minHeight: 3 }} />
-                  <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>{mes}</span>
-                </div>
-              );
-            })}
-          </div>
-          <p style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 4 }}>
-            valores em R$ · <span style={{ color: 'var(--warning)' }}>■ RF</span> <span style={{ color: 'var(--success)' }}>■ FIIs</span> <span style={{ color: 'var(--accent)' }}>■ Ações</span>
-          </p>
-          <p style={{ fontSize: 9, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 14 }}>Importe extrato B3 para ver histórico mensal completo</p>
-
-          {/* Benchmark */}
-          <div style={S.divider} />
           {secTitle('var(--warning)', 'Comparativo vs benchmark')}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, textAlign: 'center' }}>
-            {[
-              ['Sua carteira', `${pctTotal >= 0 ? '+' : ''}${fmt.pct(pctTotal)}`, 'var(--success)', 'retorno total'],
-              ['CDI', cdiAnual > 0 ? `+${fmt.pct(cdiAnual)}` : '—', 'var(--warning)', 'no período'],
-              ['Ibovespa', 'via Brapi', 'var(--text-muted)', 'benchmark'],
-            ].map(([lbl, val, c, sub]) => (
-              <div key={lbl} style={{ padding: '10px 6px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8 }}>
-                <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>{lbl}</p>
-                <p style={{ fontSize: 15, fontWeight: 800, color: c }}>{val}</p>
-                <p style={{ fontSize: 9, color: 'var(--text-muted)' }}>{sub}</p>
-              </div>
-            ))}
+
+          {/* Carteira vs CDI */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+            <div style={{ padding: '12px 10px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, textAlign: 'center' }}>
+              <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Sua carteira</p>
+              <p style={{ fontSize: 20, fontWeight: 800, color: pctTotal >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                {pctTotal >= 0 ? '+' : ''}{fmt.pct(pctTotal)}
+              </p>
+              <p style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>retorno total desde início</p>
+            </div>
+            <div style={{ padding: '12px 10px', background: 'var(--bg)', border: '1px solid var(--warning)', borderRadius: 8, textAlign: 'center' }}>
+              <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>CDI acumulado</p>
+              <p style={{ fontSize: 20, fontWeight: 800, color: 'var(--warning)' }}>
+                {cdiAnual > 0 ? `+${fmt.pct(cdiAnual)}` : '—'}
+              </p>
+              <p style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>no período</p>
+            </div>
           </div>
-          {pctTotal > 0 && cdiAnual > 0 && (
-            <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: pctTotal > cdiAnual ? 'var(--bg-success)' : 'var(--bg-danger)', border: `1px solid ${pctTotal > cdiAnual ? 'var(--success)' : 'var(--danger)'}`, fontSize: 10, color: pctTotal > cdiAnual ? 'var(--success)' : 'var(--danger)', fontWeight: 600, textAlign: 'center' }}>
+          {cdiAnual > 0 && (
+            <div style={{
+              padding: '8px 12px', borderRadius: 8, marginBottom: 14,
+              background: pctTotal > cdiAnual ? 'var(--bg-success)' : 'var(--bg-danger)',
+              border: `1px solid ${pctTotal > cdiAnual ? 'var(--success)' : 'var(--danger)'}`,
+              fontSize: 11, fontWeight: 700, textAlign: 'center',
+              color: pctTotal > cdiAnual ? 'var(--success)' : 'var(--danger)',
+            }}>
               {pctTotal > cdiAnual
-                ? `✅ Carteira bateu o CDI em +${fmt.pct(pctTotal - cdiAnual)}`
+                ? `✅ Carteira superou o CDI em +${fmt.pct(pctTotal - cdiAnual)}`
                 : `⚠️ Carteira abaixo do CDI em ${fmt.pct(cdiAnual - pctTotal)}`}
             </div>
           )}
 
-          {/* Média mensal */}
           <div style={S.divider} />
-          {secTitle('var(--warning)', 'Renda recebida — média mensal')}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-            <div style={{ padding: '10px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, textAlign: 'center' }}>
-              <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Média mensal (RF)</p>
-              <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--success)' }}>{fmt.brl(rfTotalLiq / mesAtual)}</p>
-              <p style={{ fontSize: 9, color: 'var(--text-muted)' }}>RF líq. ÷ {mesAtual} meses</p>
-            </div>
-            <div style={{ padding: '10px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 8, textAlign: 'center' }}>
-              <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Aplicações ativas</p>
-              <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--success)' }}>{rf.length}</p>
-              <p style={{ fontSize: 9, color: 'var(--text-muted)' }}>renda fixa</p>
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
-            {[
-              ['RF média/mês',     fmt.brl(rfTotalLiq   / mesAtual), 'var(--warning)'],
-              ['FII média/mês',    divFIIs    > 0 ? fmt.brl(divFIIs    / mesAtual) : '—', 'var(--success)'],
-              ['Ações média/mês',  divAcoesLiq > 0 ? fmt.brl(divAcoesLiq / mesAtual) : '—', 'var(--accent)'],
-            ].map(([lbl, val, c]) => (
-              <div key={lbl} style={{ background: 'var(--bg)', border: `1px solid ${c}`, borderRadius: 7, padding: 8, textAlign: 'center' }}>
-                <p style={{ fontSize: 9, color: c, fontWeight: 700, marginBottom: 2 }}>{lbl}</p>
-                <p style={{ fontSize: 13, fontWeight: 800, color: c }}>{val}</p>
-              </div>
-            ))}
-          </div>
 
-          {/* Crescimento */}
+          {/* Média mensal */}
+          {secTitle('var(--success)', 'Média mensal estimada (2026)')}
+          {(() => {
+            const mes = new Date().getMonth() + 1;
+            const rfMes     = mes > 0 ? rfTotalLiq   / mes : 0;
+            const fiiMes    = mes > 0 ? divFIIs       / mes : 0;
+            const acoesMes  = mes > 0 ? divAcoesLiq   / mes : 0;
+            const totalMes  = rfMes + fiiMes + acoesMes;
+            return (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+                  {[
+                    ['Renda Fixa',  fmt.brl(rfMes),    'var(--warning)', 'líquido'],
+                    ['FIIs',        fmt.brl(fiiMes),   'var(--success)', 'isento IR'],
+                    ['Ações',       fmt.brl(acoesMes), 'var(--accent)',  'líq. IRRF'],
+                  ].map(([lbl, val, c, sub]) => (
+                    <div key={lbl} style={{ background: 'var(--bg)', border: `1px solid ${c}`, borderRadius: 7, padding: '8px 6px', textAlign: 'center' }}>
+                      <p style={{ fontSize: 9, color: c, fontWeight: 700, marginBottom: 3 }}>{lbl}</p>
+                      <p style={{ fontSize: 13, fontWeight: 800, color: c }}>{val}</p>
+                      <p style={{ fontSize: 8, color: 'var(--text-muted)', marginTop: 2 }}>{sub}</p>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ padding: '8px 12px', borderRadius: 8, background: 'var(--bg-success)', border: '1px solid var(--success)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, color: 'var(--success)', fontWeight: 600 }}>Total líquido/mês (média)</span>
+                  <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--success)' }}>{fmt.brl(totalMes)}</span>
+                </div>
+                <p style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 5, textAlign: 'center' }}>Total 2026 ÷ {mes} meses</p>
+              </>
+            );
+          })()}
+
           <div style={S.divider} />
-          {secTitle('var(--accent)', 'Crescimento da renda passiva')}
-          {[
-            ['2024 (ano completo)', null,        0,  'var(--accent)'],
-            ['2025 (ano completo)', null,        0,  'var(--accent)'],
-            ['2026 (até out)',      rfTotalLiq + divFIIs + divAcoesLiq,  60, 'var(--success)'],
-          ].map(([lbl, val, pct, c]) => (
-            <div key={lbl} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, marginBottom: 6 }}>
-              <span style={{ color: c === 'var(--success)' ? c : 'var(--text-muted)', fontWeight: c === 'var(--success)' ? 700 : 400, minWidth: 130 }}>{lbl}</span>
-              <div style={{ flex: 1, margin: '0 8px', height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
-                <div style={{ width: `${pct}%`, height: '100%', background: c, borderRadius: 3 }} />
-              </div>
-              <span style={{ fontWeight: 700, color: val ? c : 'var(--text-muted)', minWidth: 70, textAlign: 'right' }}>
-                {val ? fmt.brl(val) : '—'}
-              </span>
-            </div>
-          ))}
-          <div style={{ padding: '7px 10px', borderRadius: 7, background: 'var(--bg-accent)', border: '1px solid var(--accent)', fontSize: 10, color: 'var(--accent)', fontWeight: 600, marginTop: 4 }}>
-            📈 Importe extrato para ver histórico completo 2024/2025
-          </div>
+
+          {/* Distribuição da renda 2026 */}
+          {secTitle('var(--accent)', 'Distribuição da renda 2026')}
+          {(() => {
+            const total2026 = rfTotalLiq + divFIIs + divAcoesLiq;
+            const fatias = [
+              ['Renda Fixa', rfTotalLiq,    'var(--warning)'],
+              ['FIIs',       divFIIs,       'var(--success)'],
+              ['Ações',      divAcoesLiq,   'var(--accent)'],
+            ].filter(([,v]) => v > 0);
+            if (total2026 === 0) return <p style={S.muted}>Nenhum rendimento registrado.</p>;
+            return (
+              <>
+                {/* Barra de proporção */}
+                <div style={{ height: 8, borderRadius: 4, overflow: 'hidden', display: 'flex', marginBottom: 10 }}>
+                  {fatias.map(([lbl, val, c]) => (
+                    <div key={lbl} style={{ width: `${(val / total2026) * 100}%`, background: c }} />
+                  ))}
+                </div>
+                {fatias.map(([lbl, val, c]) => (
+                  <div key={lbl} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                    <span style={{ flex: 1, fontSize: 11, color: 'var(--text-muted)' }}>{lbl}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: c }}>{fmt.pct((val / total2026) * 100)}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, minWidth: 72, textAlign: 'right' }}>{fmt.brl(val)}</span>
+                  </div>
+                ))}
+              </>
+            );
+          })()}
         </div>
 
         {/* ── COL 3: DISTRIBUIÇÃO + VARIAÇÃO HOJE + VENCIMENTOS ── */}

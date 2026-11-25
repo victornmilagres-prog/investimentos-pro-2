@@ -177,19 +177,45 @@ dashboardRouter.get('/', async (req, res) => {
       pool.query('SELECT * FROM watchlist WHERE usuario_id=$1', [req.userId]),
       pool.query(`
         SELECT
-          -- Ações Ano: posições ativas (dividendos_ano) + acoes_proventos do ano atual (vendidas)
-          (SELECT COALESCE(SUM(ac.dividendos_ano),0) FROM acoes_carteira ac WHERE ac.usuario_id=$1 AND ac.vendido IS NOT TRUE)
-          + COALESCE((SELECT SUM(ap.valor_por_cota * ap.quantidade) FROM acoes_proventos ap WHERE ap.usuario_id=$1 AND EXTRACT(YEAR FROM ap.mes_referencia)=$2),0)
+          -- Ações Ano: todos registros de dividendos_acoes para o ano
+          -- + acoes_proventos para tickers que NÃO têm registro em dividendos_acoes (evita dupla contagem)
+          COALESCE((SELECT SUM(da.valor_total) FROM dividendos_acoes da WHERE da.usuario_id=$1 AND da.ano=$2), 0)
+          + COALESCE((
+            SELECT SUM(ap.valor_por_cota * ap.quantidade)
+            FROM acoes_proventos ap
+            WHERE ap.usuario_id=$1
+              AND EXTRACT(YEAR FROM ap.mes_referencia)=$2
+              AND ap.ticker NOT IN (
+                SELECT DISTINCT da2.ticker FROM dividendos_acoes da2 WHERE da2.usuario_id=$1 AND da2.ano=$2
+              )
+          ), 0)
           AS div_acoes_ano,
 
-          -- FIIs Ano: posições ativas (dividendos_ano) + fiis_proventos do ano atual (vendidas)
-          (SELECT COALESCE(SUM(fc.dividendos_ano),0) FROM fiis_carteira fc WHERE fc.usuario_id=$1 AND fc.vendido IS NOT TRUE)
-          + COALESCE((SELECT SUM(fp.valor_por_cota * fp.quantidade) FROM fiis_proventos fp WHERE fp.usuario_id=$1 AND EXTRACT(YEAR FROM fp.mes_referencia)=$2),0)
+          -- FIIs Ano: todos registros de dividendos_fiis para o ano
+          -- + fiis_proventos para tickers que NÃO têm registro em dividendos_fiis (evita dupla contagem)
+          COALESCE((SELECT SUM(df.valor_total) FROM dividendos_fiis df WHERE df.usuario_id=$1 AND df.ano=$2), 0)
+          + COALESCE((
+            SELECT SUM(fp.valor_por_cota * fp.quantidade)
+            FROM fiis_proventos fp
+            WHERE fp.usuario_id=$1
+              AND EXTRACT(YEAR FROM fp.mes_referencia)=$2
+              AND fp.ticker NOT IN (
+                SELECT DISTINCT df2.ticker FROM dividendos_fiis df2 WHERE df2.usuario_id=$1 AND df2.ano=$2
+              )
+          ), 0)
           AS div_fiis_ano,
 
-          -- FIIs Geral (desde início): posições ativas (dividendos_geral) + TODOS fiis_proventos (vendidas)
-          (SELECT COALESCE(SUM(fc.dividendos_geral),0) FROM fiis_carteira fc WHERE fc.usuario_id=$1 AND fc.vendido IS NOT TRUE)
-          + COALESCE((SELECT SUM(fp.valor_por_cota * fp.quantidade) FROM fiis_proventos fp WHERE fp.usuario_id=$1),0)
+          -- FIIs Geral (desde início): todos dividendos_fiis
+          -- + fiis_proventos para tickers sem registro em dividendos_fiis
+          COALESCE((SELECT SUM(df.valor_total) FROM dividendos_fiis df WHERE df.usuario_id=$1), 0)
+          + COALESCE((
+            SELECT SUM(fp.valor_por_cota * fp.quantidade)
+            FROM fiis_proventos fp
+            WHERE fp.usuario_id=$1
+              AND fp.ticker NOT IN (
+                SELECT DISTINCT df2.ticker FROM dividendos_fiis df2 WHERE df2.usuario_id=$1
+              )
+          ), 0)
           AS div_fiis_geral
       `, [req.userId, anoAtual])
     ]);
