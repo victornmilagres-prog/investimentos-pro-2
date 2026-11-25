@@ -4364,6 +4364,114 @@ const PROVENTOS = [
   }
 ];
 
+// Total de proventos por ticker: { ticker -> { tbCart, total } }
+const TOTAIS = {
+  "RZAT11": {
+    "tbCart": "fiis_carteira",
+    "total": 314.56
+  },
+  "FATN11": {
+    "tbCart": "fiis_carteira",
+    "total": 6.4
+  },
+  "HFOF11": {
+    "tbCart": "fiis_carteira",
+    "total": 178.82
+  },
+  "TVRI11": {
+    "tbCart": "fiis_carteira",
+    "total": 625.23
+  },
+  "VALE3": {
+    "tbCart": "acoes_carteira",
+    "total": 366.75
+  },
+  "PETR4": {
+    "tbCart": "acoes_carteira",
+    "total": 2279.88
+  },
+  "SAPR4": {
+    "tbCart": "acoes_carteira",
+    "total": 11.3
+  },
+  "GGBR4": {
+    "tbCart": "acoes_carteira",
+    "total": 7.84
+  },
+  "ITUB4": {
+    "tbCart": "acoes_carteira",
+    "total": 0.52
+  },
+  "ALPK3": {
+    "tbCart": "acoes_carteira",
+    "total": 0.58
+  },
+  "CMIN3": {
+    "tbCart": "acoes_carteira",
+    "total": 5.46
+  },
+  "BBDC3": {
+    "tbCart": "acoes_carteira",
+    "total": 7.93
+  },
+  "IRDM11": {
+    "tbCart": "fiis_carteira",
+    "total": 686.54
+  },
+  "DEVA11": {
+    "tbCart": "fiis_carteira",
+    "total": 355.14
+  },
+  "HABT11": {
+    "tbCart": "fiis_carteira",
+    "total": 651.03
+  },
+  "ABEV3": {
+    "tbCart": "acoes_carteira",
+    "total": 26.29
+  },
+  "KLBN4": {
+    "tbCart": "acoes_carteira",
+    "total": 12.83
+  },
+  "BRAP3": {
+    "tbCart": "acoes_carteira",
+    "total": 126.56
+  },
+  "KNSC11": {
+    "tbCart": "fiis_carteira",
+    "total": 176.6
+  },
+  "MGLU3": {
+    "tbCart": "acoes_carteira",
+    "total": 0.61
+  },
+  "GOAU3": {
+    "tbCart": "acoes_carteira",
+    "total": 95.25
+  },
+  "GGBR3": {
+    "tbCart": "acoes_carteira",
+    "total": 8.9
+  },
+  "KLBN3": {
+    "tbCart": "acoes_carteira",
+    "total": 46.86
+  },
+  "AGRO3": {
+    "tbCart": "acoes_carteira",
+    "total": 78.23
+  },
+  "MRFG3": {
+    "tbCart": "acoes_carteira",
+    "total": 9.86
+  },
+  "HCTR11": {
+    "tbCart": "fiis_carteira",
+    "total": 30.3
+  }
+};
+
 async function importB3() {
   try {
     // Garantir tabelas de proventos
@@ -4422,6 +4530,20 @@ async function importB3() {
       );
       ok++;
     } catch(e) { er++; console.error('[importB3 prov]', p.t, e.message); }
+  }
+
+  // Atualizar dividendos_geral (FIIs) e dividendos_ano (ações) nas carteiras vendidas
+  for (const [ticker, { tbCart, total }] of Object.entries(TOTAIS)) {
+    try {
+      const divCol = tbCart === 'fiis_carteira' ? 'dividendos_geral' : 'dividendos_ano';
+      await pool.query(
+        "UPDATE "+tbCart+" SET "+divCol+"=$3 "+
+        "WHERE usuario_id=(SELECT id FROM usuarios WHERE email=$1) AND ticker=$2::VARCHAR AND vendido=TRUE "+
+        "AND ("+divCol+" IS NULL OR "+divCol+"=0)",
+        [EMAIL, ticker, total]
+      );
+      ok++;
+    } catch(e) { er++; console.error('[importB3 div]', ticker, e.message); }
   }
 
   console.log('[importB3] Done:', ok, 'ok,', er, 'erros');
