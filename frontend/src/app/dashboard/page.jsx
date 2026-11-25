@@ -155,15 +155,15 @@ export default function DashboardPage() {
   })() : '—';
 
   // ── dividendos recebidos — inclui posições ativas E vendidas ────────────
-  // usa totalDivAcoes/totalDivFIIs do backend (todas as posições, inclusive vendidas)
-  const divAcoes     = resumo.totalDivAcoes != null
+  // usa campos do backend (todas as posições, inclusive vendidas)
+  const divAcoes     = resumo.totalDivAcoes     != null
     ? Number(resumo.totalDivAcoes)
     : acoes.reduce((s, a) => s + Number(a.dividendos_ano  || 0), 0);
-  const divFIIs      = resumo.totalDivFIIs  != null
-    ? Number(resumo.totalDivFIIs)
+  const divFIIs      = resumo.totalDivFIIsAno   != null
+    ? Number(resumo.totalDivFIIsAno)
     : fiis.reduce ((s, f) => s + Number(f.dividendos_ano  || 0), 0);
-  const divFIIsGeral = resumo.totalDivFIIs  != null
-    ? Number(resumo.totalDivFIIs)
+  const divFIIsGeral = resumo.totalDivFIIsGeral != null
+    ? Number(resumo.totalDivFIIsGeral)
     : fiis.reduce ((s, f) => s + Number(f.dividendos_geral|| 0), 0);
   const divAcoesLiq  = divAcoes * 0.85; // IRRF 15%
 
