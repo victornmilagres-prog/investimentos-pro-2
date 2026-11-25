@@ -1262,24 +1262,30 @@ export default function AcoesPage() {
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
                 <thead>
                   <tr style={{borderBottom:'2px solid #E8ECF0'}}>
-                    {['Ticker','Nome','PM (R$)','Preço Venda','Data Venda','Proventos Recebidos','Resultado G/P'].map(h=>(
+                    {['Ticker','Nome','Qtde','PM Unit','Total Compra','PV Unit','Total Venda','Data Venda','Proventos Recebidos','Resultado G/P'].map(h=>(
                       <th key={h} style={{padding:'8px 12px',textAlign:'left',fontWeight:700,color:'#8896A8',fontSize:11,textTransform:'uppercase',letterSpacing:'0.04em',whiteSpace:'nowrap'}}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {acoesVendidas.map((a,i)=>{
-                    const pm        = Number(a.preco_compra || 0);
-                    const pv        = Number(a.preco_venda  || 0);
-                    const resultado = pv > 0 && pm > 0 ? pv - pm : null;
-                    const pctRes    = pm > 0 && resultado != null ? (resultado / pm) * 100 : null;
-                    const provTotal = Number(a.dividendos_ano || 0);
+                    const pm          = Number(a.preco_compra || 0);
+                    const pv          = Number(a.preco_venda  || 0);
+                    const qtd         = Number(a.quantidade   || 0);
+                    const totalCompra = pm > 0 && qtd > 0 ? pm * qtd : null;
+                    const totalVenda  = pv > 0 && qtd > 0 ? pv * qtd : null;
+                    const resultado   = totalVenda != null && totalCompra != null ? totalVenda - totalCompra : null;
+                    const pctRes      = totalCompra != null && totalCompra > 0 && resultado != null ? (resultado / totalCompra) * 100 : null;
+                    const provTotal   = Number(a.dividendos_ano || 0);
                     return (
                       <tr key={a.ticker} style={{borderBottom:'1px solid #F0F2F5',background:i%2===0?'transparent':'#FAFBFC'}}>
                         <td style={{padding:'10px 12px',fontWeight:700,color:'#1A1A2E'}}>{a.ticker}</td>
-                        <td style={{padding:'10px 12px',color:'#4A5568',maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.nome_empresa || '—'}</td>
+                        <td style={{padding:'10px 12px',color:'#4A5568',maxWidth:140,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.nome_empresa || '—'}</td>
+                        <td style={{padding:'10px 12px',color:'#4A5568',textAlign:'right'}}>{qtd > 0 ? qtd : '—'}</td>
                         <td style={{padding:'10px 12px',color:'#4A5568'}}>{pm > 0 ? fmt.brl(pm) : '—'}</td>
+                        <td style={{padding:'10px 12px',color:'#4A5568'}}>{totalCompra != null ? fmt.brl(totalCompra) : '—'}</td>
                         <td style={{padding:'10px 12px',fontWeight:600,color:pv > 0 ? '#1A1A2E' : '#8896A8'}}>{pv > 0 ? fmt.brl(pv) : '—'}</td>
+                        <td style={{padding:'10px 12px',fontWeight:600,color:totalVenda != null ? '#1A1A2E' : '#8896A8'}}>{totalVenda != null ? fmt.brl(totalVenda) : '—'}</td>
                         <td style={{padding:'10px 12px',color:'#4A5568'}}>{a.data_venda ? new Date(a.data_venda).toLocaleDateString('pt-BR') : '—'}</td>
                         <td style={{padding:'10px 12px',fontWeight:600,color:provTotal > 0 ? '#16A34A' : '#8896A8'}}>{provTotal > 0 ? fmt.brl(provTotal) : '—'}</td>
                         <td style={{padding:'10px 12px'}}>
