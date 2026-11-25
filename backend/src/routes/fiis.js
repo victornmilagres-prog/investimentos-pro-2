@@ -12,13 +12,18 @@ pool.query(`
   ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS data_venda DATE;
   ALTER TABLE fiis_carteira ADD COLUMN IF NOT EXISTS preco_venda NUMERIC(10,2);
 `).then(() =>
-  // Corrige FIIs vendidos antes do feature: quantidade=0 mas sem flag vendido
   pool.query(`
     UPDATE fiis_carteira
     SET vendido = TRUE, data_venda = COALESCE(data_venda, CURRENT_DATE)
     WHERE quantidade = 0 AND (vendido IS NULL OR vendido = FALSE)
   `).then(r => { if (r.rowCount > 0) console.log('[fiis migration] Marcados', r.rowCount, 'FII(s) vendidos retroativamente'); })
 ).catch(e => console.error('[fiis migration]', e.message));
+
+// Auto-migrate: adiciona colunas de dividendos se não existirem
+pool.query(`
+  ALTER TABLE dividendos_fiis ADD COLUMN IF NOT EXISTS quantidade INTEGER;
+  ALTER TABLE dividendos_fiis ADD COLUMN IF NOT EXISTS data_pagamento DATE;
+`).catch(e => console.error('[fiis migrate dividendos]', e.message));
 
 // GET /api/fiis — retorna apenas ativos (não vendidos)
 router.get('/', async (req, res) => {
@@ -346,16 +351,15 @@ router.post('/dividendos', async (req, res) => {
       if (vendidosSet.has(tk)) {
         // FII vendido → salva em fiis_proventos
         const mesRef = `${ano}-${String(mes).padStart(2,'0')}-01`;
-        const qtd = quantidade ? Math.round(Number(quantidade)) : 1;
+        const qtdProv = quantidade ? Math.round(Number(quantidade)) : 1;
         const tipo = tipo_dividendo.includes('JCP') ? 'JCP' : tipo_dividendo.includes('Dividendo') ? 'Dividendo' : 'Rendimento';
         await pool.query(
           `INSERT INTO fiis_proventos (usuario_id, ticker, tipo, mes_referencia, valor_por_cota, quantidade, data_pagamento)
            VALUES ($1,$2,$3,$4::DATE,$5,$6,$7)
            ON CONFLICT (usuario_id, ticker, mes_referencia) DO UPDATE SET
              valor_por_cota=EXCLUDED.valor_por_cota, quantidade=EXCLUDED.quantidade, data_pagamento=EXCLUDED.data_pagamento`,
-          [req.userId, tk, tipo, mesRef, Number(valor_por_cota), qtd, data_pagamento || null]
+          [req.userId, tk, tipo, mesRef, Number(valor_por_cota), qtdProv, data_pagamento || null]
         ).catch(async () => {
-          // Se não há constraint unique, usa INSERT sem ON CONFLICT
           const exists = await pool.query(
             'SELECT 1 FROM fiis_proventos WHERE usuario_id=$1 AND ticker=$2 AND mes_referencia=$3',
             [req.userId, tk, mesRef]
@@ -364,19 +368,21 @@ router.post('/dividendos', async (req, res) => {
             await pool.query(
               `INSERT INTO fiis_proventos (usuario_id, ticker, tipo, mes_referencia, valor_por_cota, quantidade, data_pagamento)
                VALUES ($1,$2,$3,$4::DATE,$5,$6,$7)`,
-              [req.userId, tk, tipo, mesRef, Number(valor_por_cota), qtd, data_pagamento || null]
+              [req.userId, tk, tipo, mesRef, Number(valor_por_cota), qtdProv, data_pagamento || null]
             );
           }
         });
         continue; // não passa pelo fluxo normal de dividendos_fiis
       }
 
+      const qtd = quantidade != null ? Number(quantidade) : (Number(valor_por_cota) > 0 ? Math.round(valorTotal / Number(valor_por_cota)) : 0);
       await pool.query(`
-        INSERT INTO dividendos_fiis (usuario_id, ticker, tipo_dividendo, valor_por_cota, valor_total, mes, ano, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+        INSERT INTO dividendos_fiis (usuario_id, ticker, tipo_dividendo, valor_por_cota, valor_total, quantidade, data_pagamento, mes, ano, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
         ON CONFLICT (usuario_id, ticker, mes, ano, tipo_dividendo, valor_por_cota) DO UPDATE SET
-          valor_total = EXCLUDED.valor_total, created_at = NOW()
-      `, [req.userId, tk, tipo_dividendo, Number(valor_por_cota), valorTotal, mes, ano]);
+          valor_total = EXCLUDED.valor_total, quantidade = EXCLUDED.quantidade,
+          data_pagamento = EXCLUDED.data_pagamento, created_at = NOW()
+      `, [req.userId, tk, tipo_dividendo, Number(valor_por_cota), valorTotal, qtd, data_pagamento || null, mes, ano]);
     }
     const tickersAtivos = tickers.filter(t => !vendidosSet.has(t));
     for (const ticker of tickersAtivos) {
@@ -411,7 +417,9 @@ router.get('/dividendos', async (req, res) => {
   if (!mes || !ano) return res.status(400).json({ error: 'mes e ano obrigatórios.' });
   try {
     const r = await pool.query(
-      `SELECT ticker, tipo_dividendo, valor_por_cota, valor_total, mes, ano
+      `SELECT ticker, tipo_dividendo, valor_por_cota, valor_total,
+              COALESCE(quantidade, CASE WHEN valor_por_cota > 0 THEN ROUND(valor_total / valor_por_cota) ELSE 0 END) AS quantidade,
+              mes, ano, data_pagamento
        FROM dividendos_fiis WHERE usuario_id=$1 AND mes=$2 AND ano=$3
        ORDER BY ticker, tipo_dividendo`,
       [req.userId, Number(mes), Number(ano)]
@@ -493,6 +501,26 @@ router.delete('/dividendos/:ticker/:tipo/:mes/:ano', async (req, res) => {
     res.json({ message: 'Lançamento removido.' });
   } catch {
     res.status(500).json({ error: 'Erro ao remover lançamento.' });
+  }
+});
+
+// DELETE /api/fiis/dividendos/limpar — apaga TODOS os dividendos do usuário
+router.delete('/dividendos/limpar', async (req, res) => {
+  try {
+    const r = await pool.query(
+      `DELETE FROM dividendos_fiis WHERE usuario_id=$1 RETURNING ticker`,
+      [req.userId]
+    );
+    const tickers = [...new Set(r.rows.map(row => row.ticker))];
+    const anoAtual = new Date().getFullYear();
+    for (const ticker of tickers) {
+      await recalcularDividendosAno(req.userId, ticker, anoAtual);
+      await recalcularDividendosGeral(req.userId, ticker);
+    }
+    res.json({ message: `${r.rowCount} lançamentos removidos.`, removidos: r.rowCount });
+  } catch (err) {
+    console.error('[dividendos limpar]', err);
+    res.status(500).json({ error: 'Erro ao limpar dividendos.' });
   }
 });
 
