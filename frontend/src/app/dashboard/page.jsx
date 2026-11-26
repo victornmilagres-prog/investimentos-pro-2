@@ -276,7 +276,7 @@ export default function DashboardPage() {
             ['Posição total',      fmt.brl(patriAcoes),                   'inherit'],
             [`${resumo.totalAcoes||0} ativos · ${fmt.pct(pctAcoes)} carteira`, '—', 'var(--accent)'],
             ['Dividendos recebidos', divAcoes > 0 ? fmt.brl(divAcoes) : '—', 'var(--success)'],
-            ['DY médio a.a.',      dyAcoes ? `${dyAcoes}% a.a.` : '—',   'var(--accent)'],
+            ['DY médio a.a.',      divAcoes > 0 && dyAcoes ? `${dyAcoes}% a.a.` : '—',   'var(--accent)'],
             ['Retorno total',      `${pctRetAcoes >= 0 ? '+' : ''}${fmt.pct(pctRetAcoes)}`, pctRetAcoes >= 0 ? 'var(--success)' : 'var(--danger)'],
           ].map(([k, v, c]) => (
             <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
@@ -527,7 +527,7 @@ export default function DashboardPage() {
               <div style={S.tile()}>
                 <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>DY médio a.a.</p>
                 <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>
-                  {dyAcoes ? `${dyAcoes}% a.a.` : '—'}
+                  {divAcoes > 0 && dyAcoes ? `${dyAcoes}% a.a.` : '—'}
                 </p>
               </div>
             </div>
