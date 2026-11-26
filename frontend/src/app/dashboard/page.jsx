@@ -913,11 +913,15 @@ export default function DashboardPage() {
                         {divRec > 0 && posicao > 0 ? `${((divRec / posicao) * 100).toFixed(1)}%` : '—'}
                       </td>
                       <td style={{ padding: '7px 8px', textAlign: 'right' }}>
-                        {pc > 0 ? (
-                          <span style={S.tag(gpVal >= 0 ? 'var(--bg-success)' : 'var(--bg-danger)', gpVal >= 0 ? 'var(--success)' : 'var(--danger)')}>
-                            {gpVal >= 0 ? '+' : ''}{fmt.pct(gp)}
-                          </span>
-                        ) : '—'}
+                        {pc > 0 ? (() => {
+                          const custo = pc * qtd;
+                          const ret = custo > 0 ? ((gpVal + divRec) / custo) * 100 : 0;
+                          return (
+                            <span style={S.tag(ret >= 0 ? 'var(--bg-success)' : 'var(--bg-danger)', ret >= 0 ? 'var(--success)' : 'var(--danger)')}>
+                              {ret >= 0 ? '+' : ''}{fmt.pct(ret)}
+                            </span>
+                          );
+                        })() : '—'}
                       </td>
                     </tr>
                   );
@@ -933,7 +937,9 @@ export default function DashboardPage() {
                   <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--accent)' }}>
                     {divAcoes > 0 && patriAcoes > 0 ? `${((divAcoes / patriAcoes) * 100).toFixed(1)}%` : '—'}
                   </td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right', color: ganhoAcoes >= 0 ? 'var(--success)' : 'var(--danger)' }}>{ganhoAcoes >= 0 ? '+' : ''}{fmt.pct(pctRetAcoes)}</td>
+                  <td style={{ padding: '7px 8px', textAlign: 'right', color: (ganhoAcoes + divAcoes) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                    {custoAcoes > 0 ? `${(ganhoAcoes + divAcoes) >= 0 ? '+' : ''}${fmt.pct(((ganhoAcoes + divAcoes) / custoAcoes) * 100)}` : '—'}
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -982,11 +988,15 @@ export default function DashboardPage() {
                         {divRec > 0 && posicao > 0 ? `${((divRec / posicao) * 100).toFixed(1)}%` : '—'}
                       </td>
                       <td style={{ padding: '7px 8px', textAlign: 'right' }}>
-                        {pc > 0 ? (
-                          <span style={S.tag(gpVal >= 0 ? 'var(--bg-success)' : 'var(--bg-danger)', gpVal >= 0 ? 'var(--success)' : 'var(--danger)')}>
-                            {gpVal >= 0 ? '+' : ''}{fmt.pct(gp)}
-                          </span>
-                        ) : '—'}
+                        {pc > 0 ? (() => {
+                          const custo = pc * qtd;
+                          const ret = custo > 0 ? ((gpVal + divRec) / custo) * 100 : 0;
+                          return (
+                            <span style={S.tag(ret >= 0 ? 'var(--bg-success)' : 'var(--bg-danger)', ret >= 0 ? 'var(--success)' : 'var(--danger)')}>
+                              {ret >= 0 ? '+' : ''}{fmt.pct(ret)}
+                            </span>
+                          );
+                        })() : '—'}
                       </td>
                     </tr>
                   );
@@ -1002,7 +1012,9 @@ export default function DashboardPage() {
                   <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--success)' }}>
                     {divFIIs > 0 && patriFIIs > 0 ? `${((divFIIs / patriFIIs) * 100).toFixed(1)}%` : '—'}
                   </td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right', color: ganhoFIIs >= 0 ? 'var(--success)' : 'var(--danger)' }}>{ganhoFIIs >= 0 ? '+' : ''}{fmt.pct(pctRetFIIs)}</td>
+                  <td style={{ padding: '7px 8px', textAlign: 'right', color: (ganhoFIIs + divFIIs) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                    {custoFIIs > 0 ? `${(ganhoFIIs + divFIIs) >= 0 ? '+' : ''}${fmt.pct(((ganhoFIIs + divFIIs) / custoFIIs) * 100)}` : '—'}
+                  </td>
                 </tr>
               </tbody>
             </table>
