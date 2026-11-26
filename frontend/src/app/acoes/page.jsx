@@ -219,7 +219,7 @@ async function parsearArquivoB3(file) {
   const parsarData = val => {
     if (!val) return { mes: null, ano: null, data: null };
     if (val instanceof Date) {
-      const dia = val.getDate(), mes = val.getMonth()+1, ano = val.getFullYear();
+      const dia = val.getUTCDate(), mes = val.getUTCMonth()+1, ano = val.getUTCFullYear();
       return { mes, ano, data: `${ano}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}` };
     }
     const m = String(val).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
@@ -426,7 +426,7 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
     }]);
   };
 
-  const linhasSelecionadas = linhas.filter(l => l.selecionado && l.valor);
+  const linhasSelecionadas = linhas.filter(l => l.selecionado && (l.valor || l.valor_total));
   const resolverQtd = (l) => l.quantidade != null ? l.quantidade : (acoes.find(a => a.ticker === l.ticker)?.quantidade || 0);
   const resolverTotal = (l) => l.valor_total != null ? l.valor_total : (Number(l.valor) * resolverQtd(l));
   const total = linhasSelecionadas.reduce((acc, l) => acc + resolverTotal(l), 0);
@@ -592,7 +592,7 @@ function ModalProventos({ acoes, onFechar, onSalvar }) {
                       <td style={{padding:'7px 10px',textAlign:'right',color:'#4A5568'}}>R$ {Number(item.valor_por_acao).toFixed(4)}</td>
                       <td style={{padding:'7px 10px',textAlign:'right',fontWeight:600,color:'#2563EB'}}>{item.quantidade ?? Math.round((item.valor_total||0)/Math.max(item.valor_por_acao,0.0001))}</td>
                       <td style={{padding:'7px 10px',textAlign:'right',fontWeight:700,color:'#065F46'}}>{fmt.brl(item.valor_total)}</td>
-                      <td style={{padding:'7px 10px',textAlign:'center',color:'#8896A8',fontSize:11}}>{item.data_pagamento ? new Date(item.data_pagamento).toLocaleDateString('pt-BR') : '—'}</td>
+                      <td style={{padding:'7px 10px',textAlign:'center',color:'#8896A8',fontSize:11}}>{(() => { if (!item.data_pagamento) return '—'; const m = String(item.data_pagamento).match(/(\d{4})-(\d{2})-(\d{2})/); if (m) return new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('pt-BR'); const d = new Date(item.data_pagamento); return isNaN(d) ? '—' : d.toLocaleDateString('pt-BR'); })()}</td>
                       <td style={{padding:'7px 10px',textAlign:'center'}}><button onClick={()=>excluirExistente(item)} style={{background:'#fff5f5',color:'#fc8181',border:'1px solid #fed7d7',borderRadius:5,padding:'2px 7px',fontSize:11,cursor:'pointer'}}>🗑</button></td>
                     </tr>
                   ))}
@@ -1106,7 +1106,7 @@ export default function AcoesPage() {
   const [proventosAno,       setProventosAno]       = useState(new Date().getFullYear());
   const [proventosAnos,      setProventosAnos]      = useState([]);
   const [modalProvento,      setModalProvento]      = useState(false);
-  const [formProvento,       setFormProvento]       = useState({ ticker:'', tipo:'Dividendo', mes_referencia:'', valor_por_cota:'', quantidade:'', data_pagamento:'' });
+  const [formProvento,       setFormProvento]       = useState({ ticker:'', tipo:'Dividendo', mes_referencia:'', valor_por_cota:'', quantidade:'', data_pagamento:'', valor_total:'' });
   const [salvandoProv,       setSalvandoProv]       = useState(false);
 
   const { anosDisponiveis, anoFiltro, setAnoFiltro, resumoAno, resumoGeral, carregarDados } = useProventosExtras(acoes);
@@ -1140,12 +1140,23 @@ export default function AcoesPage() {
   }, [activeTab, proventosAno]);
 
   const salvarProvento = async () => {
-    if (!formProvento.ticker || !formProvento.mes_referencia || !formProvento.valor_por_cota || !formProvento.quantidade) return;
+    const isRendimento = formProvento.tipo === 'Rendimento';
+    if (!formProvento.ticker || !formProvento.mes_referencia) return;
+    if (isRendimento && !formProvento.valor_total) return;
+    if (!isRendimento && (!formProvento.valor_por_cota || !formProvento.quantidade)) return;
     setSalvandoProv(true);
     try {
-      await api.post('/acoes/proventos-registro', { ...formProvento, valor_por_cota: Number(formProvento.valor_por_cota), quantidade: Number(formProvento.quantidade) });
+      await api.post('/acoes/proventos-registro', {
+        ticker: formProvento.ticker,
+        tipo: formProvento.tipo,
+        mes_referencia: formProvento.mes_referencia,
+        valor_por_cota: isRendimento ? 0 : Number(formProvento.valor_por_cota),
+        quantidade: isRendimento ? 0 : Number(formProvento.quantidade),
+        data_pagamento: formProvento.data_pagamento || null,
+        valor_total: isRendimento ? Number(formProvento.valor_total) : null,
+      });
       setModalProvento(false);
-      setFormProvento({ ticker:'', tipo:'Dividendo', mes_referencia:'', valor_por_cota:'', quantidade:'', data_pagamento:'' });
+      setFormProvento({ ticker:'', tipo:'Dividendo', mes_referencia:'', valor_por_cota:'', quantidade:'', data_pagamento:'', valor_total:'' });
       await fetchProventos(proventosAno);
     } finally { setSalvandoProv(false); }
   };
@@ -1364,8 +1375,6 @@ export default function AcoesPage() {
             {[
               { label:'Ticker', key:'ticker', type:'text', placeholder:'Ex: PETR4' },
               { label:'Mês de referência', key:'mes_referencia', type:'month', placeholder:'' },
-              { label:'Valor por ação (R$)', key:'valor_por_cota', type:'number', placeholder:'0.00' },
-              { label:'Quantidade de ações', key:'quantidade', type:'number', placeholder:'100' },
               { label:'Data de pagamento (opcional)', key:'data_pagamento', type:'date', placeholder:'' },
             ].map(f => (
               <div key={f.key} style={{marginBottom:14}}>
@@ -1377,19 +1386,42 @@ export default function AcoesPage() {
             ))}
             <div style={{marginBottom:14}}>
               <label style={{display:'block',fontSize:12,fontWeight:600,color:'var(--text-secondary,#8896A8)',marginBottom:5,textTransform:'uppercase',letterSpacing:'0.04em'}}>Tipo</label>
-              <select value={formProvento.tipo} onChange={e=>setFormProvento(p=>({...p,tipo:e.target.value}))}
+              <select value={formProvento.tipo} onChange={e=>setFormProvento(p=>({...p,tipo:e.target.value,valor_por_cota:'',quantidade:'',valor_total:''}))}
                 style={{width:'100%',padding:'9px 12px',border:'1px solid var(--border,#E8ECF0)',borderRadius:8,fontSize:14,background:'var(--surface,#fff)',color:'var(--text-primary,#1A1A2E)'}}>
                 {['Dividendo','JCP','Rendimento'].map(t=><option key={t}>{t}</option>)}
               </select>
             </div>
-            {formProvento.valor_por_cota && formProvento.quantidade && (
-              <div style={{background:'rgba(22,163,74,0.08)',border:'1px solid rgba(22,163,74,0.2)',borderRadius:8,padding:'8px 12px',marginBottom:14,fontSize:13,fontWeight:600,color:'#16A34A'}}>
-                Total estimado: R$ {(Number(formProvento.valor_por_cota)*Number(formProvento.quantidade)).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}
+            {formProvento.tipo === 'Rendimento' ? (
+              <div style={{marginBottom:14}}>
+                <label style={{display:'block',fontSize:12,fontWeight:600,color:'var(--text-secondary,#8896A8)',marginBottom:5,textTransform:'uppercase',letterSpacing:'0.04em'}}>Valor total recebido (R$)</label>
+                <input type="number" placeholder="0.00" value={formProvento.valor_total}
+                  onChange={e=>setFormProvento(p=>({...p,valor_total:e.target.value}))}
+                  style={{width:'100%',padding:'9px 12px',border:'1px solid var(--border,#E8ECF0)',borderRadius:8,fontSize:14,background:'var(--surface,#fff)',color:'var(--text-primary,#1A1A2E)',boxSizing:'border-box'}} />
+                <div style={{fontSize:11,color:'var(--text-secondary,#8896A8)',marginTop:4}}>Rendimento não usa preço/quantidade — informe apenas o valor líquido recebido</div>
               </div>
+            ) : (
+              <>
+                {[
+                  { label:'Valor por ação (R$)', key:'valor_por_cota', placeholder:'0.00' },
+                  { label:'Quantidade de ações', key:'quantidade', placeholder:'100' },
+                ].map(f => (
+                  <div key={f.key} style={{marginBottom:14}}>
+                    <label style={{display:'block',fontSize:12,fontWeight:600,color:'var(--text-secondary,#8896A8)',marginBottom:5,textTransform:'uppercase',letterSpacing:'0.04em'}}>{f.label}</label>
+                    <input type="number" placeholder={f.placeholder} value={formProvento[f.key]}
+                      onChange={e=>setFormProvento(p=>({...p,[f.key]:e.target.value}))}
+                      style={{width:'100%',padding:'9px 12px',border:'1px solid var(--border,#E8ECF0)',borderRadius:8,fontSize:14,background:'var(--surface,#fff)',color:'var(--text-primary,#1A1A2E)',boxSizing:'border-box'}} />
+                  </div>
+                ))}
+                {formProvento.valor_por_cota && formProvento.quantidade && (
+                  <div style={{background:'rgba(22,163,74,0.08)',border:'1px solid rgba(22,163,74,0.2)',borderRadius:8,padding:'8px 12px',marginBottom:14,fontSize:13,fontWeight:600,color:'#16A34A'}}>
+                    Total estimado: R$ {(Number(formProvento.valor_por_cota)*Number(formProvento.quantidade)).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}
+                  </div>
+                )}
+              </>
             )}
             <div style={{display:'flex',gap:10,justifyContent:'flex-end',marginTop:4}}>
               <button onClick={()=>setModalProvento(false)} style={{padding:'9px 18px',border:'1px solid var(--border,#E8ECF0)',borderRadius:8,background:'none',cursor:'pointer',fontWeight:600,fontSize:13}}>Cancelar</button>
-              <button onClick={salvarProvento} disabled={salvandoProv||!formProvento.ticker||!formProvento.mes_referencia||!formProvento.valor_por_cota||!formProvento.quantidade}
+              <button onClick={salvarProvento} disabled={salvandoProv}
                 style={{padding:'9px 18px',background:'var(--accent,#2563EB)',color:'#fff',border:'none',borderRadius:8,cursor:'pointer',fontWeight:700,fontSize:13,opacity:salvandoProv?0.7:1}}>
                 {salvandoProv ? 'Salvando…' : 'Lançar'}
               </button>

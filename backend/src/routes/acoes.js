@@ -362,7 +362,8 @@ router.post('/proventos', async (req, res) => {
     const anoAtual = new Date().getFullYear();
     for (const lanc of lancamentos) {
       const { ticker, tipo_provento = 'Dividendo', valor_por_acao, quantidade, valor_total_override, mes, ano, data_pagamento } = lanc;
-      if (!ticker || !valor_por_acao || !mes || !ano) continue;
+      const temValor = Number(valor_por_acao) > 0 || (valor_total_override != null && Number(valor_total_override) > 0);
+      if (!ticker || !temValor || !mes || !ano) continue;
       const valorTotal = valor_total_override != null
         ? Number(valor_total_override)
         : Number(valor_por_acao) * Number(quantidade || 0);
@@ -727,15 +728,38 @@ router.get('/proventos-registro', async (req, res) => {
 // POST /api/acoes/proventos-registro
 router.post('/proventos-registro', async (req, res) => {
   try {
-    const { ticker, tipo, mes_referencia, valor_por_cota, quantidade, data_pagamento } = req.body;
-    if (!ticker || !mes_referencia || !valor_por_cota || !quantidade)
-      return res.status(400).json({ error: 'ticker, mes_referencia, valor_por_cota e quantidade são obrigatórios.' });
-    const result = await pool.query(
-      `INSERT INTO acoes_proventos (usuario_id, ticker, tipo, mes_referencia, valor_por_cota, quantidade, data_pagamento)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [req.userId, ticker.toUpperCase(), tipo || 'Dividendo', mes_referencia, valor_por_cota, quantidade, data_pagamento || null]
-    );
-    res.json(result.rows[0]);
+    const { ticker, tipo, mes_referencia, valor_por_cota, quantidade, data_pagamento, valor_total } = req.body;
+    if (!ticker || !mes_referencia)
+      return res.status(400).json({ error: 'ticker e mes_referencia são obrigatórios.' });
+    const [anoStr, mesStr] = String(mes_referencia).split('-');
+    const mes = Number(mesStr), ano = Number(anoStr);
+    if (!mes || !ano) return res.status(400).json({ error: 'mes_referencia inválido.' });
+    const tipoProvento = tipo || 'Dividendo';
+    const precoUnit = Number(valor_por_cota) || 0;
+    const qtd = Number(quantidade) || 0;
+    let valorTotal;
+    if (valor_total != null && Number(valor_total) > 0) {
+      valorTotal = Number(valor_total);
+    } else if (precoUnit > 0) {
+      valorTotal = precoUnit * qtd;
+    } else {
+      return res.status(400).json({ error: 'Informe o valor por ação ou o valor total recebido.' });
+    }
+    const valorPorAcao = tipoProvento === 'Rendimento'
+      ? (qtd > 0 ? valorTotal / qtd : 0)
+      : precoUnit;
+    const anoAtual = new Date().getFullYear();
+    const tk = ticker.toUpperCase();
+    await pool.query(`
+      INSERT INTO dividendos_acoes (usuario_id, ticker, tipo_provento, valor_por_acao, valor_total, quantidade, data_pagamento, mes, ano, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+      ON CONFLICT (usuario_id, ticker, mes, ano, tipo_provento, valor_por_acao) DO UPDATE SET
+        valor_total = EXCLUDED.valor_total, quantidade = EXCLUDED.quantidade,
+        data_pagamento = EXCLUDED.data_pagamento, created_at = NOW()
+    `, [req.userId, tk, tipoProvento, valorPorAcao, valorTotal, qtd, data_pagamento || null, mes, ano]);
+    await recalcularProventosAno(req.userId, tk, anoAtual);
+    await recalcularProventosGeral(req.userId, tk);
+    res.json({ ok: true });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Erro ao lançar provento' });
@@ -745,10 +769,15 @@ router.post('/proventos-registro', async (req, res) => {
 // DELETE /api/acoes/proventos-registro/:id
 router.delete('/proventos-registro/:id', async (req, res) => {
   try {
-    await pool.query(
-      'DELETE FROM acoes_proventos WHERE id=$1 AND usuario_id=$2',
+    const r = await pool.query(
+      'DELETE FROM dividendos_acoes WHERE id=$1 AND usuario_id=$2 RETURNING ticker',
       [req.params.id, req.userId]
     );
+    if (r.rows[0]) {
+      const anoAtual = new Date().getFullYear();
+      await recalcularProventosAno(req.userId, r.rows[0].ticker, anoAtual);
+      await recalcularProventosGeral(req.userId, r.rows[0].ticker);
+    }
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao excluir provento' });

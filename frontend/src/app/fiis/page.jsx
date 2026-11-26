@@ -71,7 +71,7 @@ async function parsearArquivoB3FII(file) {
   const parseDataBR = (val) => {
     if (!val) return { mes: null, ano: null, data: null };
     if (val instanceof Date) {
-      const dia = val.getDate(), mes = val.getMonth()+1, ano = val.getFullYear();
+      const dia = val.getUTCDate(), mes = val.getUTCMonth()+1, ano = val.getUTCFullYear();
       return { mes, ano, data: `${ano}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}` };
     }
     const m = String(val).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
@@ -524,7 +524,7 @@ function ModalDividendosFII({ fiis, onFechar, onSalvar }) {
                       <td style={{padding:'7px 10px',textAlign:'right',color:'#4A5568'}}>R$ {Number(item.valor_por_cota).toFixed(4)}</td>
                       <td style={{padding:'7px 10px',textAlign:'right',fontWeight:600,color:'#2563EB'}}>{item.quantidade ?? Math.round((item.valor_total||0)/Math.max(item.valor_por_cota,0.0001))}</td>
                       <td style={{padding:'7px 10px',textAlign:'right',fontWeight:700,color:'#065F46'}}>{fmt.brl(item.valor_total)}</td>
-                      <td style={{padding:'7px 10px',textAlign:'center',color:'#8896A8',fontSize:11}}>{item.data_pagamento ? new Date(item.data_pagamento).toLocaleDateString('pt-BR') : '—'}</td>
+                      <td style={{padding:'7px 10px',textAlign:'center',color:'#8896A8',fontSize:11}}>{(() => { if (!item.data_pagamento) return '—'; const m = String(item.data_pagamento).match(/(\d{4})-(\d{2})-(\d{2})/); if (m) return new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('pt-BR'); const d = new Date(item.data_pagamento); return isNaN(d) ? '—' : d.toLocaleDateString('pt-BR'); })()}</td>
                       <td style={{padding:'7px 10px',textAlign:'center'}}><button onClick={()=>excluir(item)} style={{background:'#fff5f5',color:'#fc8181',border:'1px solid #fed7d7',borderRadius:5,padding:'2px 7px',fontSize:11,cursor:'pointer'}}>🗑</button></td>
                     </tr>
                   ))}

@@ -710,10 +710,15 @@ router.post('/proventos', async (req, res) => {
 // DELETE /api/fiis/proventos/:id
 router.delete('/proventos/:id', async (req, res) => {
   try {
-    await pool.query(
-      'DELETE FROM fiis_proventos WHERE id=$1 AND usuario_id=$2',
+    const r = await pool.query(
+      'DELETE FROM dividendos_fiis WHERE id=$1 AND usuario_id=$2 RETURNING ticker',
       [req.params.id, req.userId]
     );
+    if (r.rows[0]) {
+      const anoAtual = new Date().getFullYear();
+      await recalcularDividendosAno(req.userId, r.rows[0].ticker, anoAtual);
+      await recalcularDividendosGeral(req.userId, r.rows[0].ticker);
+    }
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'Erro ao excluir provento' });
