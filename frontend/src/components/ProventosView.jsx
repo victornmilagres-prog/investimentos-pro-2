@@ -146,7 +146,7 @@ export default function ProventosView({ proventos, ano, setAno, onLancar, onExcl
                             <td style={{ padding: '9px 10px', borderBottom: '1px solid var(--border)', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{fmtBrl(item.valor_por_cota)}</td>
                             <td style={{ padding: '9px 10px', borderBottom: '1px solid var(--border)', textAlign: 'right', fontWeight: 700, color: 'var(--success)', fontVariantNumeric: 'tabular-nums' }}>{fmtBrl(item.total)}</td>
                             <td style={{ padding: '9px 10px', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text-secondary)' }}>
-                              {item.data_pagamento ? new Date(item.data_pagamento + 'T12:00').toLocaleDateString('pt-BR') : '—'}
+                              {(() => { if (!item.data_pagamento) return '—'; const m = String(item.data_pagamento).match(/(\d{4})-(\d{2})-(\d{2})/); if (m) return new Date(+m[1],+m[2]-1,+m[3]).toLocaleDateString('pt-BR'); return '—'; })()}
                             </td>
                             <td style={{ padding: '9px 10px', borderBottom: '1px solid var(--border)' }}>
                               <button onClick={() => onExcluir(item.id)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 14 }}>🗑</button>
