@@ -910,7 +910,12 @@ export default function DashboardPage() {
                         {divRec > 0 ? fmt.brl(divRec) : '—'}
                       </td>
                       <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--accent)' }}>
-                        {a.dy_anual ? `${Number(a.dy_anual).toFixed(1)}%` : '—'}
+                        {(() => {
+                          const dyMkt = Number(a.dy || 0);
+                          if (dyMkt > 0) return `${dyMkt.toFixed(1)}%`;
+                          if (divRec > 0 && posicao > 0) return `${((divRec / posicao) * 100).toFixed(1)}%`;
+                          return '—';
+                        })()}
                       </td>
                       <td style={{ padding: '7px 8px', textAlign: 'right' }}>
                         {pc > 0 ? (
