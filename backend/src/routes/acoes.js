@@ -239,7 +239,7 @@ router.post('/comprar-radar', async (req, res) => {
 
 // ─── POST /api/acoes/vender ───────────────────────────────────────────────
 router.post('/vender', async (req, res) => {
-  const { ticker, quantidade } = req.body;
+  const { ticker, quantidade, preco_venda: precoVendaCustom, data_venda: dataVendaCustom } = req.body;
   if (!ticker || !quantidade) return res.status(400).json({ error: 'ticker e quantidade obrigatórios.' });
   try {
     const atual = await pool.query(
@@ -248,16 +248,19 @@ router.post('/vender', async (req, res) => {
     );
     if (!atual.rows.length) return res.status(404).json({ error: 'Ação não encontrada na carteira.' });
     const novaQtd    = Math.max(0, Number(atual.rows[0].quantidade) - Number(quantidade));
-    const precoAtual = Number(atual.rows[0].preco_atual || 0);
+    const precoAtual = precoVendaCustom != null ? Number(precoVendaCustom) : Number(atual.rows[0].preco_atual || 0);
     const pmVenda    = Number(atual.rows[0].preco_compra || 0);
     const resultado  = precoAtual > 0 ? parseFloat(((precoAtual - pmVenda) * Number(quantidade)).toFixed(2)) : null;
     const totalVenda = parseFloat((precoAtual * Number(quantidade)).toFixed(2));
+    const dataVenda  = dataVendaCustom || 'CURRENT_DATE';
     if (novaQtd === 0) {
       // Posição totalmente encerrada — marca como vendido (mantém proventos)
       await pool.query(
-        `UPDATE acoes_carteira SET quantidade=0, vendido=TRUE, data_venda=CURRENT_DATE,
+        `UPDATE acoes_carteira SET quantidade=0, vendido=TRUE, data_venda=${dataVendaCustom ? '$4::DATE' : 'CURRENT_DATE'},
          preco_venda=$1, updated_at=NOW() WHERE usuario_id=$2 AND ticker=$3`,
-        [precoAtual || null, req.userId, ticker.toUpperCase()]
+        dataVendaCustom
+          ? [precoAtual || null, req.userId, ticker.toUpperCase(), dataVendaCustom]
+          : [precoAtual || null, req.userId, ticker.toUpperCase()]
       );
     } else {
       await pool.query(
@@ -266,10 +269,13 @@ router.post('/vender', async (req, res) => {
       );
     }
     // Histórico
+    const dataOp = dataVendaCustom || null;
     await pool.query(
       `INSERT INTO historico_operacoes (usuario_id, categoria, ticker, tipo, quantidade, preco_unitario, total, resultado, data_operacao)
-       VALUES ($1,'acao',$2,'venda',$3,$4,$5,$6,CURRENT_DATE)`,
-      [req.userId, ticker.toUpperCase(), Number(quantidade), precoAtual || null, totalVenda, resultado]
+       VALUES ($1,'acao',$2,'venda',$3,$4,$5,$6,${dataOp ? '$7::DATE' : 'CURRENT_DATE'})`,
+      dataOp
+        ? [req.userId, ticker.toUpperCase(), Number(quantidade), precoAtual || null, totalVenda, resultado, dataOp]
+        : [req.userId, ticker.toUpperCase(), Number(quantidade), precoAtual || null, totalVenda, resultado]
     ).catch(e => console.error('[hist acao venda]', e.message));
     res.json({ message: 'Venda registrada.', novaQtd });
   } catch (err) {
