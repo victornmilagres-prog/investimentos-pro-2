@@ -332,13 +332,7 @@ router.post('/dividendos', async (req, res) => {
     return res.status(400).json({ error: 'Nenhum lançamento informado.' });
   try {
     const anoAtual = new Date().getFullYear();
-    // Descobrir quais tickers são vendidos para redirecionar para fiis_proventos
     const tickers = [...new Set(lancamentos.map(l => l.ticker.toUpperCase()))];
-    const vendidosRes = await pool.query(
-      `SELECT ticker FROM fiis_carteira WHERE usuario_id=$1 AND ticker = ANY($2) AND vendido = TRUE`,
-      [req.userId, tickers]
-    );
-    const vendidosSet = new Set(vendidosRes.rows.map(r => r.ticker));
 
     for (const lanc of lancamentos) {
       const { ticker, tipo_dividendo = 'Rendimento', valor_por_cota, quantidade, valor_total_override, mes, ano, data_pagamento } = lanc;
@@ -347,33 +341,6 @@ router.post('/dividendos', async (req, res) => {
       const valorTotal = valor_total_override != null
         ? Number(valor_total_override)
         : Number(valor_por_cota) * Number(quantidade || 0);
-
-      if (vendidosSet.has(tk)) {
-        // FII vendido → salva em fiis_proventos
-        const mesRef = `${ano}-${String(mes).padStart(2,'0')}-01`;
-        const qtdProv = quantidade ? Math.round(Number(quantidade)) : 1;
-        const tipo = tipo_dividendo.includes('JCP') ? 'JCP' : tipo_dividendo.includes('Dividendo') ? 'Dividendo' : 'Rendimento';
-        await pool.query(
-          `INSERT INTO fiis_proventos (usuario_id, ticker, tipo, mes_referencia, valor_por_cota, quantidade, data_pagamento)
-           VALUES ($1,$2,$3,$4::DATE,$5,$6,$7)
-           ON CONFLICT (usuario_id, ticker, mes_referencia) DO UPDATE SET
-             valor_por_cota=EXCLUDED.valor_por_cota, quantidade=EXCLUDED.quantidade, data_pagamento=EXCLUDED.data_pagamento`,
-          [req.userId, tk, tipo, mesRef, Number(valor_por_cota), qtdProv, data_pagamento || null]
-        ).catch(async () => {
-          const exists = await pool.query(
-            'SELECT 1 FROM fiis_proventos WHERE usuario_id=$1 AND ticker=$2 AND mes_referencia=$3',
-            [req.userId, tk, mesRef]
-          );
-          if (!exists.rows.length) {
-            await pool.query(
-              `INSERT INTO fiis_proventos (usuario_id, ticker, tipo, mes_referencia, valor_por_cota, quantidade, data_pagamento)
-               VALUES ($1,$2,$3,$4::DATE,$5,$6,$7)`,
-              [req.userId, tk, tipo, mesRef, Number(valor_por_cota), qtdProv, data_pagamento || null]
-            );
-          }
-        });
-        continue; // não passa pelo fluxo normal de dividendos_fiis
-      }
 
       const qtd = quantidade != null ? Number(quantidade) : (Number(valor_por_cota) > 0 ? Math.round(valorTotal / Number(valor_por_cota)) : 0);
       await pool.query(`
@@ -384,8 +351,7 @@ router.post('/dividendos', async (req, res) => {
           data_pagamento = EXCLUDED.data_pagamento, created_at = NOW()
       `, [req.userId, tk, tipo_dividendo, Number(valor_por_cota), valorTotal, qtd, data_pagamento || null, mes, ano]);
     }
-    const tickersAtivos = tickers.filter(t => !vendidosSet.has(t));
-    for (const ticker of tickersAtivos) {
+    for (const ticker of tickers) {
       await recalcularDividendosAno(req.userId, ticker, anoAtual);
       await recalcularDividendosGeral(req.userId, ticker);
     }
@@ -616,9 +582,9 @@ router.get('/vendidos', async (req, res) => {
       `SELECT fc.ticker, fc.nome_fundo, fc.preco_compra, fc.preco_venda, fc.data_venda,
               fc.dividendos_ano, fc.quantidade,
               COALESCE(
-                (SELECT SUM(fp.valor_por_cota * fp.quantidade)
-                 FROM fiis_proventos fp
-                 WHERE fp.usuario_id = fc.usuario_id AND fp.ticker = fc.ticker),
+                (SELECT SUM(df.valor_total)
+                 FROM dividendos_fiis df
+                 WHERE df.usuario_id = fc.usuario_id AND df.ticker = fc.ticker),
                 fc.dividendos_geral, 0
               ) AS dividendos_geral
        FROM fiis_carteira fc
@@ -688,22 +654,13 @@ pool.query(`
     data_pagamento DATE,
     created_at TIMESTAMP DEFAULT NOW()
   )
-`).then(() =>
-  pool.query(`
-    INSERT INTO fiis_proventos (usuario_id, ticker, tipo, mes_referencia, valor_por_cota, quantidade, data_pagamento)
-    SELECT usuario_id, ticker, tipo_dividendo,
-           make_date(ano::int, mes::int, 1),
-           valor_total, 1, NULL
-    FROM dividendos_fiis
-    WHERE NOT EXISTS (SELECT 1 FROM fiis_proventos fp WHERE fp.usuario_id=dividendos_fiis.usuario_id AND fp.ticker=dividendos_fiis.ticker)
-  `).then(r => { if (r.rowCount > 0) console.log('[fiis migration] Migrados', r.rowCount, 'proventos para fiis_proventos'); })
-).catch(e => console.error('[fiis_proventos migration]', e.message));
+`).catch(e => console.error('[fiis_proventos migration]', e.message));
 
 // GET /api/fiis/proventos/anos
 router.get('/proventos/anos', async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT DISTINCT EXTRACT(YEAR FROM mes_referencia)::int AS ano FROM fiis_proventos WHERE usuario_id=$1 ORDER BY ano`,
+      `SELECT DISTINCT ano::int AS ano FROM dividendos_fiis WHERE usuario_id=$1 ORDER BY ano`,
       [req.userId]
     );
     res.json(r.rows.map(row => row.ano));
@@ -717,10 +674,12 @@ router.get('/proventos', async (req, res) => {
   try {
     const ano = req.query.ano || new Date().getFullYear();
     const rows = await pool.query(
-      `SELECT id, ticker, tipo, mes_referencia, valor_por_cota, quantidade, total, data_pagamento, created_at
-       FROM fiis_proventos
-       WHERE usuario_id=$1 AND EXTRACT(YEAR FROM mes_referencia)=$2
-       ORDER BY mes_referencia DESC, ticker ASC`,
+      `SELECT id, ticker, tipo_dividendo AS tipo,
+              make_date(ano::int, mes::int, 1) AS mes_referencia,
+              valor_por_cota, quantidade, valor_total AS total, data_pagamento, created_at
+       FROM dividendos_fiis
+       WHERE usuario_id=$1 AND ano=$2::int
+       ORDER BY mes DESC, ticker ASC`,
       [req.userId, ano]
     );
     res.json(rows.rows);

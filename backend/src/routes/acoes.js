@@ -284,9 +284,9 @@ router.get('/vendidas', async (req, res) => {
       `SELECT ac.ticker, ac.nome_empresa, ac.preco_compra, ac.preco_venda, ac.data_venda,
               ac.quantidade,
               COALESCE(
-                (SELECT SUM(ap.valor_por_cota * ap.quantidade)
-                 FROM acoes_proventos ap
-                 WHERE ap.usuario_id = ac.usuario_id AND ap.ticker = ac.ticker),
+                (SELECT SUM(da.valor_total)
+                 FROM dividendos_acoes da
+                 WHERE da.usuario_id = ac.usuario_id AND da.ticker = ac.ticker),
                 ac.dividendos_ano, 0
               ) AS dividendos_ano
        FROM acoes_carteira ac
@@ -403,56 +403,25 @@ router.post('/dividendos', async (req, res) => {
     return res.status(400).json({ error: 'Nenhum lançamento informado.' });
   try {
     const anoAtual = new Date().getFullYear();
-    // Descobrir quais tickers são vendidos para redirecionar para acoes_proventos
     const tickers = [...new Set(lancamentos.map(l => l.ticker.toUpperCase()))];
-    const vendidosRes = await pool.query(
-      `SELECT ticker FROM acoes_carteira WHERE usuario_id=$1 AND ticker = ANY($2) AND vendido = TRUE`,
-      [req.userId, tickers]
-    );
-    const vendidosSet = new Set(vendidosRes.rows.map(r => r.ticker));
 
     for (const lanc of lancamentos) {
       const { ticker, valor_por_acao, tipo_dividendo, quantidade, mes, ano, data_pagamento } = lanc;
       if (!ticker || !valor_por_acao || !mes || !ano) continue;
       const tk = ticker.toUpperCase();
       const valorTotal = Number(valor_por_acao) * Number(quantidade || 0);
-
-      if (vendidosSet.has(tk)) {
-        // Ação vendida → salva em acoes_proventos
-        const mesRef = `${ano}-${String(mes).padStart(2,'0')}-01`;
-        const qtd = quantidade ? Math.round(Number(quantidade)) : 1;
-        const tipo = tipo_dividendo?.includes('JCP') ? 'JCP' : 'Dividendo';
-        await pool.query(
-          `INSERT INTO acoes_proventos (usuario_id, ticker, tipo, mes_referencia, valor_por_cota, quantidade, data_pagamento)
-           VALUES ($1,$2,$3,$4::DATE,$5,$6,$7)
-           ON CONFLICT (usuario_id, ticker, mes_referencia) DO UPDATE SET
-             valor_por_cota=EXCLUDED.valor_por_cota, quantidade=EXCLUDED.quantidade, data_pagamento=EXCLUDED.data_pagamento`,
-          [req.userId, tk, tipo, mesRef, Number(valor_por_acao), qtd, data_pagamento || null]
-        ).catch(async () => {
-          const exists = await pool.query(
-            'SELECT 1 FROM acoes_proventos WHERE usuario_id=$1 AND ticker=$2 AND mes_referencia=$3',
-            [req.userId, tk, mesRef]
-          );
-          if (!exists.rows.length) {
-            await pool.query(
-              `INSERT INTO acoes_proventos (usuario_id, ticker, tipo, mes_referencia, valor_por_cota, quantidade, data_pagamento)
-               VALUES ($1,$2,$3,$4::DATE,$5,$6,$7)`,
-              [req.userId, tk, tipo, mesRef, Number(valor_por_acao), qtd, data_pagamento || null]
-            );
-          }
-        });
-        continue;
-      }
+      const qtd = quantidade != null ? Number(quantidade) : 0;
+      const tipo = tipo_dividendo || 'Dividendo';
 
       await pool.query(`
-        INSERT INTO dividendos_acoes (usuario_id, ticker, tipo_provento, valor_por_acao, valor_total, mes, ano, created_at)
-        VALUES ($1, $2, 'Dividendo', $3, $4, $5, $6, NOW())
+        INSERT INTO dividendos_acoes (usuario_id, ticker, tipo_provento, valor_por_acao, valor_total, quantidade, data_pagamento, mes, ano, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
         ON CONFLICT (usuario_id, ticker, mes, ano, tipo_provento, valor_por_acao) DO UPDATE SET
-          valor_total = EXCLUDED.valor_total, created_at = NOW()
-      `, [req.userId, tk, Number(valor_por_acao), valorTotal, mes, ano]);
+          valor_total = EXCLUDED.valor_total, quantidade = EXCLUDED.quantidade,
+          data_pagamento = EXCLUDED.data_pagamento, created_at = NOW()
+      `, [req.userId, tk, tipo, Number(valor_por_acao), valorTotal, qtd, data_pagamento || null, mes, ano]);
     }
-    const tickersAtivos = tickers.filter(t => !vendidosSet.has(t));
-    for (const ticker of tickersAtivos) {
+    for (const ticker of tickers) {
       await recalcularProventosAno(req.userId, ticker, anoAtual);
       await recalcularProventosGeral(req.userId, ticker);
     }
@@ -712,22 +681,13 @@ pool.query(`
     data_pagamento DATE,
     created_at TIMESTAMP DEFAULT NOW()
   )
-`).then(() =>
-  pool.query(`
-    INSERT INTO acoes_proventos (usuario_id, ticker, tipo, mes_referencia, valor_por_cota, quantidade, data_pagamento)
-    SELECT usuario_id, ticker, tipo_provento,
-           make_date(ano::int, mes::int, 1),
-           valor_total, 1, NULL
-    FROM dividendos_acoes
-    WHERE NOT EXISTS (SELECT 1 FROM acoes_proventos ap WHERE ap.usuario_id=dividendos_acoes.usuario_id AND ap.ticker=dividendos_acoes.ticker)
-  `).then(r => { if (r.rowCount > 0) console.log('[acoes migration] Migrados', r.rowCount, 'proventos para acoes_proventos'); })
-).catch(e => console.error('[acoes_proventos migration]', e.message));
+`).catch(e => console.error('[acoes_proventos migration]', e.message));
 
 // GET /api/acoes/proventos-registro/anos
 router.get('/proventos-registro/anos', async (req, res) => {
   try {
     const r = await pool.query(
-      `SELECT DISTINCT EXTRACT(YEAR FROM mes_referencia)::int AS ano FROM acoes_proventos WHERE usuario_id=$1 ORDER BY ano`,
+      `SELECT DISTINCT ano::int AS ano FROM dividendos_acoes WHERE usuario_id=$1 ORDER BY ano`,
       [req.userId]
     );
     res.json(r.rows.map(row => row.ano));
@@ -741,10 +701,14 @@ router.get('/proventos-registro', async (req, res) => {
   try {
     const ano = req.query.ano || new Date().getFullYear();
     const rows = await pool.query(
-      `SELECT id, ticker, tipo, mes_referencia, valor_por_cota, quantidade, total, data_pagamento, created_at
-       FROM acoes_proventos
-       WHERE usuario_id=$1 AND EXTRACT(YEAR FROM mes_referencia)=$2
-       ORDER BY mes_referencia DESC, ticker ASC`,
+      `SELECT id, ticker, tipo_provento AS tipo,
+              make_date(ano::int, mes::int, 1) AS mes_referencia,
+              valor_por_acao AS valor_por_cota,
+              COALESCE(quantidade, CASE WHEN valor_por_acao > 0 THEN ROUND(valor_total / valor_por_acao) ELSE 0 END) AS quantidade,
+              valor_total AS total, data_pagamento, created_at
+       FROM dividendos_acoes
+       WHERE usuario_id=$1 AND ano=$2::int
+       ORDER BY mes DESC, ticker ASC`,
       [req.userId, ano]
     );
     res.json(rows.rows);
