@@ -887,28 +887,37 @@ export default function DashboardPage() {
               </thead>
               <tbody>
                 {acoes.map((a, i) => {
-                  const gp    = (a.ganho_perda_pct || a.ganho_perda || 0);
-                  const gpVal = a.ganho_perda || 0;
+                  const pc     = Number(a.preco_compra || 0);
+                  const pa     = Number(a.preco_atual  || 0);
+                  const qtd    = Number(a.quantidade   || 0);
+                  const posicao = pa * qtd;
+                  const gpVal   = (pa - pc) * qtd;
+                  const gp      = pc > 0 ? ((pa - pc) / pc) * 100 : 0;
+                  const divRec  = Number(a.dividendos_ano || 0);
                   return (
                     <tr key={a.ticker || i} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '7px 8px', fontWeight: 700 }}>
                         {a.ticker}<span style={S.tag('var(--bg-accent)', 'var(--accent)')}> Ação</span>
                       </td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(a.preco_medio || a.preco_compra || 0)}</td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(a.preco_atual || 0)}</td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{a.quantidade || 0}</td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(a.valor_total || a.valor_atual || 0)}</td>
+                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{pc > 0 ? fmt.brl(pc) : '—'}</td>
+                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(pa)}</td>
+                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{qtd}</td>
+                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(posicao)}</td>
                       <td style={{ padding: '7px 8px', textAlign: 'right', color: gpVal >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>
-                        {gpVal >= 0 ? '+' : ''}{fmt.pct(gp)}
+                        {pc > 0 ? `${gpVal >= 0 ? '+' : ''}${fmt.pct(gp)}` : '—'}
                       </td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--success)' }}>—</td>
+                      <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--success)' }}>
+                        {divRec > 0 ? fmt.brl(divRec) : '—'}
+                      </td>
                       <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--accent)' }}>
                         {a.dy_anual ? `${Number(a.dy_anual).toFixed(1)}%` : '—'}
                       </td>
                       <td style={{ padding: '7px 8px', textAlign: 'right' }}>
-                        <span style={S.tag(gpVal >= 0 ? 'var(--bg-success)' : 'var(--bg-danger)', gpVal >= 0 ? 'var(--success)' : 'var(--danger)')}>
-                          {gpVal >= 0 ? '+' : ''}{fmt.pct(gp)}
-                        </span>
+                        {pc > 0 ? (
+                          <span style={S.tag(gpVal >= 0 ? 'var(--bg-success)' : 'var(--bg-danger)', gpVal >= 0 ? 'var(--success)' : 'var(--danger)')}>
+                            {gpVal >= 0 ? '+' : ''}{fmt.pct(gp)}
+                          </span>
+                        ) : '—'}
                       </td>
                     </tr>
                   );
@@ -920,7 +929,7 @@ export default function DashboardPage() {
                   <td style={{ padding: '7px 8px', textAlign: 'right' }}>—</td>
                   <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(patriAcoes)}</td>
                   <td style={{ padding: '7px 8px', textAlign: 'right', color: ganhoAcoes >= 0 ? 'var(--success)' : 'var(--danger)' }}>{ganhoAcoes >= 0 ? '+' : ''}{fmt.pct(pctRetAcoes)}</td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right' }}>—</td>
+                  <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--success)' }}>{divAcoes > 0 ? fmt.brl(divAcoes) : '—'}</td>
                   <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--accent)' }}>—</td>
                   <td style={{ padding: '7px 8px', textAlign: 'right', color: ganhoAcoes >= 0 ? 'var(--success)' : 'var(--danger)' }}>{ganhoAcoes >= 0 ? '+' : ''}{fmt.pct(pctRetAcoes)}</td>
                 </tr>
@@ -945,28 +954,37 @@ export default function DashboardPage() {
               </thead>
               <tbody>
                 {fiis.map((f, i) => {
-                  const gp    = f.ganho_perda_pct || f.ganho_perda || 0;
-                  const gpVal = f.ganho_perda || 0;
+                  const pc     = Number(f.preco_compra || 0);
+                  const pa     = Number(f.preco_atual  || 0);
+                  const qtd    = Number(f.quantidade   || 0);
+                  const posicao = pa * qtd;
+                  const gpVal   = (pa - pc) * qtd;
+                  const gp      = pc > 0 ? ((pa - pc) / pc) * 100 : 0;
+                  const divRec  = Number(f.dividendos_ano || 0);
                   return (
                     <tr key={f.ticker || i} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '7px 8px', fontWeight: 700 }}>
                         {f.ticker}<span style={S.tag('var(--bg-success)', 'var(--success)')}> FII</span>
                       </td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(f.preco_medio || f.preco_compra || 0)}</td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(f.preco_atual || 0)}</td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{f.quantidade || 0}</td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(f.valor_total || f.valor_atual || 0)}</td>
+                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{pc > 0 ? fmt.brl(pc) : '—'}</td>
+                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(pa)}</td>
+                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{qtd}</td>
+                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(posicao)}</td>
                       <td style={{ padding: '7px 8px', textAlign: 'right', color: gpVal >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>
-                        {gpVal >= 0 ? '+' : ''}{fmt.pct(gp)}
+                        {pc > 0 ? `${gpVal >= 0 ? '+' : ''}${fmt.pct(gp)}` : '—'}
                       </td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--success)' }}>—</td>
+                      <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--success)' }}>
+                        {divRec > 0 ? fmt.brl(divRec) : '—'}
+                      </td>
                       <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--success)' }}>
                         {f.dy_anual ? `${Number(f.dy_anual).toFixed(1)}%` : '—'}
                       </td>
                       <td style={{ padding: '7px 8px', textAlign: 'right' }}>
-                        <span style={S.tag(gpVal >= 0 ? 'var(--bg-success)' : 'var(--bg-danger)', gpVal >= 0 ? 'var(--success)' : 'var(--danger)')}>
-                          {gpVal >= 0 ? '+' : ''}{fmt.pct(gp)}
-                        </span>
+                        {pc > 0 ? (
+                          <span style={S.tag(gpVal >= 0 ? 'var(--bg-success)' : 'var(--bg-danger)', gpVal >= 0 ? 'var(--success)' : 'var(--danger)')}>
+                            {gpVal >= 0 ? '+' : ''}{fmt.pct(gp)}
+                          </span>
+                        ) : '—'}
                       </td>
                     </tr>
                   );
@@ -978,7 +996,7 @@ export default function DashboardPage() {
                   <td style={{ padding: '7px 8px', textAlign: 'right' }}>—</td>
                   <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(patriFIIs)}</td>
                   <td style={{ padding: '7px 8px', textAlign: 'right', color: ganhoFIIs >= 0 ? 'var(--success)' : 'var(--danger)' }}>{ganhoFIIs >= 0 ? '+' : ''}{fmt.pct(pctRetFIIs)}</td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right' }}>—</td>
+                  <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--success)' }}>{divFIIs > 0 ? fmt.brl(divFIIs) : '—'}</td>
                   <td style={{ padding: '7px 8px', textAlign: 'right' }}>—</td>
                   <td style={{ padding: '7px 8px', textAlign: 'right', color: ganhoFIIs >= 0 ? 'var(--success)' : 'var(--danger)' }}>{ganhoFIIs >= 0 ? '+' : ''}{fmt.pct(pctRetFIIs)}</td>
                 </tr>
