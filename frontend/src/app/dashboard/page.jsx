@@ -910,12 +910,7 @@ export default function DashboardPage() {
                         {divRec > 0 ? fmt.brl(divRec) : '—'}
                       </td>
                       <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--accent)' }}>
-                        {(() => {
-                          const dyMkt = Number(a.dy || 0);
-                          if (dyMkt > 0) return `${dyMkt.toFixed(1)}%`;
-                          if (divRec > 0 && posicao > 0) return `${((divRec / posicao) * 100).toFixed(1)}%`;
-                          return '—';
-                        })()}
+                        {divRec > 0 && posicao > 0 ? `${((divRec / posicao) * 100).toFixed(1)}%` : '—'}
                       </td>
                       <td style={{ padding: '7px 8px', textAlign: 'right' }}>
                         {pc > 0 ? (
@@ -982,7 +977,7 @@ export default function DashboardPage() {
                         {divRec > 0 ? fmt.brl(divRec) : '—'}
                       </td>
                       <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--success)' }}>
-                        {f.dy_anual ? `${Number(f.dy_anual).toFixed(1)}%` : '—'}
+                        {divRec > 0 && posicao > 0 ? `${((divRec / posicao) * 100).toFixed(1)}%` : '—'}
                       </td>
                       <td style={{ padding: '7px 8px', textAlign: 'right' }}>
                         {pc > 0 ? (
