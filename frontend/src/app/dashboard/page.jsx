@@ -51,23 +51,26 @@ export default function DashboardPage() {
   const [fiis,        setFiis]        = useState([]);
   const [rf,          setRf]          = useState([]);
   const [taxas,       setTaxas]       = useState({});
+  const [outrosAtivos,setOutrosAtivos] = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [atualizando, setAtualizando] = useState(false);
   const [tabRenda,    setTabRenda]    = useState('ano');
 
   const carregar = async () => {
     try {
-      const [dash, rfRes, acoesRes, fiisRes] = await Promise.all([
+      const [dash, rfRes, acoesRes, fiisRes, outrosRes] = await Promise.all([
         api.get('/dashboard'),
         api.get('/renda-fixa').catch(() => ({ data: { itens: [], taxas: {} } })),
         api.get('/acoes').catch(() => ({ data: [] })),
         api.get('/fiis').catch(() => ({ data: [] })),
+        api.get('/outros-ativos').catch(() => ({ data: [] })),
       ]);
       setDados(dash.data);
       setRf(Array.isArray(rfRes.data?.itens) ? rfRes.data.itens : []);
       setTaxas(rfRes.data?.taxas || {});
       setAcoes(Array.isArray(acoesRes.data)  ? acoesRes.data   : []);
       setFiis(Array.isArray(fiisRes.data)    ? fiisRes.data    : []);
+      setOutrosAtivos(Array.isArray(outrosRes.data) ? outrosRes.data : []);
     } catch { /* silencia */ }
     finally { setLoading(false); }
   };
@@ -112,16 +115,24 @@ export default function DashboardPage() {
   const ganhoAcoes  = resumo.ganhoAcoes          || 0;
   const ganhoFIIs   = resumo.ganhoFIIs           || 0;
 
-  const custoAcoes  = patriAcoes - ganhoAcoes;
-  const custoFIIs   = patriFIIs  - ganhoFIIs;
-  const pctAcoes    = totalPatr > 0 ? (patriAcoes / totalPatr) * 100 : 0;
-  const pctFIIs     = totalPatr > 0 ? (patriFIIs  / totalPatr) * 100 : 0;
-  const pctRF       = totalPatr > 0 ? (patriRF    / totalPatr) * 100 : 0;
-  const pctRetAcoes = custoAcoes > 0 ? (ganhoAcoes / custoAcoes) * 100 : 0;
-  const pctRetFIIs  = custoFIIs  > 0 ? (ganhoFIIs  / custoFIIs)  * 100 : 0;
+  // ── outros ativos ────────────────────────────────────────────────────────
+  const custoOutros     = outrosAtivos.reduce((s, o) => s + Number(o.valor_investido || 0), 0);
+  const ganhoOutros     = outrosAtivos.reduce((s, o) => s + Number(o.resultado || 0), 0);
+  const patriOutros     = custoOutros + ganhoOutros;
+  const totalPatrGlobal = totalPatr + patriOutros;
 
-  const ganhoTotal  = ganhoAcoes + ganhoFIIs + rfTotalLiq;
-  const custoTotal  = totalPatr - ganhoTotal;
+  const custoAcoes   = patriAcoes - ganhoAcoes;
+  const custoFIIs    = patriFIIs  - ganhoFIIs;
+  const pctRetOutros = custoOutros > 0 ? (ganhoOutros / custoOutros) * 100 : 0;
+  const pctAcoes     = totalPatrGlobal > 0 ? (patriAcoes  / totalPatrGlobal) * 100 : 0;
+  const pctFIIs      = totalPatrGlobal > 0 ? (patriFIIs   / totalPatrGlobal) * 100 : 0;
+  const pctRF        = totalPatrGlobal > 0 ? (patriRF     / totalPatrGlobal) * 100 : 0;
+  const pctOutros    = totalPatrGlobal > 0 ? (patriOutros / totalPatrGlobal) * 100 : 0;
+  const pctRetAcoes  = custoAcoes > 0 ? (ganhoAcoes / custoAcoes) * 100 : 0;
+  const pctRetFIIs   = custoFIIs  > 0 ? (ganhoFIIs  / custoFIIs)  * 100 : 0;
+
+  const ganhoTotal  = ganhoAcoes + ganhoFIIs + rfTotalLiq + ganhoOutros;
+  const custoTotal  = totalPatrGlobal - ganhoTotal;
   const pctTotal    = custoTotal > 0 ? (ganhoTotal / custoTotal) * 100 : 0;
 
   // ── score médio normalizado para /10 ─────────────────────────────────────
@@ -165,7 +176,7 @@ export default function DashboardPage() {
   const divFIIsGeral = resumo.totalDivFIIsGeral != null
     ? Number(resumo.totalDivFIIsGeral)
     : fiis.reduce ((s, f) => s + Number(f.dividendos_geral|| 0), 0);
-  const divAcoesLiq  = divAcoes * 0.85; // IRRF 15%
+  const mediaAcoesMensal = divAcoes > 0 ? divAcoes / (new Date().getMonth() + 1) : 0;
 
   // ── DY médio FIIs e Ações ─────────────────────────────────────────────────
   // FIIs: campo dy_anual; Ações: campo dy (nome real na tabela acoes_carteira)
@@ -180,8 +191,8 @@ export default function DashboardPage() {
   const rfTab          = rfTotalLiq;
   const divFIIsTab     = tabRenda === 'ano' ? divFIIs : divFIIsGeral;
   const divAcoesTab    = divAcoes;
-  const divAcoesLiqTab = divAcoesTab * 0.85;
-  const totalLiqTab    = rfTab + divFIIsTab + divAcoesLiqTab;
+  const mediaAcoesTab  = divAcoesTab > 0 ? divAcoesTab / (new Date().getMonth() + 1) : 0;
+  const totalLiqTab    = rfTab + divFIIsTab + divAcoesTab;
 
   const now = new Date();
   const dataHora = now.toLocaleDateString('pt-BR') + ' · ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -212,15 +223,15 @@ export default function DashboardPage() {
           {[
             {
               lbl: 'Patrimônio total',
-              val: fmt.brl(totalPatr),
-              sub: `${resumo.totalAtivos||0} ativos · ${resumo.totalAcoes||0} ações · ${resumo.totalFIIs||0} FIIs`,
+              val: fmt.brl(totalPatrGlobal),
+              sub: `${resumo.totalAtivos||0} ativos · ${resumo.totalAcoes||0} ações · ${resumo.totalFIIs||0} FIIs · ${outrosAtivos.length} outros`,
               color: 'var(--text-primary)',
             },
             {
               lbl: 'Retorno preço',
-              val: `${(ganhoAcoes+ganhoFIIs) >= 0 ? '+' : ''}${fmt.brl(ganhoAcoes+ganhoFIIs)}`,
-              sub: `${pctRetAcoes >= 0 ? '+' : ''}${fmt.pct((custoAcoes+custoFIIs) > 0 ? ((ganhoAcoes+ganhoFIIs)/(custoAcoes+custoFIIs))*100 : 0)} desde o início`,
-              color: (ganhoAcoes+ganhoFIIs) >= 0 ? 'var(--success)' : 'var(--danger)',
+              val: `${(ganhoAcoes+ganhoFIIs+ganhoOutros) >= 0 ? '+' : ''}${fmt.brl(ganhoAcoes+ganhoFIIs+ganhoOutros)}`,
+              sub: `${((custoAcoes+custoFIIs+custoOutros) > 0 ? ((ganhoAcoes+ganhoFIIs+ganhoOutros)/(custoAcoes+custoFIIs+custoOutros))*100 : 0) >= 0 ? '+' : ''}${fmt.pct((custoAcoes+custoFIIs+custoOutros) > 0 ? ((ganhoAcoes+ganhoFIIs+ganhoOutros)/(custoAcoes+custoFIIs+custoOutros))*100 : 0)} desde o início`,
+              color: (ganhoAcoes+ganhoFIIs+ganhoOutros) >= 0 ? 'var(--success)' : 'var(--danger)',
             },
             {
               lbl: 'Retorno total c/ dividendos',
@@ -233,10 +244,10 @@ export default function DashboardPage() {
               valExtra: (
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 2 }}>
                   <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>total líq.</span>
-                  <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--success)', letterSpacing: '-0.5px', lineHeight: 1.1 }}>{fmt.brl(rfTotalLiq + divFIIs + divAcoesLiq)}</span>
+                  <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--success)', letterSpacing: '-0.5px', lineHeight: 1.1 }}>{fmt.brl(rfTotalLiq + divFIIs + divAcoes)}</span>
                 </div>
               ),
-              sub: `RF: ${fmt.brl(rfTotalLiq)} · FIIs: ${fmt.brl(divFIIs)} · Ações: ${fmt.brl(divAcoesLiq)}`,
+              sub: `RF: ${fmt.brl(rfTotalLiq)} · FIIs: ${fmt.brl(divFIIs)} · Ações: ${fmt.brl(divAcoes)}`,
               color: 'var(--success)',
             },
           ].map(({ lbl, val, valExtra, sub, color }, i, arr) => (
@@ -257,7 +268,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── ASSET CARDS ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12 }}>
 
         {/* Ações */}
         <div style={{ ...S.card, padding: 16 }}>
@@ -338,6 +349,33 @@ export default function DashboardPage() {
               <span style={{ fontWeight: 700, color: c }}>{v}</span>
             </div>
           ))}
+        </div>
+
+        {/* Outros Ativos */}
+        <div style={{ ...S.card, padding: 16 }}>
+          <p style={{ ...S.label, color: 'var(--text-muted)', marginBottom: 8 }}>💼 Outros Ativos</p>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 2 }}>
+            <span style={{ fontSize: 18, fontWeight: 800, color: ganhoOutros >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+              {ganhoOutros >= 0 ? '+' : ''}{fmt.brl(ganhoOutros)}
+            </span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: ganhoOutros >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+              {pctRetOutros >= 0 ? '+' : ''}{fmt.pct(pctRetOutros)}
+            </span>
+          </div>
+          <p style={{ fontSize: 10, color: ganhoOutros >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600, marginBottom: 8 }}>Resultado acumulado</p>
+          <div style={{ height: 1, background: 'var(--border)', marginBottom: 8 }} />
+          {[
+            ['Posição total',  fmt.brl(patriOutros), 'inherit'],
+            [`${outrosAtivos.length} ativo${outrosAtivos.length !== 1 ? 's' : ''} · ${fmt.pct(pctOutros)} cart.`, '—', 'var(--text-muted)'],
+            ['Investido',      fmt.brl(custoOutros),  'inherit'],
+            ['Resultado',      `${ganhoOutros >= 0 ? '+' : ''}${fmt.brl(ganhoOutros)}`, ganhoOutros >= 0 ? 'var(--success)' : 'var(--danger)'],
+          ].map(([k, v, c]) => (
+            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
+              <span style={{ color: 'var(--text-muted)' }}>{k}</span>
+              <span style={{ fontWeight: 700, color: c }}>{v}</span>
+            </div>
+          ))}
+          {outrosAtivos.length === 0 && <p style={{ ...S.muted, marginTop: 8 }}>Adicione em Outros Ativos.</p>}
         </div>
 
         {/* Score */}
@@ -438,7 +476,7 @@ export default function DashboardPage() {
               <div style={{ background: 'var(--surface)', border: '1px solid var(--accent)', borderRadius: 8, padding: 8, textAlign: 'center' }}>
                 <p style={{ fontSize: 9, color: 'var(--accent)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 3 }}>Ações</p>
                 <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--accent)' }}>{divAcoesTab > 0 ? fmt.brl(divAcoesTab) : '—'}</p>
-                <p style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 1 }}>líq. {divAcoesLiqTab > 0 ? fmt.brl(divAcoesLiqTab) : '—'}</p>
+                <p style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 1 }}>líquido</p>
               </div>
             </div>
             <p style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: 'var(--success)', textAlign: 'center' }}>
@@ -505,6 +543,18 @@ export default function DashboardPage() {
                   {dyFIIs ? `${dyFIIs}% a.a.` : '—'}
                 </p>
               </div>
+              <div style={S.tile()}>
+                <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Média mensal</p>
+                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--success)' }}>
+                  {divFIIsTab > 0 ? fmt.brl(divFIIsTab / (new Date().getMonth() + 1)) + '/mês' : '—'}
+                </p>
+              </div>
+              <div style={S.tile()}>
+                <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>DY real a.a.</p>
+                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--success)' }}>
+                  {patriFIIs > 0 && divFIIs > 0 ? `${((divFIIs / patriFIIs) * 100).toFixed(1)}% a.a.` : '—'}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -516,11 +566,11 @@ export default function DashboardPage() {
               <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 <span style={S.dot('var(--accent)')} />Ações
               </span>
-              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>IRRF 15%</span>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}></span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 6 }}>
               <div style={S.tile()}>
-                <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Proventos brutos</p>
+                <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Proventos recebidos</p>
                 <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>{divAcoesTab > 0 ? fmt.brl(divAcoesTab) : '—'}</p>
                 {divAcoes === 0 && <p style={{ fontSize: 9, color: 'var(--text-muted)' }}>Registre em Ações</p>}
               </div>
@@ -531,9 +581,9 @@ export default function DashboardPage() {
                 </p>
               </div>
             </div>
-            <div style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--success)', background: 'var(--bg-success)' }}>
-              <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Líquido após IRRF 15%</p>
-              <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--success)' }}>{divAcoesLiqTab > 0 ? fmt.brl(divAcoesLiqTab) : '—'}</p>
+            <div style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)' }}>
+              <p style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Média mensal</p>
+              <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>{mediaAcoesTab > 0 ? fmt.brl(mediaAcoesTab) + '/mês' : '—'}</p>
             </div>
           </div>
         </div>
@@ -581,7 +631,7 @@ export default function DashboardPage() {
             const mes = new Date().getMonth() + 1;
             const rfMes     = mes > 0 ? rfTotalLiq   / mes : 0;
             const fiiMes    = mes > 0 ? divFIIs       / mes : 0;
-            const acoesMes  = mes > 0 ? divAcoesLiq   / mes : 0;
+            const acoesMes  = mes > 0 ? divAcoes / mes : 0;
             const totalMes  = rfMes + fiiMes + acoesMes;
             return (
               <>
@@ -589,7 +639,7 @@ export default function DashboardPage() {
                   {[
                     ['Renda Fixa',  fmt.brl(rfMes),    'var(--warning)', 'líquido'],
                     ['FIIs',        fmt.brl(fiiMes),   'var(--success)', 'isento IR'],
-                    ['Ações',       fmt.brl(acoesMes), 'var(--accent)',  'líq. IRRF'],
+                    ['Ações',       fmt.brl(acoesMes), 'var(--accent)',  'líquido'],
                   ].map(([lbl, val, c, sub]) => (
                     <div key={lbl} style={{ background: 'var(--bg)', border: `1px solid ${c}`, borderRadius: 7, padding: '8px 6px', textAlign: 'center' }}>
                       <p style={{ fontSize: 9, color: c, fontWeight: 700, marginBottom: 3 }}>{lbl}</p>
@@ -612,11 +662,11 @@ export default function DashboardPage() {
           {/* Distribuição da renda 2026 */}
           {secTitle('var(--accent)', 'Distribuição da renda 2026')}
           {(() => {
-            const total2026 = rfTotalLiq + divFIIs + divAcoesLiq;
+            const total2026 = rfTotalLiq + divFIIs + divAcoes;
             const fatias = [
-              ['Renda Fixa', rfTotalLiq,    'var(--warning)'],
-              ['FIIs',       divFIIs,       'var(--success)'],
-              ['Ações',      divAcoesLiq,   'var(--accent)'],
+              ['Renda Fixa', rfTotalLiq, 'var(--warning)'],
+              ['FIIs',       divFIIs,    'var(--success)'],
+              ['Ações',      divAcoes,   'var(--accent)'],
             ].filter(([,v]) => v > 0);
             if (total2026 === 0) return <p style={S.muted}>Nenhum rendimento registrado.</p>;
             return (
@@ -644,14 +694,16 @@ export default function DashboardPage() {
         <div style={S.card}>
           {secTitle('var(--accent)', 'Distribuição do patrimônio')}
           <div style={{ height: 8, borderRadius: 4, background: 'var(--border)', marginBottom: 10, overflow: 'hidden', display: 'flex' }}>
-            {pctAcoes > 0 && <div style={{ width: `${pctAcoes}%`, height: '100%', background: 'var(--accent)' }} />}
-            {pctFIIs  > 0 && <div style={{ width: `${pctFIIs}%`,  height: '100%', background: 'var(--success)' }} />}
-            {pctRF    > 0 && <div style={{ width: `${pctRF}%`,    height: '100%', background: 'var(--warning)' }} />}
+            {pctAcoes  > 0 && <div style={{ width: `${pctAcoes}%`,  height: '100%', background: 'var(--accent)' }} />}
+            {pctFIIs   > 0 && <div style={{ width: `${pctFIIs}%`,   height: '100%', background: 'var(--success)' }} />}
+            {pctRF     > 0 && <div style={{ width: `${pctRF}%`,     height: '100%', background: 'var(--warning)' }} />}
+            {pctOutros > 0 && <div style={{ width: `${pctOutros}%`, height: '100%', background: 'var(--text-muted)' }} />}
           </div>
           {[
-            ['Ações',      pctAcoes, patriAcoes, 'var(--accent)'],
-            ['FIIs',       pctFIIs,  patriFIIs,  'var(--success)'],
-            ['Renda Fixa', pctRF,    patriRF,    'var(--warning)'],
+            ['Ações',         pctAcoes,  patriAcoes,  'var(--accent)'],
+            ['FIIs',          pctFIIs,   patriFIIs,   'var(--success)'],
+            ['Renda Fixa',    pctRF,     patriRF,     'var(--warning)'],
+            ['Outros Ativos', pctOutros, patriOutros, 'var(--text-muted)'],
           ].filter(d => d[2] > 0).map(([lbl, pct, val, c]) => (
             <div key={lbl} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: c, flexShrink: 0 }} />
@@ -660,7 +712,7 @@ export default function DashboardPage() {
               <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 80, textAlign: 'right' }}>{fmt.brl(val)}</span>
             </div>
           ))}
-          {totalPatr === 0 && <p style={S.muted}>Nenhum ativo cadastrado.</p>}
+          {totalPatrGlobal === 0 && <p style={S.muted}>Nenhum ativo cadastrado.</p>}
 
           <div style={S.divider} />
 
@@ -979,6 +1031,67 @@ export default function DashboardPage() {
                   <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--success)' }}>+{fmt.brl(rfTotalLiq)}</td>
                   <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--success)' }}>~{fmt.pct(rfLiqPct)}</td>
                   <td colSpan={2} />
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── OUTROS ATIVOS TABELA ── */}
+      {outrosAtivos.length > 0 && (
+        <div style={S.card}>
+          {secTitle('var(--text-muted)', 'Outros Ativos — detalhe completo')}
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+              <thead>
+                <tr>
+                  {['Ativo', 'Tipo', 'Qtd', 'PM', 'Cotação', 'Investido', 'Resultado', '% Resultado', 'Var. dia'].map(h => (
+                    <th key={h} style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', padding: '6px 8px', textAlign: h === 'Ativo' ? 'left' : 'right', borderBottom: '2px solid var(--border)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {outrosAtivos.map((o, i) => {
+                  const res    = Number(o.resultado || 0);
+                  const inv    = Number(o.valor_investido || 0);
+                  const pctRes = inv > 0 ? (res / inv) * 100 : 0;
+                  return (
+                    <tr key={o.id || o.ticker || i} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '7px 8px', fontWeight: 700 }}>
+                        {o.ticker || o.nome}
+                        {o.nome && o.ticker && <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: 6, fontSize: 10 }}>{o.nome}</span>}
+                      </td>
+                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>
+                        <span style={S.tag('var(--border)', 'var(--text-muted)')}>{o.tipo}</span>
+                      </td>
+                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{o.quantidade}</td>
+                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(o.preco_compra || 0)}</td>
+                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{o.preco_atual ? fmt.brl(o.preco_atual) : '—'}</td>
+                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(inv)}</td>
+                      <td style={{ padding: '7px 8px', textAlign: 'right', color: res >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>
+                        {res >= 0 ? '+' : ''}{fmt.brl(res)}
+                      </td>
+                      <td style={{ padding: '7px 8px', textAlign: 'right', color: pctRes >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                        {pctRes >= 0 ? '+' : ''}{fmt.pct(pctRes)}
+                      </td>
+                      <td style={{ padding: '7px 8px', textAlign: 'right', color: (o.variacao_dia||0) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                        {o.variacao_dia != null ? `${(o.variacao_dia||0) >= 0 ? '+' : ''}${fmt.pct(o.variacao_dia)}` : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr style={{ background: 'var(--bg)', fontWeight: 700 }}>
+                  <td style={{ padding: '7px 8px' }}>Total Outros</td>
+                  <td colSpan={4} />
+                  <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(custoOutros)}</td>
+                  <td style={{ padding: '7px 8px', textAlign: 'right', color: ganhoOutros >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                    {ganhoOutros >= 0 ? '+' : ''}{fmt.brl(ganhoOutros)}
+                  </td>
+                  <td style={{ padding: '7px 8px', textAlign: 'right', color: ganhoOutros >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                    {custoOutros > 0 ? `${ganhoOutros >= 0 ? '+' : ''}${fmt.pct((ganhoOutros / custoOutros) * 100)}` : '—'}
+                  </td>
+                  <td />
                 </tr>
               </tbody>
             </table>
