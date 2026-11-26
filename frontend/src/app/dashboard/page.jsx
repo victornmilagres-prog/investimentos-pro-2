@@ -930,7 +930,9 @@ export default function DashboardPage() {
                   <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(patriAcoes)}</td>
                   <td style={{ padding: '7px 8px', textAlign: 'right', color: ganhoAcoes >= 0 ? 'var(--success)' : 'var(--danger)' }}>{ganhoAcoes >= 0 ? '+' : ''}{fmt.pct(pctRetAcoes)}</td>
                   <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--success)' }}>{divAcoes > 0 ? fmt.brl(divAcoes) : '—'}</td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--accent)' }}>—</td>
+                  <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--accent)' }}>
+                    {divAcoes > 0 && patriAcoes > 0 ? `${((divAcoes / patriAcoes) * 100).toFixed(1)}%` : '—'}
+                  </td>
                   <td style={{ padding: '7px 8px', textAlign: 'right', color: ganhoAcoes >= 0 ? 'var(--success)' : 'var(--danger)' }}>{ganhoAcoes >= 0 ? '+' : ''}{fmt.pct(pctRetAcoes)}</td>
                 </tr>
               </tbody>
@@ -997,7 +999,9 @@ export default function DashboardPage() {
                   <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(patriFIIs)}</td>
                   <td style={{ padding: '7px 8px', textAlign: 'right', color: ganhoFIIs >= 0 ? 'var(--success)' : 'var(--danger)' }}>{ganhoFIIs >= 0 ? '+' : ''}{fmt.pct(pctRetFIIs)}</td>
                   <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--success)' }}>{divFIIs > 0 ? fmt.brl(divFIIs) : '—'}</td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right' }}>—</td>
+                  <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--success)' }}>
+                    {divFIIs > 0 && patriFIIs > 0 ? `${((divFIIs / patriFIIs) * 100).toFixed(1)}%` : '—'}
+                  </td>
                   <td style={{ padding: '7px 8px', textAlign: 'right', color: ganhoFIIs >= 0 ? 'var(--success)' : 'var(--danger)' }}>{ganhoFIIs >= 0 ? '+' : ''}{fmt.pct(pctRetFIIs)}</td>
                 </tr>
               </tbody>
