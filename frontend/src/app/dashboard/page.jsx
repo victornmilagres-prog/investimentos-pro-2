@@ -173,9 +173,10 @@ export default function DashboardPage() {
   const divFIIs      = resumo.totalDivFIIsAno   != null
     ? Number(resumo.totalDivFIIsAno)
     : fiis.reduce ((s, f) => s + Number(f.dividendos_ano  || 0), 0);
-  const divFIIsGeral = resumo.totalDivFIIsGeral != null
+  const divFIIsGeral  = resumo.totalDivFIIsGeral != null
     ? Number(resumo.totalDivFIIsGeral)
-    : fiis.reduce ((s, f) => s + Number(f.dividendos_geral|| 0), 0);
+    : fiis.reduce ((s, f) => s + Number(f.dividendos_geral  || 0), 0);
+  const divAcoesGeral = acoes.reduce((s, a) => s + Number(a.proventos_geral || 0), 0);
   const mediaAcoesMensal = divAcoes > 0 ? divAcoes / (new Date().getMonth() + 1) : 0;
 
   // ── DY médio FIIs e Ações ─────────────────────────────────────────────────
@@ -880,65 +881,83 @@ export default function DashboardPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
               <thead>
                 <tr>
-                  {['Ativo', 'PM', 'Cotação', 'Qtd', 'Posição', 'G/P preço', 'Dividendos rec.', 'DY a.a.', 'Retorno total'].map(h => (
-                    <th key={h} style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', padding: '6px 8px', textAlign: h === 'Ativo' ? 'left' : 'right', borderBottom: '2px solid var(--border)' }}>{h}</th>
+                  {['Ativo','PM','Cotação','Qtd','Posição','G/P preço'].map(h => (
+                    <th key={h} rowSpan={2} style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', padding: '5px 6px', textAlign: h === 'Ativo' ? 'left' : 'right', borderBottom: '2px solid var(--border)', verticalAlign: 'bottom' }}>{h}</th>
                   ))}
+                  <th colSpan={2} style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-success)', padding: '4px 6px', textAlign: 'center', borderBottom: '1px solid var(--border)', borderLeft: '1px solid var(--border)' }}>Dividendos rec.</th>
+                  <th colSpan={2} style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--accent)', padding: '4px 6px', textAlign: 'center', borderBottom: '1px solid var(--border)', borderLeft: '1px solid var(--border)' }}>DY s/ posição</th>
+                  <th rowSpan={2} style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', padding: '5px 6px', textAlign: 'right', borderBottom: '2px solid var(--border)', verticalAlign: 'bottom' }}>Retorno total</th>
+                </tr>
+                <tr>
+                  <th style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', padding: '4px 6px', textAlign: 'right', borderBottom: '2px solid var(--border)', borderLeft: '1px solid var(--border)' }}>DIV Ano</th>
+                  <th style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', padding: '4px 6px', textAlign: 'right', borderBottom: '2px solid var(--border)' }}>DIV Total</th>
+                  <th style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', padding: '4px 6px', textAlign: 'right', borderBottom: '2px solid var(--border)', borderLeft: '1px solid var(--border)' }}>DY Ano</th>
+                  <th style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', padding: '4px 6px', textAlign: 'right', borderBottom: '2px solid var(--border)' }}>DY Total</th>
                 </tr>
               </thead>
               <tbody>
                 {acoes.map((a, i) => {
-                  const pc     = Number(a.preco_compra || 0);
-                  const pa     = Number(a.preco_atual  || 0);
-                  const qtd    = Number(a.quantidade   || 0);
-                  const posicao = pa * qtd;
-                  const gpVal   = (pa - pc) * qtd;
-                  const gp      = pc > 0 ? ((pa - pc) / pc) * 100 : 0;
-                  const divRec  = Number(a.dividendos_ano || 0);
+                  const pc        = Number(a.preco_compra   || 0);
+                  const pa        = Number(a.preco_atual    || 0);
+                  const qtd       = Number(a.quantidade     || 0);
+                  const posicao   = pa * qtd;
+                  const gpVal     = (pa - pc) * qtd;
+                  const gp        = pc > 0 ? ((pa - pc) / pc) * 100 : 0;
+                  const divAno    = Number(a.dividendos_ano  || 0);
+                  const divTotal  = Number(a.proventos_geral || 0);
+                  const custo     = pc * qtd;
+                  const ret       = custo > 0 ? ((gpVal + divTotal) / custo) * 100 : 0;
                   return (
                     <tr key={a.ticker || i} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: '7px 8px', fontWeight: 700 }}>
+                      <td style={{ padding: '6px 6px', fontWeight: 700 }}>
                         {a.ticker}<span style={S.tag('var(--bg-accent)', 'var(--accent)')}> Ação</span>
                       </td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{pc > 0 ? fmt.brl(pc) : '—'}</td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(pa)}</td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{qtd}</td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(posicao)}</td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right', color: gpVal >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>
+                      <td style={{ padding: '6px 6px', textAlign: 'right' }}>{pc > 0 ? fmt.brl(pc) : '—'}</td>
+                      <td style={{ padding: '6px 6px', textAlign: 'right' }}>{fmt.brl(pa)}</td>
+                      <td style={{ padding: '6px 6px', textAlign: 'right' }}>{qtd}</td>
+                      <td style={{ padding: '6px 6px', textAlign: 'right' }}>{fmt.brl(posicao)}</td>
+                      <td style={{ padding: '6px 6px', textAlign: 'right', color: gpVal >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>
                         {pc > 0 ? `${gpVal >= 0 ? '+' : ''}${fmt.pct(gp)}` : '—'}
                       </td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--success)' }}>
-                        {divRec > 0 ? fmt.brl(divRec) : '—'}
+                      <td style={{ padding: '6px 6px', textAlign: 'right', color: 'var(--success)', borderLeft: '1px solid var(--border)' }}>
+                        {divAno > 0 ? fmt.brl(divAno) : '—'}
                       </td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--accent)' }}>
-                        {divRec > 0 && posicao > 0 ? `${((divRec / posicao) * 100).toFixed(1)}%` : '—'}
+                      <td style={{ padding: '6px 6px', textAlign: 'right', color: 'var(--success)' }}>
+                        {divTotal > 0 ? fmt.brl(divTotal) : '—'}
                       </td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>
-                        {pc > 0 ? (() => {
-                          const custo = pc * qtd;
-                          const ret = custo > 0 ? ((gpVal + divRec) / custo) * 100 : 0;
-                          return (
-                            <span style={S.tag(ret >= 0 ? 'var(--bg-success)' : 'var(--bg-danger)', ret >= 0 ? 'var(--success)' : 'var(--danger)')}>
-                              {ret >= 0 ? '+' : ''}{fmt.pct(ret)}
-                            </span>
-                          );
-                        })() : '—'}
+                      <td style={{ padding: '6px 6px', textAlign: 'right', color: 'var(--accent)', borderLeft: '1px solid var(--border)' }}>
+                        {divAno > 0 && posicao > 0 ? `${((divAno / posicao) * 100).toFixed(1)}%` : '—'}
+                      </td>
+                      <td style={{ padding: '6px 6px', textAlign: 'right', color: 'var(--accent)' }}>
+                        {divTotal > 0 && posicao > 0 ? `${((divTotal / posicao) * 100).toFixed(1)}%` : '—'}
+                      </td>
+                      <td style={{ padding: '6px 6px', textAlign: 'right' }}>
+                        {pc > 0 ? (
+                          <span style={S.tag(ret >= 0 ? 'var(--bg-success)' : 'var(--bg-danger)', ret >= 0 ? 'var(--success)' : 'var(--danger)')}>
+                            {ret >= 0 ? '+' : ''}{fmt.pct(ret)}
+                          </span>
+                        ) : '—'}
                       </td>
                     </tr>
                   );
                 })}
                 <tr style={{ background: 'var(--bg)', fontWeight: 700 }}>
-                  <td style={{ padding: '7px 8px' }}>Total Ações</td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right' }}>—</td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right' }}>—</td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right' }}>—</td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(patriAcoes)}</td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right', color: ganhoAcoes >= 0 ? 'var(--success)' : 'var(--danger)' }}>{ganhoAcoes >= 0 ? '+' : ''}{fmt.pct(pctRetAcoes)}</td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--success)' }}>{divAcoes > 0 ? fmt.brl(divAcoes) : '—'}</td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--accent)' }}>
+                  <td style={{ padding: '6px 6px' }}>Total Ações</td>
+                  <td style={{ padding: '6px 6px', textAlign: 'right' }}>—</td>
+                  <td style={{ padding: '6px 6px', textAlign: 'right' }}>—</td>
+                  <td style={{ padding: '6px 6px', textAlign: 'right' }}>—</td>
+                  <td style={{ padding: '6px 6px', textAlign: 'right' }}>{fmt.brl(patriAcoes)}</td>
+                  <td style={{ padding: '6px 6px', textAlign: 'right', color: ganhoAcoes >= 0 ? 'var(--success)' : 'var(--danger)' }}>{ganhoAcoes >= 0 ? '+' : ''}{fmt.pct(pctRetAcoes)}</td>
+                  <td style={{ padding: '6px 6px', textAlign: 'right', color: 'var(--success)', borderLeft: '1px solid var(--border)' }}>{divAcoes > 0 ? fmt.brl(divAcoes) : '—'}</td>
+                  <td style={{ padding: '6px 6px', textAlign: 'right', color: 'var(--success)' }}>{divAcoesGeral > 0 ? fmt.brl(divAcoesGeral) : '—'}</td>
+                  <td style={{ padding: '6px 6px', textAlign: 'right', color: 'var(--accent)', borderLeft: '1px solid var(--border)' }}>
                     {divAcoes > 0 && patriAcoes > 0 ? `${((divAcoes / patriAcoes) * 100).toFixed(1)}%` : '—'}
                   </td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right', color: (ganhoAcoes + divAcoes) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                    {custoAcoes > 0 ? `${(ganhoAcoes + divAcoes) >= 0 ? '+' : ''}${fmt.pct(((ganhoAcoes + divAcoes) / custoAcoes) * 100)}` : '—'}
+                  <td style={{ padding: '6px 6px', textAlign: 'right', color: 'var(--accent)' }}>
+                    {divAcoesGeral > 0 && patriAcoes > 0 ? `${((divAcoesGeral / patriAcoes) * 100).toFixed(1)}%` : '—'}
+                  </td>
+                  <td style={{ padding: '6px 6px', textAlign: 'right', color: (ganhoAcoes + divAcoesGeral) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                    {custoAcoes > 0 ? `${(ganhoAcoes + divAcoesGeral) >= 0 ? '+' : ''}${fmt.pct(((ganhoAcoes + divAcoesGeral) / custoAcoes) * 100)}` : '—'}
                   </td>
                 </tr>
               </tbody>
@@ -955,65 +974,83 @@ export default function DashboardPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
               <thead>
                 <tr>
-                  {['Fundo', 'PM', 'Cotação', 'Qtd', 'Posição', 'G/P preço', 'Dividendos rec.', 'DY a.a.', 'Retorno total'].map(h => (
-                    <th key={h} style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', padding: '6px 8px', textAlign: h === 'Fundo' ? 'left' : 'right', borderBottom: '2px solid var(--border)' }}>{h}</th>
+                  {['Fundo','PM','Cotação','Qtd','Posição','G/P preço'].map(h => (
+                    <th key={h} rowSpan={2} style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', padding: '5px 6px', textAlign: h === 'Fundo' ? 'left' : 'right', borderBottom: '2px solid var(--border)', verticalAlign: 'bottom' }}>{h}</th>
                   ))}
+                  <th colSpan={2} style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-success)', padding: '4px 6px', textAlign: 'center', borderBottom: '1px solid var(--border)', borderLeft: '1px solid var(--border)' }}>Dividendos rec.</th>
+                  <th colSpan={2} style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-success)', padding: '4px 6px', textAlign: 'center', borderBottom: '1px solid var(--border)', borderLeft: '1px solid var(--border)' }}>DY s/ posição</th>
+                  <th rowSpan={2} style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', padding: '5px 6px', textAlign: 'right', borderBottom: '2px solid var(--border)', verticalAlign: 'bottom' }}>Retorno total</th>
+                </tr>
+                <tr>
+                  <th style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', padding: '4px 6px', textAlign: 'right', borderBottom: '2px solid var(--border)', borderLeft: '1px solid var(--border)' }}>DIV Ano</th>
+                  <th style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', padding: '4px 6px', textAlign: 'right', borderBottom: '2px solid var(--border)' }}>DIV Total</th>
+                  <th style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', padding: '4px 6px', textAlign: 'right', borderBottom: '2px solid var(--border)', borderLeft: '1px solid var(--border)' }}>DY Ano</th>
+                  <th style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', padding: '4px 6px', textAlign: 'right', borderBottom: '2px solid var(--border)' }}>DY Total</th>
                 </tr>
               </thead>
               <tbody>
                 {fiis.map((f, i) => {
-                  const pc     = Number(f.preco_compra || 0);
-                  const pa     = Number(f.preco_atual  || 0);
-                  const qtd    = Number(f.quantidade   || 0);
-                  const posicao = pa * qtd;
-                  const gpVal   = (pa - pc) * qtd;
-                  const gp      = pc > 0 ? ((pa - pc) / pc) * 100 : 0;
-                  const divRec  = Number(f.dividendos_ano || 0);
+                  const pc       = Number(f.preco_compra     || 0);
+                  const pa       = Number(f.preco_atual      || 0);
+                  const qtd      = Number(f.quantidade       || 0);
+                  const posicao  = pa * qtd;
+                  const gpVal    = (pa - pc) * qtd;
+                  const gp       = pc > 0 ? ((pa - pc) / pc) * 100 : 0;
+                  const divAno   = Number(f.dividendos_ano   || 0);
+                  const divTotal = Number(f.dividendos_geral || 0);
+                  const custo    = pc * qtd;
+                  const ret      = custo > 0 ? ((gpVal + divTotal) / custo) * 100 : 0;
                   return (
                     <tr key={f.ticker || i} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: '7px 8px', fontWeight: 700 }}>
+                      <td style={{ padding: '6px 6px', fontWeight: 700 }}>
                         {f.ticker}<span style={S.tag('var(--bg-success)', 'var(--success)')}> FII</span>
                       </td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{pc > 0 ? fmt.brl(pc) : '—'}</td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(pa)}</td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{qtd}</td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(posicao)}</td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right', color: gpVal >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>
+                      <td style={{ padding: '6px 6px', textAlign: 'right' }}>{pc > 0 ? fmt.brl(pc) : '—'}</td>
+                      <td style={{ padding: '6px 6px', textAlign: 'right' }}>{fmt.brl(pa)}</td>
+                      <td style={{ padding: '6px 6px', textAlign: 'right' }}>{qtd}</td>
+                      <td style={{ padding: '6px 6px', textAlign: 'right' }}>{fmt.brl(posicao)}</td>
+                      <td style={{ padding: '6px 6px', textAlign: 'right', color: gpVal >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>
                         {pc > 0 ? `${gpVal >= 0 ? '+' : ''}${fmt.pct(gp)}` : '—'}
                       </td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--success)' }}>
-                        {divRec > 0 ? fmt.brl(divRec) : '—'}
+                      <td style={{ padding: '6px 6px', textAlign: 'right', color: 'var(--success)', borderLeft: '1px solid var(--border)' }}>
+                        {divAno > 0 ? fmt.brl(divAno) : '—'}
                       </td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--success)' }}>
-                        {divRec > 0 && posicao > 0 ? `${((divRec / posicao) * 100).toFixed(1)}%` : '—'}
+                      <td style={{ padding: '6px 6px', textAlign: 'right', color: 'var(--success)' }}>
+                        {divTotal > 0 ? fmt.brl(divTotal) : '—'}
                       </td>
-                      <td style={{ padding: '7px 8px', textAlign: 'right' }}>
-                        {pc > 0 ? (() => {
-                          const custo = pc * qtd;
-                          const ret = custo > 0 ? ((gpVal + divRec) / custo) * 100 : 0;
-                          return (
-                            <span style={S.tag(ret >= 0 ? 'var(--bg-success)' : 'var(--bg-danger)', ret >= 0 ? 'var(--success)' : 'var(--danger)')}>
-                              {ret >= 0 ? '+' : ''}{fmt.pct(ret)}
-                            </span>
-                          );
-                        })() : '—'}
+                      <td style={{ padding: '6px 6px', textAlign: 'right', color: 'var(--success)', borderLeft: '1px solid var(--border)' }}>
+                        {divAno > 0 && posicao > 0 ? `${((divAno / posicao) * 100).toFixed(1)}%` : '—'}
+                      </td>
+                      <td style={{ padding: '6px 6px', textAlign: 'right', color: 'var(--success)' }}>
+                        {divTotal > 0 && posicao > 0 ? `${((divTotal / posicao) * 100).toFixed(1)}%` : '—'}
+                      </td>
+                      <td style={{ padding: '6px 6px', textAlign: 'right' }}>
+                        {pc > 0 ? (
+                          <span style={S.tag(ret >= 0 ? 'var(--bg-success)' : 'var(--bg-danger)', ret >= 0 ? 'var(--success)' : 'var(--danger)')}>
+                            {ret >= 0 ? '+' : ''}{fmt.pct(ret)}
+                          </span>
+                        ) : '—'}
                       </td>
                     </tr>
                   );
                 })}
                 <tr style={{ background: 'var(--bg)', fontWeight: 700 }}>
-                  <td style={{ padding: '7px 8px' }}>Total FIIs</td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right' }}>—</td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right' }}>—</td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right' }}>—</td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right' }}>{fmt.brl(patriFIIs)}</td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right', color: ganhoFIIs >= 0 ? 'var(--success)' : 'var(--danger)' }}>{ganhoFIIs >= 0 ? '+' : ''}{fmt.pct(pctRetFIIs)}</td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--success)' }}>{divFIIs > 0 ? fmt.brl(divFIIs) : '—'}</td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--success)' }}>
+                  <td style={{ padding: '6px 6px' }}>Total FIIs</td>
+                  <td style={{ padding: '6px 6px', textAlign: 'right' }}>—</td>
+                  <td style={{ padding: '6px 6px', textAlign: 'right' }}>—</td>
+                  <td style={{ padding: '6px 6px', textAlign: 'right' }}>—</td>
+                  <td style={{ padding: '6px 6px', textAlign: 'right' }}>{fmt.brl(patriFIIs)}</td>
+                  <td style={{ padding: '6px 6px', textAlign: 'right', color: ganhoFIIs >= 0 ? 'var(--success)' : 'var(--danger)' }}>{ganhoFIIs >= 0 ? '+' : ''}{fmt.pct(pctRetFIIs)}</td>
+                  <td style={{ padding: '6px 6px', textAlign: 'right', color: 'var(--success)', borderLeft: '1px solid var(--border)' }}>{divFIIs > 0 ? fmt.brl(divFIIs) : '—'}</td>
+                  <td style={{ padding: '6px 6px', textAlign: 'right', color: 'var(--success)' }}>{divFIIsGeral > 0 ? fmt.brl(divFIIsGeral) : '—'}</td>
+                  <td style={{ padding: '6px 6px', textAlign: 'right', color: 'var(--success)', borderLeft: '1px solid var(--border)' }}>
                     {divFIIs > 0 && patriFIIs > 0 ? `${((divFIIs / patriFIIs) * 100).toFixed(1)}%` : '—'}
                   </td>
-                  <td style={{ padding: '7px 8px', textAlign: 'right', color: (ganhoFIIs + divFIIs) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                    {custoFIIs > 0 ? `${(ganhoFIIs + divFIIs) >= 0 ? '+' : ''}${fmt.pct(((ganhoFIIs + divFIIs) / custoFIIs) * 100)}` : '—'}
+                  <td style={{ padding: '6px 6px', textAlign: 'right', color: 'var(--success)' }}>
+                    {divFIIsGeral > 0 && patriFIIs > 0 ? `${((divFIIsGeral / patriFIIs) * 100).toFixed(1)}%` : '—'}
+                  </td>
+                  <td style={{ padding: '6px 6px', textAlign: 'right', color: (ganhoFIIs + divFIIsGeral) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                    {custoFIIs > 0 ? `${(ganhoFIIs + divFIIsGeral) >= 0 ? '+' : ''}${fmt.pct(((ganhoFIIs + divFIIsGeral) / custoFIIs) * 100)}` : '—'}
                   </td>
                 </tr>
               </tbody>
